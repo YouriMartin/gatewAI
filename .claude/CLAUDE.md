@@ -38,6 +38,28 @@ Principes non négociables :
 - Pull du modèle d'embedding : `docker compose exec ollama ollama pull nomic-embed-text`
 - **Toujours lancer `./mvnw test` avant de committer.**
 
+## Architecture hexagonale (packages)
+
+```
+com.example.gatewai
+├── domain/model/            # Entités, value objects — zéro dépendance Spring/JPA
+├── domain/port/in/          # Ports entrants (use cases)
+├── domain/port/out/         # Ports sortants (persistence, LLM, vector store)
+├── application/service/     # Services applicatifs — dépend de domain uniquement
+├── infrastructure/          # Adapters sortants — implémente ports out
+│   ├── persistence/         # JPA
+│   ├── llm/                 # ChatClient/ChatModel
+│   └── vectorstore/         # VectorStore
+└── adapter/in/web/          # Controllers REST (ingress OpenAI)
+```
+
+**Règles de dépendance :**
+- `domain` ne dépend de rien (ni Spring, ni JPA, ni Spring AI)
+- `application` dépend de `domain` uniquement
+- `infrastructure` implémente les ports `out` de `domain`
+- `adapter.in.web` appelle les ports `in` de `domain`
+- Ces règles sont vérifiées par **ArchUnit** (`ArchitectureTest.java`)
+
 ## Conventions
 - Java `record` pour les DTO.
 - Builders immutables Spring AI 2.0 (pas de setters).
@@ -45,6 +67,17 @@ Principes non négociables :
 - Secrets via variables d'environnement, **jamais commités** (`ANTHROPIC_API_KEY`).
 - Messages de commit courts, **en anglais**, à l'impératif.
 - **Toujours proposer un message de commit à la fin de chaque implémentation.**
+
+## Tests
+- Nommage : `{Classe}Test.java` dans le même package miroir sous `src/test/java`
+- Tests unitaires sur toutes les classes **sauf** : controllers REST (testés en intégration), mappers triviaux
+- `ArchitectureTest` valide les règles hexagonales via ArchUnit
+- **Toujours lancer `./mvnw test` avant de committer**
+
+## Linters & analyse statique
+- **Checkstyle** (`maven-checkstyle-plugin`) — phase `validate`, fail-fast, config `checkstyle.xml` (Google Style + surcharges)
+- **SpotBugs** (`spotbugs-maven-plugin`) — phase `verify`, effort=max, threshold=low
+- `./mvnw verify` lance les trois (Checkstyle + Tests + SpotBugs)
 
 ## État / roadmap
 MVP = Phases 0 à 2 + tranche de Phase 3 (détail dans `plan-action-green-ai-proxy.md`).

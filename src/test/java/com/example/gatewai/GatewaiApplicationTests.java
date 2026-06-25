@@ -4,11 +4,10 @@ import org.junit.jupiter.api.Test;
 
 class GatewaiApplicationTests {
 
-	@Test
-	void applicationClassExists() {
-		// Vérifie que la classe principale existe et est instanciable
-		var app = new GatewaiApplication();
-		assert app != null;
-	}
+  @Test
+  void applicationClassExists() {
+    var app = new GatewaiApplication();
+    assert app != null;
+  }
 
 }
