@@ -1,0 +1,53 @@
+# Green AI Proxy & Router — Contexte projet
+
+Proxy / gateway LLM open-source, auto-hébergé (**on-premise**), pour entreprises :
+il sécurise, met en cache, route et mesure l'empreinte carbone des requêtes IA.
+Projet portfolio Java/Spring, développé en solo.
+
+## Stack
+- **Java 25 LTS** (Virtual Threads + Scoped Values)
+- **Spring Boot 4.0**, **Spring AI 2.0**
+- **PostgreSQL + pgvector** — base unique : cache vectoriel **ET** metrics relationnelles
+- **Ollama** — embeddings locaux (`nomic-embed-text`, 768 dimensions)
+- **Docker Compose** pour l'infra locale
+- Build : **Maven** (wrapper `./mvnw`)
+
+## Architecture (à respecter strictement)
+Une seule chaîne de traitement, pas trois applications. Gateway mince + chaîne d'**Advisors** Spring AI.
+
+```
+Client → ingress format OpenAI (/v1/chat/completions) → mapping DTO → Prompt
+   → [Advisor 1] cache sémantique   ── court-circuit si hit (n'appelle pas chain.nextCall())
+   → [Advisor 2] routeur            ── choisit le ChatClient cible
+   → [Advisor 3] comptabilité green ── coût € + gCO2
+      → egress : ChatModel réel (Claude d'abord, puis OpenAI / Ollama)
+   ← remap réponse → DTO OpenAI → Client
+```
+
+Principes non négociables :
+- **Ingress** (le format parlé par les clients = OpenAI) et **egress** (le fournisseur appelé) sont **indépendants**.
+- Le cache custom implémente `CallAdvisor`/`StreamAdvisor`, `getOrder()` bas, court-circuite en **n'appelant pas** `chain.nextCall()`.
+- Toute la persistance (entité `RequestLog` + vecteurs du cache) va dans le **même PostgreSQL**.
+- Dépendre de l'interface `VectorStore`, **jamais** de pgvector en dur (réversibilité vers Qdrant).
+- **Structured Concurrency = preview → NE PAS l'utiliser** dans le cœur. **Scoped Values = OK** (propagation contexte client/trace).
+
+## Commandes
+- Tests : `./mvnw test`
+- Lancer l'app : `./mvnw spring-boot:run` (Boot démarre Postgres + Ollama via `compose.yaml`)
+- Infra seule : `docker compose up -d`
+- Pull du modèle d'embedding : `docker compose exec ollama ollama pull nomic-embed-text`
+- **Toujours lancer `./mvnw test` avant de committer.**
+
+## Conventions
+- Java `record` pour les DTO.
+- Builders immutables Spring AI 2.0 (pas de setters).
+- Jackson 3 → package `tools.jackson` (et non `com.fasterxml.jackson`).
+- Secrets via variables d'environnement, **jamais commités** (`ANTHROPIC_API_KEY`).
+- Messages de commit courts, en français, à l'impératif.
+
+## État / roadmap
+MVP = Phases 0 à 2 + tranche de Phase 3 (détail dans `plan-action-green-ai-proxy.md`).
+Avancement : _(à mettre à jour au fil de l'eau)_
+- [ ] Phase 0 — squelette + infra locale
+- [ ] Phase 1 — passerelle pass-through (ingress OpenAI → egress Claude)
+- [ ] Phase 2 — cache sémantique

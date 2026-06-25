@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(docker compose:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Read(.env)",
+      "Read(./**/*.env)"
+    ]
+  }
+}
