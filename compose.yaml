@@ -11,6 +11,12 @@ services:
       - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d greenaiproxy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   ollama:
     image: 'ollama/ollama:latest'
@@ -20,6 +26,11 @@ services:
       - '11434:11434'
     volumes:
       - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
