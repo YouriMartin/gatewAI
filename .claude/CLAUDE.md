@@ -43,7 +43,8 @@ Principes non négociables :
 - Builders immutables Spring AI 2.0 (pas de setters).
 - Jackson 3 → package `tools.jackson` (et non `com.fasterxml.jackson`).
 - Secrets via variables d'environnement, **jamais commités** (`ANTHROPIC_API_KEY`).
-- Messages de commit courts, en français, à l'impératif.
+- Messages de commit courts, **en anglais**, à l'impératif.
+- **Toujours proposer un message de commit à la fin de chaque implémentation.**
 
 ## État / roadmap
 MVP = Phases 0 à 2 + tranche de Phase 3 (détail dans `plan-action-green-ai-proxy.md`).

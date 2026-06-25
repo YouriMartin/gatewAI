@@ -1,37 +1,26 @@
 services:
-  ollama:
-    image: 'ollama/ollama:latest'
-    ports:
-      - '11434'
   pgvector:
-    image: 'pgvector/pgvector:pg16'
+    image: 'pgvector/pgvector:pg17'
     environment:
-      - 'POSTGRES_DB=mydatabase'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
+      - 'POSTGRES_DB=greenaiproxy'
+      - 'POSTGRES_PASSWORD=dev'
+      - 'POSTGRES_USER=dev'
     labels:
       - "org.springframework.boot.service-connection=postgres"
     ports:
-      - '5432'
-  spring:
-    threads:
-      virtual:
-        enabled: true
-    datasource:
-      url: jdbc:postgresql://localhost:5432/greenaiproxy
-      username: dev
-      password: dev
-    ai:
-      anthropic:
-        api-key: ${ANTHROPIC_API_KEY}
-      ollama:
-        base-url: http://localhost:11434
-        embedding:
-          options:
-            model: nomic-embed-text
-      vectorstore:
-        pgvector:
-          initialize-schema: true
-          dimensions: 768
-          index-type: hnsw
-          distance-type: cosine_distance
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  ollama:
+    image: 'ollama/ollama:latest'
+    labels:
+      - "org.springframework.boot.service-connection=ollama"
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  pgdata:
+  ollama:
