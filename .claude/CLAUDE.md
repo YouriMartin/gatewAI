@@ -85,3 +85,8 @@ Avancement : _(à mettre à jour au fil de l'eau)_
 - [ ] Phase 0 — squelette + infra locale
 - [ ] Phase 1 — passerelle pass-through (ingress OpenAI → egress Claude)
 - [ ] Phase 2 — cache sémantique
+
+## Préférences de communication
+- **Après chaque implémentation** : expliquer en détail ce qui a été fait et pourquoi (choix techniques, trade-offs, liens avec l'architecture).
+- **Avant chaque commande** : expliquer pourquoi cette commande est nécessaire avant de demander confirmation.
+- **Langue** : répondre en français quand l'utilisateur écrit en français.
