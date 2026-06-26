@@ -10,9 +10,12 @@ class SecurityConfig {
 
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http.authorizeHttpRequests(auth -> auth
-        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-        .anyRequest().authenticated());
+    http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+            .requestMatchers("/v1/**").permitAll()
+            .anyRequest().authenticated());
     return http.build();
   }
 }
