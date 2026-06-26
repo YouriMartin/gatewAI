@@ -1,0 +1,63 @@
+package com.example.gatewai.infrastructure.persistence;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import com.example.gatewai.domain.model.RequestLog;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "request_log")
+class RequestLogEntity {
+
+  @Id
+  @Column(updatable = false)
+  private UUID id;
+
+  @Column(updatable = false, nullable = false)
+  private Instant timestamp;
+
+  @Column(updatable = false, nullable = false)
+  private String model;
+
+  @Column(name = "prompt_hash", updatable = false, nullable = false, length = 64)
+  private String promptHash;
+
+  @Column(name = "prompt_tokens", updatable = false, nullable = false)
+  private int promptTokens;
+
+  @Column(name = "completion_tokens", updatable = false, nullable = false)
+  private int completionTokens;
+
+  @Column(name = "total_tokens", updatable = false, nullable = false)
+  private int totalTokens;
+
+  @Column(name = "latency_ms", updatable = false, nullable = false)
+  private long latencyMs;
+
+  protected RequestLogEntity() {
+    // JPA requires a no-arg constructor
+  }
+
+  RequestLogEntity(RequestLog log) {
+    this.id = log.id();
+    this.timestamp = log.timestamp();
+    this.model = log.model();
+    this.promptHash = log.promptHash();
+    this.promptTokens = log.promptTokens();
+    this.completionTokens = log.completionTokens();
+    this.totalTokens = log.totalTokens();
+    this.latencyMs = log.latencyMs();
+  }
+
+  RequestLog toDomain() {
+    return new RequestLog(
+        id, timestamp, model, promptHash,
+        promptTokens, completionTokens, totalTokens, latencyMs
+    );
+  }
+}
