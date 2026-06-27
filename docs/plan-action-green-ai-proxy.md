@@ -137,14 +137,55 @@ Objectif : mesurer, minimiser et restituer l'empreinte carbone.
 
 Objectif : administration + visualisation métier.
 
-Le brief mentionne Vite/React, mais utilise ce que tu maîtrises — **SvelteKit, Angular ou Vue** font parfaitement l'affaire et c'est un terrain où tu vas plus vite.
+### Choix technologique : **Svelte + Vite (SPA statique)**
+
+Décision assumée et **cohérente avec le thème green** : parmi React/Angular/Vue/Svelte,
+**Svelte** est le plus léger (compilateur, pas de runtime ni de virtual DOM → bundle le plus
+petit, moins de JS à parser/exécuter → moins d'énergie côté client). On reste sur **Svelte +
+Vite en SPA statique** (pas SvelteKit : pas de runtime Node, on ne sert que des assets statiques).
+Pour les graphiques : lib légère (**uPlot** ou SVG natif), surtout **pas** Chart.js/D3.
+
+### Mono-repo (adapter l'existant, pas de second dépôt)
+
+```
+src/main/
+├── java/…                ← back Spring Boot (inchangé)
+├── resources/…           ← config back
+└── frontend/             ← app Svelte + Vite (nouveau)
+    ├── package.json
+    ├── vite.config.ts    ← build.outDir → ../../../target/classes/static ; proxy /v1 en dev
+    └── src/…
+```
+
+- **Build orchestré par Maven** via `frontend-maven-plugin` : installe un Node *local* (épinglé,
+  reproductible, pas de Node global), lance `npm ci` + `npm run build`. Vite émet les assets dans
+  `target/classes/static` → **embarqués dans le jar**, servis par Spring Boot. Un seul
+  `./mvnw package` produit un livrable auto-suffisant (cohérent avec l'**on-premise**).
+- **`./mvnw test` reste sans Node** : le build front est lié à la phase `prepare-package` (après
+  `test`), derrière un profil **désactivable** (`-DskipFrontend`) pour le travail back pur.
+- `.gitignore` : `src/main/frontend/node_modules` et `dist`/sortie de build.
+
+### Serving & sécurité
+
+- Spring sert `index.html` + assets statiques. `SecurityConfig` doit **`permitAll`** le shell
+  (`/`, `/assets/**`, `/favicon.ico`) tout en gardant `/v1/**` **authentifié**.
+- Le dashboard appelle l'API avec la **clé API en Bearer** (saisie par l'utilisateur, gardée en
+  mémoire). Téléchargements CSV/PDF via `fetch` + `Blob` (un `<a href>` ne peut pas porter le header
+  d'auth). **Trade-off assumé** : clé dans le navigateur = acceptable pour un outil interne
+  auto-hébergé ; une auth par session est une évolution Phase 6.
+
+### Workflow dev
+
+- `npm run dev` → Vite sur `:5173` avec **proxy `/v1` → `localhost:8080`** (hot reload).
+- Build prod = `./mvnw package` (front bundlé dans le jar).
 
 | Tâche | Détail |
 |---|---|
-| 5.1 | Admin des clés d'API | CRUD clients/clés |
-| 5.2 | Config du routage | Réglage des seuils et règles à chaud |
-| 5.3 | Metrics live | € et gCO2 dans le temps, taux de hit, répartition des modèles |
-| 5.4 | Rapports | Génération et téléchargement des exports CSRD |
+| 5.0 | **Socle** : projet Svelte+Vite dans `src/main/frontend`, `frontend-maven-plugin`, serving statique + `SecurityConfig`, shell + saisie clé API |
+| 5.1 | Admin des clés d'API — CRUD clients/clés (nécessite des endpoints back d'admin) |
+| 5.2 | Config du routage — réglage des seuils et règles à chaud |
+| 5.3 | Metrics live — € et gCO2 dans le temps, taux de hit, répartition des modèles (consomme `/v1/reports/green`) |
+| 5.4 | Rapports — génération et téléchargement des exports CSRD (CSV/PDF déjà en place côté back) |
 
 ---
 
