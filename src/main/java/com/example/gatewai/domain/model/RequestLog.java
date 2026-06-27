@@ -12,5 +12,6 @@ public record RequestLog(
     int completionTokens,
     int totalTokens,
     long latencyMs,
-    String clientId
+    String clientId,
+    GreenMetrics green
 ) {}

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.example.gatewai.domain.model.GreenMetrics;
 import com.example.gatewai.domain.model.RequestLog;
 
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,8 @@ class JpaRequestLogAdapterTest {
   void saveDelegatesToSpringData() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), Instant.now(), "claude-3",
-        "a".repeat(64), 10, 5, 15, 200L, "client-1"
+        "a".repeat(64), 10, 5, 15, 200L, "client-1",
+        new GreenMetrics(0.3, 0.01, 2.3, 1.5)
     );
 
     when(jpaRepository.save(any(RequestLogEntity.class)))
@@ -47,6 +49,7 @@ class JpaRequestLogAdapterTest {
     assertEquals(log.id(), captured.toDomain().id());
     assertEquals(log.model(), captured.toDomain().model());
     assertEquals(log.clientId(), captured.toDomain().clientId());
+    assertEquals(log.green(), captured.toDomain().green());
   }
 
   @Test
@@ -54,7 +57,8 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3-opus", "b".repeat(64),
-        100, 50, 150, 1234L, "tenant-42"
+        100, 50, 150, 1234L, "tenant-42",
+        new GreenMetrics(2.25, 0.75, 172.5, 60.0)
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);
@@ -68,7 +72,7 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3", "c".repeat(64),
-        10, 5, 15, 100L, null
+        10, 5, 15, 100L, null, GreenMetrics.ZERO
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);

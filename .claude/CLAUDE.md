@@ -94,7 +94,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
 - [~] Phase 4 — green inference & reporting
   - [x] 4.1 — modèle carbone (tokens → kWh → gCO2)
   - [x] 4.2 — intensité temps réel (`CarbonIntensityProvider` swappable, ElectricityMaps)
-  - [ ] 4.3 — persistance coût + carbone + « CO2 évité »
+  - [x] 4.3 — persistance coût + carbone + « CO2 évité »
   - [ ] 4.4 — routage temporel/géo (worker `@Scheduled`)
   - [ ] 4.5 — API de reporting (agrégats + export CSV/PDF)
 

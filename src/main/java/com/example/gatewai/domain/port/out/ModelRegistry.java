@@ -12,5 +12,7 @@ public interface ModelRegistry {
 
   Optional<ModelDefinition> findByKey(String key);
 
+  Optional<ModelDefinition> findByModelId(String modelId);
+
   List<ModelDefinition> findByTier(ModelTier tier);
 }

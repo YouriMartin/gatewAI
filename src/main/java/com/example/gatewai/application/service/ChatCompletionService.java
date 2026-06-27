@@ -8,12 +8,18 @@ import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.example.gatewai.domain.model.GreenAccountant;
+import com.example.gatewai.domain.model.GreenMetrics;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.ModelDefinition;
+import com.example.gatewai.domain.model.ModelTier;
 import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
+import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 import com.example.gatewai.domain.port.out.LlmClient;
+import com.example.gatewai.domain.port.out.ModelRegistry;
 import com.example.gatewai.domain.port.out.RequestLogRepository;
 
 import org.springframework.stereotype.Service;
@@ -23,11 +29,20 @@ class ChatCompletionService implements ChatCompletionUseCase {
 
   private final LlmClient llmClient;
   private final RequestLogRepository requestLogRepository;
+  private final ModelRegistry modelRegistry;
+  private final CarbonIntensityProvider carbonIntensityProvider;
+  private final GreenAccountant greenAccountant;
 
   ChatCompletionService(LlmClient llmClient,
-                        RequestLogRepository requestLogRepository) {
+                        RequestLogRepository requestLogRepository,
+                        ModelRegistry modelRegistry,
+                        CarbonIntensityProvider carbonIntensityProvider,
+                        GreenAccountant greenAccountant) {
     this.llmClient = llmClient;
     this.requestLogRepository = requestLogRepository;
+    this.modelRegistry = modelRegistry;
+    this.carbonIntensityProvider = carbonIntensityProvider;
+    this.greenAccountant = greenAccountant;
   }
 
   @Override
@@ -39,6 +54,7 @@ class ChatCompletionService implements ChatCompletionUseCase {
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     String promptHash = hashPrompt(request);
     String clientId = resolveClientId();
+    GreenMetrics green = accountGreen(response);
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
@@ -49,11 +65,25 @@ class ChatCompletionService implements ChatCompletionUseCase {
         response.completionTokens(),
         response.totalTokens(),
         latencyMs,
-        clientId
+        clientId,
+        green
     );
     requestLogRepository.save(log);
 
     return response;
+  }
+
+  private GreenMetrics accountGreen(LlmResponse response) {
+    ModelDefinition used =
+        modelRegistry.findByModelId(response.model()).orElse(null);
+    ModelDefinition premiumBaseline =
+        modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
+            .findFirst()
+            .orElse(null);
+    double gridIntensity = carbonIntensityProvider.gramsCo2PerKwh();
+
+    return greenAccountant.account(
+        used, premiumBaseline, response.totalTokens(), gridIntensity);
   }
 
   private static String resolveClientId() {

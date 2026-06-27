@@ -5,18 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
+import com.example.gatewai.domain.model.GreenAccountant;
+import com.example.gatewai.domain.model.GreenMetrics;
 import com.example.gatewai.domain.model.LlmMessage;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
+import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 import com.example.gatewai.domain.port.out.LlmClient;
+import com.example.gatewai.domain.port.out.ModelRegistry;
 import com.example.gatewai.domain.port.out.RequestLogRepository;
 
 import org.junit.jupiter.api.Test;
@@ -35,6 +40,15 @@ class ChatCompletionServiceTest {
 
   @Mock
   private RequestLogRepository requestLogRepository;
+
+  @Mock
+  private ModelRegistry modelRegistry;
+
+  @Mock
+  private CarbonIntensityProvider carbonIntensityProvider;
+
+  @Mock
+  private GreenAccountant greenAccountant;
 
   @InjectMocks
   private ChatCompletionService service;
@@ -128,5 +142,25 @@ class ChatCompletionServiceTest {
 
     verify(requestLogRepository).save(logCaptor.capture());
     assertEquals("tenant-42", logCaptor.getValue().clientId());
+  }
+
+  @Test
+  void persistsGreenMetricsFromAccountant() {
+    LlmRequest request = new LlmRequest(
+        "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
+    LlmResponse response = new LlmResponse(
+        "claude-haiku-4", "Hi!", "end_turn", 12, 8, 20);
+    GreenMetrics metrics = new GreenMetrics(0.04, 0.00004, 0.0092, 0.092);
+
+    when(llmClient.call(request)).thenReturn(response);
+    when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
+    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0)))
+        .thenReturn(metrics);
+    doNothing().when(requestLogRepository).save(any());
+
+    service.complete(request);
+
+    verify(requestLogRepository).save(logCaptor.capture());
+    assertEquals(metrics, logCaptor.getValue().green());
   }
 }

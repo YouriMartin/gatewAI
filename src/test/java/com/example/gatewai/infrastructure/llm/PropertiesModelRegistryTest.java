@@ -80,6 +80,23 @@ class PropertiesModelRegistryTest {
   }
 
   @Test
+  void findByModelIdReturnsMatchingModel() {
+    Optional<ModelDefinition> result =
+        registry.findByModelId("claude-haiku-4-20250506");
+
+    assertTrue(result.isPresent());
+    assertEquals("claude-haiku", result.get().key());
+    assertEquals(ModelTier.CLOUD_ENTRY, result.get().tier());
+  }
+
+  @Test
+  void findByModelIdReturnsEmptyForUnknownModelId() {
+    Optional<ModelDefinition> result = registry.findByModelId("gpt-4o");
+
+    assertTrue(result.isEmpty());
+  }
+
+  @Test
   void findByTierReturnsMatchingModels() {
     List<ModelDefinition> premiums =
         registry.findByTier(ModelTier.CLOUD_PREMIUM);

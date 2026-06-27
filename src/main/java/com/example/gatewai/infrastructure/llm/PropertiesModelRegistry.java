@@ -34,6 +34,13 @@ class PropertiesModelRegistry implements ModelRegistry {
   }
 
   @Override
+  public Optional<ModelDefinition> findByModelId(String modelId) {
+    return models.stream()
+        .filter(m -> m.modelId().equals(modelId))
+        .findFirst();
+  }
+
+  @Override
   public List<ModelDefinition> findByTier(ModelTier tier) {
     return models.stream()
         .filter(m -> m.tier() == tier)
