@@ -20,6 +20,7 @@ import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
 import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 import com.example.gatewai.domain.port.out.LlmClient;
+import com.example.gatewai.domain.port.out.MetricsRecorder;
 import com.example.gatewai.domain.port.out.ModelRegistry;
 import com.example.gatewai.domain.port.out.RequestLogRepository;
 
@@ -33,17 +34,20 @@ class ChatCompletionService implements ChatCompletionUseCase {
   private final ModelRegistry modelRegistry;
   private final CarbonIntensityProvider carbonIntensityProvider;
   private final GreenAccountant greenAccountant;
+  private final MetricsRecorder metricsRecorder;
 
   ChatCompletionService(LlmClient llmClient,
                         RequestLogRepository requestLogRepository,
                         ModelRegistry modelRegistry,
                         CarbonIntensityProvider carbonIntensityProvider,
-                        GreenAccountant greenAccountant) {
+                        GreenAccountant greenAccountant,
+                        MetricsRecorder metricsRecorder) {
     this.llmClient = llmClient;
     this.requestLogRepository = requestLogRepository;
     this.modelRegistry = modelRegistry;
     this.carbonIntensityProvider = carbonIntensityProvider;
     this.greenAccountant = greenAccountant;
+    this.metricsRecorder = metricsRecorder;
   }
 
   @Override
@@ -71,6 +75,7 @@ class ChatCompletionService implements ChatCompletionUseCase {
         response.cacheHit()
     );
     requestLogRepository.save(log);
+    metricsRecorder.record(log);
 
     return response;
   }

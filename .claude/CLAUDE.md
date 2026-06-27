@@ -103,6 +103,12 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 5.2 — config du routage à chaud : seuils/mots-clés configurables, `/v1/admin/routing` GET/PUT, UI
   - [x] 5.3 — metrics live : série temporelle `/v1/reports/green/series`, sparklines SVG + répartition modèles
   - [x] 5.4 — rapports : sélecteur de période + téléchargement CSV/PDF (fetch+Blob, header Bearer)
+- [~] Phase 6 — valorisation d'ingénierie (polish)
+  - [x] 6.1 — observabilité : Micrometer → `/actuator/prometheus`, métriques natives Spring AI + `gatewai_*` custom, stack Prometheus/Grafana séparée
+  - [ ] 6.2 — rate limiting
+  - [ ] 6.3 — image native GraalVM
+  - [ ] 6.4 — exposition MCP
+  - [ ] 6.5 — packaging final
 
 ## Build front (mono-repo)
 - App Svelte+Vite dans `src/main/frontend`, buildée vers `target/classes/static` (bundlée dans le jar).

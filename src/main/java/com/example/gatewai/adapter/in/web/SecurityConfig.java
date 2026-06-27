@@ -25,7 +25,8 @@ class SecurityConfig {
             new ApiKeyAuthenticationFilter(apiClientRepository),
             UsernamePasswordAuthenticationFilter.class)
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/info",
+                "/actuator/prometheus").permitAll()
             // Dashboard SPA shell (static assets). Data under /v1/** stays secured.
             .requestMatchers("/", "/index.html", "/assets/**",
                 "/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()

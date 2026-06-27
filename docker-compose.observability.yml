@@ -1,0 +1,24 @@
+# Optional observability stack (Phase 6.1). Run on demand, separately from the
+# app's own compose.yaml:
+#   docker compose -f docker-compose.observability.yml up -d
+# Prometheus scrapes the running gateway at host:8080/actuator/prometheus;
+# Grafana (anonymous admin for local demo) is at http://localhost:3000.
+services:
+  prometheus:
+    image: 'prom/prometheus:latest'
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  grafana:
+    image: 'grafana/grafana:latest'
+    ports:
+      - '3000:3000'
+    environment:
+      - 'GF_AUTH_ANONYMOUS_ENABLED=true'
+      - 'GF_AUTH_ANONYMOUS_ORG_ROLE=Admin'
+    depends_on:
+      - prometheus

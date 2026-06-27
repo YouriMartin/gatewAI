@@ -21,6 +21,7 @@ import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 import com.example.gatewai.domain.port.out.LlmClient;
+import com.example.gatewai.domain.port.out.MetricsRecorder;
 import com.example.gatewai.domain.port.out.ModelRegistry;
 import com.example.gatewai.domain.port.out.RequestLogRepository;
 
@@ -49,6 +50,9 @@ class ChatCompletionServiceTest {
 
   @Mock
   private GreenAccountant greenAccountant;
+
+  @Mock
+  private MetricsRecorder metricsRecorder;
 
   @InjectMocks
   private ChatCompletionService service;
@@ -93,6 +97,7 @@ class ChatCompletionServiceTest {
     assertEquals(20, log.totalTokens());
     assertEquals(64, log.promptHash().length());
     assertTrue(log.latencyMs() >= 0);
+    verify(metricsRecorder).record(log);
   }
 
   @Test
