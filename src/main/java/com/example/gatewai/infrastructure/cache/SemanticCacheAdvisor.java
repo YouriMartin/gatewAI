@@ -1,7 +1,11 @@
 package com.example.gatewai.infrastructure.cache;
 
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.example.gatewai.domain.model.RequestContext;
 
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -59,7 +63,9 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       return buildCachedResponse(hits.getFirst(), request.context());
     }
 
-    return chain.nextCall(request);
+    ChatClientResponse response = chain.nextCall(request);
+    cacheStore(userText, response);
+    return response;
   }
 
   @Override
@@ -84,6 +90,42 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       return null;
     }
     return userMessage.getText();
+  }
+
+  private void cacheStore(String userText, ChatClientResponse response) {
+    ChatResponse chatResponse = response.chatResponse();
+    if (chatResponse == null || chatResponse.getResult() == null) {
+      return;
+    }
+
+    String responseText = chatResponse.getResult().getOutput().getText();
+    if (responseText == null) {
+      return;
+    }
+
+    Map<String, Object> metadata = new HashMap<>();
+    metadata.put(CACHE_RESPONSE_KEY, responseText);
+    metadata.put("created_at", Instant.now().toString());
+
+    if (chatResponse.getMetadata() != null
+        && chatResponse.getMetadata().getModel() != null) {
+      metadata.put(CACHE_MODEL_KEY, chatResponse.getMetadata().getModel());
+    }
+
+    if (chatResponse.getResult().getMetadata() != null
+        && chatResponse.getResult().getMetadata().getFinishReason() != null) {
+      metadata.put(CACHE_FINISH_REASON_KEY,
+          chatResponse.getResult().getMetadata().getFinishReason());
+    }
+
+    if (RequestContext.CURRENT.isBound()) {
+      String clientId = RequestContext.CURRENT.get().clientId();
+      if (clientId != null) {
+        metadata.put("client_id", clientId);
+      }
+    }
+
+    vectorStore.add(List.of(new Document(userText, metadata)));
   }
 
   private static ChatClientResponse buildCachedResponse(Document hit,
