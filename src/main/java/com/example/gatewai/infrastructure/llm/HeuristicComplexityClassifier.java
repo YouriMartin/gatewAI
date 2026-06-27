@@ -1,6 +1,7 @@
 package com.example.gatewai.infrastructure.llm;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import com.example.gatewai.domain.model.ModelTier;
@@ -35,7 +36,7 @@ class HeuristicComplexityClassifier implements ComplexityClassifier {
       return ModelTier.CLOUD_PREMIUM;
     }
 
-    String lower = userText.toLowerCase();
+    String lower = userText.toLowerCase(Locale.ROOT);
     for (String keyword : PREMIUM_KEYWORDS) {
       if (lower.contains(keyword)) {
         return ModelTier.CLOUD_PREMIUM;

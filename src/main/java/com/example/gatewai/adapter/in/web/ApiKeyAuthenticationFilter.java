@@ -64,7 +64,7 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
       } catch (IOException e) {
         throw new java.io.UncheckedIOException(e);
       } catch (ServletException e) {
-        throw new RuntimeException(e);
+        throw new IllegalStateException(e);
       }
     });
     return;

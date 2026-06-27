@@ -23,7 +23,7 @@ class PropertiesModelRegistry implements ModelRegistry {
 
   @Override
   public List<ModelDefinition> allModels() {
-    return models;
+    return List.copyOf(models);
   }
 
   @Override

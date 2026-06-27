@@ -6,6 +6,8 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 final class ApiKeyAuthentication extends AbstractAuthenticationToken {
 
+  private static final long serialVersionUID = 1L;
+
   private final String clientId;
   private final String clientName;
 

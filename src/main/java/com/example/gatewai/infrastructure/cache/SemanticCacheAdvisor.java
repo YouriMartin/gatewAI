@@ -135,11 +135,21 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
 
   private void cacheStore(String userText, ChatClientResponse response) {
     ChatResponse chatResponse = response.chatResponse();
-    if (chatResponse == null || chatResponse.getResult() == null) {
+    if (chatResponse == null) {
       return;
     }
 
-    String responseText = chatResponse.getResult().getOutput().getText();
+    Generation result = chatResponse.getResult();
+    if (result == null) {
+      return;
+    }
+
+    AssistantMessage output = result.getOutput();
+    if (output == null) {
+      return;
+    }
+
+    String responseText = output.getText();
     if (responseText == null) {
       return;
     }
@@ -148,15 +158,14 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     metadata.put(CACHE_RESPONSE_KEY, responseText);
     metadata.put(CREATED_AT_KEY, Instant.now().toEpochMilli());
 
-    if (chatResponse.getMetadata() != null
-        && chatResponse.getMetadata().getModel() != null) {
-      metadata.put(CACHE_MODEL_KEY, chatResponse.getMetadata().getModel());
+    ChatResponseMetadata responseMetadata = chatResponse.getMetadata();
+    if (responseMetadata != null && responseMetadata.getModel() != null) {
+      metadata.put(CACHE_MODEL_KEY, responseMetadata.getModel());
     }
 
-    if (chatResponse.getResult().getMetadata() != null
-        && chatResponse.getResult().getMetadata().getFinishReason() != null) {
-      metadata.put(CACHE_FINISH_REASON_KEY,
-          chatResponse.getResult().getMetadata().getFinishReason());
+    ChatGenerationMetadata resultMetadata = result.getMetadata();
+    if (resultMetadata != null && resultMetadata.getFinishReason() != null) {
+      metadata.put(CACHE_FINISH_REASON_KEY, resultMetadata.getFinishReason());
     }
 
     if (RequestContext.CURRENT.isBound()) {
