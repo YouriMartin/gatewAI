@@ -9,11 +9,13 @@ import org.junit.jupiter.api.Test;
 
 class HeuristicComplexityClassifierTest {
 
+  private ClassifierProperties properties;
   private HeuristicComplexityClassifier classifier;
 
   @BeforeEach
   void setUp() {
-    classifier = new HeuristicComplexityClassifier();
+    properties = new ClassifierProperties();
+    classifier = new HeuristicComplexityClassifier(properties);
   }
 
   // ---- LOCAL tier ----
@@ -36,7 +38,7 @@ class HeuristicComplexityClassifierTest {
   @Test
   void textAtEntryThresholdReturnsLocal() {
     String text = "x".repeat(
-        HeuristicComplexityClassifier.ENTRY_LENGTH_THRESHOLD);
+        properties.getEntryLengthThreshold());
     assertEquals(ModelTier.LOCAL, classifier.classify(text));
   }
 
@@ -45,14 +47,14 @@ class HeuristicComplexityClassifierTest {
   @Test
   void mediumLengthTextReturnsCloudEntry() {
     String text = "x".repeat(
-        HeuristicComplexityClassifier.ENTRY_LENGTH_THRESHOLD + 1);
+        properties.getEntryLengthThreshold() + 1);
     assertEquals(ModelTier.CLOUD_ENTRY, classifier.classify(text));
   }
 
   @Test
   void textJustBelowPremiumThresholdReturnsCloudEntry() {
     String text = "x".repeat(
-        HeuristicComplexityClassifier.PREMIUM_LENGTH_THRESHOLD);
+        properties.getPremiumLengthThreshold());
     assertEquals(ModelTier.CLOUD_ENTRY, classifier.classify(text));
   }
 
@@ -61,7 +63,7 @@ class HeuristicComplexityClassifierTest {
   @Test
   void longTextReturnsCloudPremium() {
     String text = "x".repeat(
-        HeuristicComplexityClassifier.PREMIUM_LENGTH_THRESHOLD + 1);
+        properties.getPremiumLengthThreshold() + 1);
     assertEquals(ModelTier.CLOUD_PREMIUM, classifier.classify(text));
   }
 

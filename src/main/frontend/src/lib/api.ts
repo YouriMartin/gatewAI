@@ -78,3 +78,29 @@ export async function revokeClient(apiKey: string, id: string): Promise<void> {
   });
   await ensureOk(response);
 }
+
+export interface RoutingConfig {
+  strategy: string;
+  entry_length_threshold: number;
+  premium_length_threshold: number;
+  premium_keywords: string[];
+}
+
+export async function getRoutingConfig(apiKey: string): Promise<RoutingConfig> {
+  const response = await fetch('/v1/admin/routing', {
+    headers: authHeaders(apiKey),
+  });
+  return (await (await ensureOk(response)).json()) as RoutingConfig;
+}
+
+export async function updateRoutingConfig(
+  apiKey: string,
+  config: RoutingConfig,
+): Promise<RoutingConfig> {
+  const response = await fetch('/v1/admin/routing', {
+    method: 'PUT',
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  return (await (await ensureOk(response)).json()) as RoutingConfig;
+}

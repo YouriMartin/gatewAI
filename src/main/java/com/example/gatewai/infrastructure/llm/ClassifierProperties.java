@@ -1,5 +1,7 @@
 package com.example.gatewai.infrastructure.llm;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -44,6 +46,20 @@ class ClassifierProperties {
    */
   private boolean fallbackToHeuristic = true;
 
+  /** Heuristic V1: text longer than this (chars) routes at least to entry. */
+  private int entryLengthThreshold = 100;
+
+  /** Heuristic V1: text longer than this (chars) routes to premium. */
+  private int premiumLengthThreshold = 500;
+
+  /** Heuristic V1: substrings that force a request to the premium tier. */
+  private List<String> premiumKeywords = List.of(
+      "refactor", "architecture", "demonstrate", "démontrer",
+      "analyze", "analyser", "optimize", "optimiser",
+      "debug", "algorithm", "algorithme",
+      "security", "sécurité", "vulnerability", "vulnérabilité",
+      "design pattern", "scalab", "migrat");
+
   ClassifierStrategy getStrategy() {
     return strategy;
   }
@@ -82,5 +98,30 @@ class ClassifierProperties {
 
   void setFallbackToHeuristic(boolean fallbackToHeuristic) {
     this.fallbackToHeuristic = fallbackToHeuristic;
+  }
+
+  int getEntryLengthThreshold() {
+    return entryLengthThreshold;
+  }
+
+  void setEntryLengthThreshold(int entryLengthThreshold) {
+    this.entryLengthThreshold = entryLengthThreshold;
+  }
+
+  int getPremiumLengthThreshold() {
+    return premiumLengthThreshold;
+  }
+
+  void setPremiumLengthThreshold(int premiumLengthThreshold) {
+    this.premiumLengthThreshold = premiumLengthThreshold;
+  }
+
+  List<String> getPremiumKeywords() {
+    return premiumKeywords;
+  }
+
+  void setPremiumKeywords(List<String> premiumKeywords) {
+    this.premiumKeywords = premiumKeywords == null
+        ? List.of() : List.copyOf(premiumKeywords);
   }
 }

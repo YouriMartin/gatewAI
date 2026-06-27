@@ -4,8 +4,11 @@
     listClients,
     createClient,
     revokeClient,
+    getRoutingConfig,
+    updateRoutingConfig,
     type GreenReport,
     type ApiClientView,
+    type RoutingConfig,
   } from './lib/api';
 
   const STORAGE_KEY = 'gatewai.apiKey';
@@ -20,6 +23,11 @@
   let newName = $state('');
   let newAdmin = $state(false);
   let createdKey = $state<string | null>(null);
+
+  let routing = $state<RoutingConfig | null>(null);
+  let keywordsText = $state('');
+  let routingError = $state('');
+  let routingSaved = $state(false);
 
   function lastThirtyDays(): { from: string; to: string } {
     const to = new Date();
@@ -40,9 +48,43 @@
       report = await fetchGreenReport(apiKey, from, to);
       status = 'ok';
       await loadClients();
+      await loadRouting();
     } catch (e) {
       error = message(e);
       status = 'error';
+    }
+  }
+
+  async function loadRouting() {
+    try {
+      routing = await getRoutingConfig(apiKey);
+      keywordsText = routing.premium_keywords.join(', ');
+      routingError = '';
+    } catch (e) {
+      routing = null;
+      routingError = message(e);
+    }
+  }
+
+  async function saveRouting() {
+    if (!routing) {
+      return;
+    }
+    routingSaved = false;
+    const keywords = keywordsText
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    try {
+      routing = await updateRoutingConfig(apiKey, {
+        ...routing,
+        premium_keywords: keywords,
+      });
+      keywordsText = routing.premium_keywords.join(', ');
+      routingSaved = true;
+      routingError = '';
+    } catch (e) {
+      routingError = message(e);
     }
   }
 
@@ -166,6 +208,50 @@
             {/each}
           </tbody>
         </table>
+      {/if}
+    </section>
+
+    <section class="admin">
+      <h2>Config du routage</h2>
+
+      {#if routingError}
+        <p class="error">Config indisponible : {routingError} (clé admin requise)</p>
+      {/if}
+
+      {#if routing}
+        <div class="routing-form">
+          <label>
+            Stratégie
+            <select bind:value={routing.strategy}>
+              <option value="heuristic">heuristic</option>
+              <option value="llm">llm</option>
+            </select>
+          </label>
+          <label>
+            Seuil entrée (chars)
+            <input
+              type="number"
+              min="0"
+              bind:value={routing.entry_length_threshold}
+            />
+          </label>
+          <label>
+            Seuil premium (chars)
+            <input
+              type="number"
+              min="0"
+              bind:value={routing.premium_length_threshold}
+            />
+          </label>
+          <label class="wide">
+            Mots-clés premium (séparés par des virgules)
+            <input type="text" bind:value={keywordsText} />
+          </label>
+          <div class="actions">
+            <button onclick={saveRouting}>Enregistrer</button>
+            {#if routingSaved}<span class="ok">Enregistré ✓</span>{/if}
+          </div>
+        </div>
       {/if}
     </section>
   {/if}
