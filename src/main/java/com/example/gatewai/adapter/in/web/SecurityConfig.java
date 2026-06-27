@@ -26,6 +26,9 @@ class SecurityConfig {
             UsernamePasswordAuthenticationFilter.class)
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+            // Dashboard SPA shell (static assets). Data under /v1/** stays secured.
+            .requestMatchers("/", "/index.html", "/assets/**",
+                "/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
             .requestMatchers("/v1/**").authenticated()
             .anyRequest().authenticated());
     return http.build();

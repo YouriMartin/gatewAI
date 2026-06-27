@@ -97,6 +97,17 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 4.3 — persistance coût + carbone + « CO2 évité »
   - [x] 4.4 — routage temporel/géo (endpoint async + worker `@Scheduled` + zone la plus verte)
   - [x] 4.5 — API de reporting (agrégats + export CSV/PDF)
+- [~] Phase 5 — dashboard (Svelte + Vite, mono-repo, bundlé dans le jar)
+  - [x] 5.0 — socle : projet Svelte, `frontend-maven-plugin`, serving statique, `SecurityConfig`, shell + clé API + 3 KPI
+  - [ ] 5.1 — admin des clés d'API (CRUD, nécessite endpoints back)
+  - [ ] 5.2 — config du routage (seuils/règles à chaud)
+  - [ ] 5.3 — metrics live (consomme `/v1/reports/green`)
+  - [ ] 5.4 — rapports (téléchargement CSV/PDF)
+
+## Build front (mono-repo)
+- App Svelte+Vite dans `src/main/frontend`, buildée vers `target/classes/static` (bundlée dans le jar).
+- `./mvnw package` build le front (profil `frontend` actif par défaut) ; `./mvnw test` reste sans Node.
+- Travail back pur : `./mvnw … -DskipFrontend`. Dev front : `npm run dev` (proxy `/v1` → `:8080`).
 
 ## Préférences de communication
 - **Après chaque implémentation** : expliquer en détail ce qui a été fait et pourquoi (choix techniques, trade-offs, liens avec l'architecture).

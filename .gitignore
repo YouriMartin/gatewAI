@@ -1,6 +1,10 @@
 # Maven
 target/
 
+# Frontend (Svelte + Vite)
+src/main/frontend/node_modules/
+src/main/frontend/dist/
+
 # IDE
 .idea/
 *.iml

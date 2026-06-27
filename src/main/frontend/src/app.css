@@ -1,0 +1,107 @@
+:root {
+  --bg: #0f1115;
+  --panel: #1a1d23;
+  --text: #e6e8eb;
+  --muted: #9aa0a6;
+  --accent: #3fb950;
+  --error: #f85149;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0.25rem 0 1.5rem;
+  color: var(--muted);
+}
+
+.connect {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--panel);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.connect label {
+  color: var(--muted);
+}
+
+.connect input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2d333b;
+  border-radius: 6px;
+  background: #0d1117;
+  color: var(--text);
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #0d1117;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ok {
+  color: var(--accent);
+}
+
+.error {
+  color: var(--error);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.card {
+  background: var(--panel);
+  padding: 1.25rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card .label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.card strong {
+  font-size: 1.8rem;
+}

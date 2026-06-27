@@ -214,6 +214,50 @@
 				</plugins>
 			</build>
 		</profile>
+			<!-- Builds the Svelte dashboard into target/classes/static (bundled in
+		     the jar). Active by default; skip with -DskipFrontend. Bound to
+		     prepare-package so `./mvnw test` stays fast and Node-free. -->
+		<profile>
+			<id>frontend</id>
+			<activation>
+				<property>
+					<name>!skipFrontend</name>
+				</property>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>com.github.eirslett</groupId>
+						<artifactId>frontend-maven-plugin</artifactId>
+						<version>1.15.1</version>
+						<configuration>
+							<workingDirectory>src/main/frontend</workingDirectory>
+							<installDirectory>${project.build.directory}</installDirectory>
+						</configuration>
+						<executions>
+							<execution>
+								<id>install-node-and-npm</id>
+								<goals><goal>install-node-and-npm</goal></goals>
+								<phase>prepare-package</phase>
+								<configuration><nodeVersion>v22.12.0</nodeVersion></configuration>
+							</execution>
+							<execution>
+								<id>npm-ci</id>
+								<goals><goal>npm</goal></goals>
+								<phase>prepare-package</phase>
+								<configuration><arguments>ci</arguments></configuration>
+							</execution>
+							<execution>
+								<id>npm-build</id>
+								<goals><goal>npm</goal></goals>
+								<phase>prepare-package</phase>
+								<configuration><arguments>run build</arguments></configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
 	</profiles>
 
 </project>
