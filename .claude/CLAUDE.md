@@ -85,12 +85,18 @@ Avancement : _(à mettre à jour au fil de l'eau)_
 - [x] Phase 0 — squelette + infra locale
 - [x] Phase 1 — passerelle pass-through (ingress OpenAI → egress Claude)
 - [x] Phase 2 — cache sémantique
-- [~] Phase 3 — routeur intelligent
+- [x] Phase 3 — routeur intelligent
   - [x] 3.1 — registre de modèles (`@ConfigurationProperties`)
   - [x] 3.2 — `ChatClient` qualifiés par palier
   - [x] 3.3 — classifieur de complexité V1 (heuristiques)
   - [x] 3.4 — `RoutingAdvisor` (classifieur → sélection du ChatClient)
   - [x] 3.5 — classifieur V2 (petit modèle + Structured Outputs, règles configurables à chaud)
+- [ ] Phase 4 — green inference & reporting
+  - [ ] 4.1 — modèle carbone (tokens → kWh → gCO2)
+  - [ ] 4.2 — intensité temps réel (`CarbonIntensityProvider` swappable)
+  - [ ] 4.3 — persistance coût + carbone + « CO2 évité »
+  - [ ] 4.4 — routage temporel/géo (worker `@Scheduled`)
+  - [ ] 4.5 — API de reporting (agrégats + export CSV/PDF)
 
 ## Préférences de communication
 - **Après chaque implémentation** : expliquer en détail ce qui a été fait et pourquoi (choix techniques, trade-offs, liens avec l'architecture).
