@@ -36,6 +36,22 @@ class ChatClientConfiguration {
   // OllamaChatAutoConfiguration is re-enabled (requires a running
   // Ollama instance with a chat model pulled).
 
+  @Bean
+  @Qualifier("classifierClient")
+  ChatClient classifierClient(ChatModel chatModel,
+                              ClassifierProperties classifierProperties,
+                              ModelRegistryProperties modelProperties) {
+    String modelId = classifierProperties.getModelId();
+    if (modelId == null || modelId.isBlank()) {
+      modelId = resolveModelId(modelProperties, ModelTier.CLOUD_ENTRY);
+    }
+    return ChatClient.builder(chatModel)
+        .defaultOptions(ChatOptions.builder()
+            .model(modelId)
+            .temperature(classifierProperties.getTemperature()))
+        .build();
+  }
+
   static String resolveModelId(ModelRegistryProperties properties,
                                ModelTier tier) {
     return properties.getRegistry().values().stream()
