@@ -8,5 +8,6 @@ public record ApiClient(
     String name,
     String apiKeyHash,
     boolean enabled,
-    Instant createdAt
+    Instant createdAt,
+    boolean admin
 ) {}

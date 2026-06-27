@@ -30,6 +30,9 @@ class ApiClientEntity {
   @Column(name = "created_at", updatable = false, nullable = false)
   private Instant createdAt;
 
+  @Column(name = "admin", updatable = false, nullable = false)
+  private boolean admin;
+
   protected ApiClientEntity() {
     // JPA requires a no-arg constructor
   }
@@ -40,9 +43,10 @@ class ApiClientEntity {
     this.apiKeyHash = client.apiKeyHash();
     this.enabled = client.enabled();
     this.createdAt = client.createdAt();
+    this.admin = client.admin();
   }
 
   ApiClient toDomain() {
-    return new ApiClient(id, name, apiKeyHash, enabled, createdAt);
+    return new ApiClient(id, name, apiKeyHash, enabled, createdAt, admin);
   }
 }

@@ -29,6 +29,7 @@ class SecurityConfig {
             // Dashboard SPA shell (static assets). Data under /v1/** stays secured.
             .requestMatchers("/", "/index.html", "/assets/**",
                 "/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
+            .requestMatchers("/v1/admin/**").hasRole("ADMIN")
             .requestMatchers("/v1/**").authenticated()
             .anyRequest().authenticated());
     return http.build();

@@ -55,7 +55,7 @@ class ApiKeyAuthenticationFilterTest {
     String keyHash = ApiKeyAuthenticationFilter.hashApiKey(rawKey);
     UUID clientId = UUID.randomUUID();
     ApiClient client = new ApiClient(
-        clientId, "acme-corp", keyHash, true, Instant.now()
+        clientId, "acme-corp", keyHash, true, Instant.now(), false
     );
 
     when(apiClientRepository.findByApiKeyHash(keyHash))
@@ -110,7 +110,7 @@ class ApiKeyAuthenticationFilterTest {
     String rawKey = "sk-disabled-key";
     String keyHash = ApiKeyAuthenticationFilter.hashApiKey(rawKey);
     ApiClient disabledClient = new ApiClient(
-        UUID.randomUUID(), "disabled-corp", keyHash, false, Instant.now()
+        UUID.randomUUID(), "disabled-corp", keyHash, false, Instant.now(), false
     );
 
     when(apiClientRepository.findByApiKeyHash(keyHash))

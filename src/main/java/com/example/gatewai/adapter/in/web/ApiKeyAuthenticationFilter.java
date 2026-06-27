@@ -1,12 +1,11 @@
 package com.example.gatewai.adapter.in.web;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import java.util.Collection;
+import java.util.List;
 
 import com.example.gatewai.domain.model.ApiClient;
+import com.example.gatewai.domain.model.ApiKeyHasher;
 import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.port.out.ApiClientRepository;
 
@@ -15,6 +14,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -53,8 +54,8 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
-    ApiKeyAuthentication authentication =
-        new ApiKeyAuthentication(client.id().toString(), client.name());
+    ApiKeyAuthentication authentication = new ApiKeyAuthentication(
+        client.id().toString(), client.name(), authorities(client));
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
     RequestContext ctx = new RequestContext(client.id().toString(), null);
@@ -70,17 +71,13 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     return;
   }
 
-  static String hashApiKey(String rawKey) {
-    MessageDigest digest = sha256();
-    digest.update(rawKey.getBytes(StandardCharsets.UTF_8));
-    return HexFormat.of().formatHex(digest.digest());
+  private static Collection<GrantedAuthority> authorities(ApiClient client) {
+    return client.admin()
+        ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        : List.of();
   }
 
-  private static MessageDigest sha256() {
-    try {
-      return MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError("SHA-256 is guaranteed by the JDK", e);
-    }
+  static String hashApiKey(String rawKey) {
+    return ApiKeyHasher.hash(rawKey);
   }
 }

@@ -30,7 +30,7 @@ class JpaApiClientAdapterTest {
   void findByApiKeyHashDelegatesToSpringData() {
     String hash = "a".repeat(64);
     ApiClient client = new ApiClient(
-        UUID.randomUUID(), "test-client", hash, true, Instant.now()
+        UUID.randomUUID(), "test-client", hash, true, Instant.now(), false
     );
     ApiClientEntity entity = new ApiClientEntity(client);
 
@@ -57,12 +57,20 @@ class JpaApiClientAdapterTest {
   void roundTripDomainToEntityToDomain() {
     ApiClient original = new ApiClient(
         UUID.randomUUID(), "acme", "c".repeat(64),
-        true, Instant.parse("2026-06-01T12:00:00Z")
+        true, Instant.parse("2026-06-01T12:00:00Z"), true
     );
 
     ApiClientEntity entity = new ApiClientEntity(original);
     ApiClient restored = entity.toDomain();
 
     assertEquals(original, restored);
+  }
+
+  @Test
+  void adminExistsDelegatesToSpringData() {
+    when(jpaRepository.existsByAdminTrue()).thenReturn(true);
+
+    assertTrue(adapter.adminExists());
+    verify(jpaRepository).existsByAdminTrue();
   }
 }

@@ -1,4 +1,4 @@
-// Thin client for the Green AI Proxy reporting API.
+// Thin client for the Green AI Proxy API.
 // The API key is sent as a Bearer token (entered by the user, kept in the browser).
 
 export interface GreenReport {
@@ -15,6 +15,30 @@ export interface GreenReport {
   model_mix: Record<string, number>;
 }
 
+export interface ApiClientView {
+  id: string;
+  name: string;
+  enabled: boolean;
+  admin: boolean;
+  created_at: string;
+}
+
+export interface CreatedClient {
+  client: ApiClientView;
+  api_key: string;
+}
+
+function authHeaders(apiKey: string): HeadersInit {
+  return { Authorization: `Bearer ${apiKey}` };
+}
+
+async function ensureOk(response: Response): Promise<Response> {
+  if (!response.ok) {
+    throw new Error(`Réponse ${response.status} de l'API`);
+  }
+  return response;
+}
+
 export async function fetchGreenReport(
   apiKey: string,
   from: string,
@@ -22,10 +46,35 @@ export async function fetchGreenReport(
 ): Promise<GreenReport> {
   const params = new URLSearchParams({ from, to });
   const response = await fetch(`/v1/reports/green?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: authHeaders(apiKey),
   });
-  if (!response.ok) {
-    throw new Error(`Réponse ${response.status} de l'API`);
-  }
-  return (await response.json()) as GreenReport;
+  return (await (await ensureOk(response)).json()) as GreenReport;
+}
+
+export async function listClients(apiKey: string): Promise<ApiClientView[]> {
+  const response = await fetch('/v1/admin/clients', {
+    headers: authHeaders(apiKey),
+  });
+  return (await (await ensureOk(response)).json()) as ApiClientView[];
+}
+
+export async function createClient(
+  apiKey: string,
+  name: string,
+  admin: boolean,
+): Promise<CreatedClient> {
+  const response = await fetch('/v1/admin/clients', {
+    method: 'POST',
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, admin }),
+  });
+  return (await (await ensureOk(response)).json()) as CreatedClient;
+}
+
+export async function revokeClient(apiKey: string, id: string): Promise<void> {
+  const response = await fetch(`/v1/admin/clients/${id}/revoke`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+  });
+  await ensureOk(response);
 }

@@ -99,7 +99,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 4.5 — API de reporting (agrégats + export CSV/PDF)
 - [~] Phase 5 — dashboard (Svelte + Vite, mono-repo, bundlé dans le jar)
   - [x] 5.0 — socle : projet Svelte, `frontend-maven-plugin`, serving statique, `SecurityConfig`, shell + clé API + 3 KPI
-  - [ ] 5.1 — admin des clés d'API (CRUD, nécessite endpoints back)
+  - [x] 5.1 — admin des clés d'API : rôle admin + seed au démarrage, CRUD `/v1/admin/clients`, UI (liste/créer/révoquer)
   - [ ] 5.2 — config du routage (seuils/règles à chaud)
   - [ ] 5.3 — metrics live (consomme `/v1/reports/green`)
   - [ ] 5.4 — rapports (téléchargement CSV/PDF)
