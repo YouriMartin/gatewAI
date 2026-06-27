@@ -8,6 +8,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.example.gatewai.domain.model.CarbonZoneContext;
 import com.example.gatewai.domain.model.GreenAccountant;
 import com.example.gatewai.domain.model.GreenMetrics;
 import com.example.gatewai.domain.model.LlmRequest;
@@ -80,7 +81,9 @@ class ChatCompletionService implements ChatCompletionUseCase {
         modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
             .findFirst()
             .orElse(null);
-    double gridIntensity = carbonIntensityProvider.gramsCo2PerKwh();
+    double gridIntensity = CarbonZoneContext.CURRENT.isBound()
+        ? carbonIntensityProvider.gramsCo2PerKwh(CarbonZoneContext.CURRENT.get())
+        : carbonIntensityProvider.gramsCo2PerKwh();
 
     return greenAccountant.account(
         used, premiumBaseline, response.totalTokens(), gridIntensity,

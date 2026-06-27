@@ -51,24 +51,30 @@ class ElectricityMapsCarbonIntensityProvider implements CarbonIntensityProvider 
 
   @Override
   public double gramsCo2PerKwh() {
+    return gramsCo2PerKwh(config.getZone());
+  }
+
+  @Override
+  public double gramsCo2PerKwh(String zone) {
     try {
       ElectricityMapsResponse response = restClient.get()
           .uri(uri -> uri.path("/carbon-intensity/latest")
-              .queryParam("zone", config.getZone())
+              .queryParam("zone", zone)
               .build())
           .header("auth-token", config.getToken())
           .retrieve()
           .body(ElectricityMapsResponse.class);
 
       if (response == null || response.carbonIntensity() <= 0) {
-        LOG.warn("ElectricityMaps returned no usable intensity, falling back");
-        return fallback.gramsCo2PerKwh();
+        LOG.warn("ElectricityMaps returned no usable intensity for zone {}, "
+            + "falling back", zone);
+        return fallback.gramsCo2PerKwh(zone);
       }
       return response.carbonIntensity();
     } catch (RestClientException e) {
-      LOG.warn("ElectricityMaps call failed ({}), falling back",
-          e.getMessage());
-      return fallback.gramsCo2PerKwh();
+      LOG.warn("ElectricityMaps call failed for zone {} ({}), falling back",
+          zone, e.getMessage());
+      return fallback.gramsCo2PerKwh(zone);
     }
   }
 }

@@ -27,4 +27,27 @@ class StaticCarbonIntensityProviderTest {
 
     assertEquals(480.0, provider.gramsCo2PerKwh());
   }
+
+  @Test
+  void returnsPerZoneIntensityWhenConfigured() {
+    CarbonProperties properties = new CarbonProperties();
+    properties.setGridIntensityGramsPerKwh(230.0);
+    properties.getZoneIntensities().put("SE", 30.0);
+
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    assertEquals(30.0, provider.gramsCo2PerKwh("SE"));
+  }
+
+  @Test
+  void fallsBackToDefaultForUnknownZone() {
+    CarbonProperties properties = new CarbonProperties();
+    properties.setGridIntensityGramsPerKwh(230.0);
+
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    assertEquals(230.0, provider.gramsCo2PerKwh("US"));
+  }
 }

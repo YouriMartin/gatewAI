@@ -25,4 +25,10 @@ class StaticCarbonIntensityProvider implements CarbonIntensityProvider {
   public double gramsCo2PerKwh() {
     return properties.getGridIntensityGramsPerKwh();
   }
+
+  @Override
+  public double gramsCo2PerKwh(String zone) {
+    return properties.getZoneIntensities()
+        .getOrDefault(zone, properties.getGridIntensityGramsPerKwh());
+  }
 }

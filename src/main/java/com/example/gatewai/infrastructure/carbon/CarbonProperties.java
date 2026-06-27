@@ -1,5 +1,8 @@
 package com.example.gatewai.infrastructure.carbon;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -16,6 +19,12 @@ class CarbonProperties {
   /** Electricity grid carbon intensity, in gCO2-equivalent per kWh. */
   private double gridIntensityGramsPerKwh = 230.0;
 
+  /**
+   * Per-zone static intensities (zone id → gCO2/kWh) used by the default
+   * provider for carbon-aware geo routing when no live API is configured.
+   */
+  private Map<String, Double> zoneIntensities = new LinkedHashMap<>();
+
   private ElectricityMaps electricityMaps = new ElectricityMaps();
 
   double getGridIntensityGramsPerKwh() {
@@ -24,6 +33,14 @@ class CarbonProperties {
 
   void setGridIntensityGramsPerKwh(double gridIntensityGramsPerKwh) {
     this.gridIntensityGramsPerKwh = gridIntensityGramsPerKwh;
+  }
+
+  Map<String, Double> getZoneIntensities() {
+    return zoneIntensities;
+  }
+
+  void setZoneIntensities(Map<String, Double> zoneIntensities) {
+    this.zoneIntensities = zoneIntensities;
   }
 
   ElectricityMaps getElectricityMaps() {
