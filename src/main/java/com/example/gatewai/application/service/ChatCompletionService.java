@@ -67,7 +67,8 @@ class ChatCompletionService implements ChatCompletionUseCase {
         response.totalTokens(),
         latencyMs,
         clientId,
-        green
+        green,
+        response.cacheHit()
     );
     requestLogRepository.save(log);
 

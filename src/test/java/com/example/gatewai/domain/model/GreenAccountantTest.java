@@ -51,6 +51,8 @@ class GreenAccountantTest {
         accountant.account(entry(), premium(), 1000, GRID, false);
 
     assertEquals(0.69, metrics.gramsCo2Avoided(), DELTA);
+    // premium cost 0.015 - entry cost 0.002 = 0.013 EUR avoided
+    assertEquals(0.013, metrics.costAvoidedEur(), DELTA);
   }
 
   @Test
@@ -114,6 +116,8 @@ class GreenAccountantTest {
         accountant.account(entry(), premium(), 1000, GRID, true);
 
     assertEquals(1.15, metrics.gramsCo2Avoided(), DELTA);
+    // full premium cost credited as avoided
+    assertEquals(0.015, metrics.costAvoidedEur(), DELTA);
   }
 
   @Test

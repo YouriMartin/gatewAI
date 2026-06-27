@@ -150,7 +150,7 @@ class ChatCompletionServiceTest {
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse response = new LlmResponse(
         "claude-haiku-4", "Hi!", "end_turn", 12, 8, 20, false);
-    GreenMetrics metrics = new GreenMetrics(0.04, 0.00004, 0.0092, 0.092);
+    GreenMetrics metrics = new GreenMetrics(0.04, 0.00004, 0.0092, 0.01, 0.092);
 
     when(llmClient.call(request)).thenReturn(response);
     when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
@@ -170,7 +170,7 @@ class ChatCompletionServiceTest {
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse cached = new LlmResponse(
         "claude-sonnet-4", "Hi!", "stop", 12, 8, 20, true);
-    GreenMetrics metrics = new GreenMetrics(0.0, 0.0, 0.0, 0.69);
+    GreenMetrics metrics = new GreenMetrics(0.0, 0.0, 0.0, 0.015, 0.69);
 
     when(llmClient.call(request)).thenReturn(cached);
     when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);

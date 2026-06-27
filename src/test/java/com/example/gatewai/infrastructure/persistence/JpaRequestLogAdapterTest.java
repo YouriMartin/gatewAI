@@ -36,7 +36,7 @@ class JpaRequestLogAdapterTest {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), Instant.now(), "claude-3",
         "a".repeat(64), 10, 5, 15, 200L, "client-1",
-        new GreenMetrics(0.3, 0.01, 2.3, 1.5)
+        new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5), false
     );
 
     when(jpaRepository.save(any(RequestLogEntity.class)))
@@ -58,7 +58,7 @@ class JpaRequestLogAdapterTest {
         UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3-opus", "b".repeat(64),
         100, 50, 150, 1234L, "tenant-42",
-        new GreenMetrics(2.25, 0.75, 172.5, 60.0)
+        new GreenMetrics(2.25, 0.75, 172.5, 22.5, 60.0), true
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);
@@ -72,7 +72,7 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3", "c".repeat(64),
-        10, 5, 15, 100L, null, GreenMetrics.ZERO
+        10, 5, 15, 100L, null, GreenMetrics.ZERO, false
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);

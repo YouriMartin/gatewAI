@@ -13,5 +13,6 @@ public record RequestLog(
     int totalTokens,
     long latencyMs,
     String clientId,
-    GreenMetrics green
+    GreenMetrics green,
+    boolean cacheHit
 ) {}

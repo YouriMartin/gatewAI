@@ -52,8 +52,14 @@ class RequestLogEntity {
   @Column(name = "grams_co2", updatable = false)
   private double gramsCo2;
 
+  @Column(name = "cost_avoided_eur", updatable = false)
+  private double costAvoidedEur;
+
   @Column(name = "grams_co2_avoided", updatable = false)
   private double gramsCo2Avoided;
+
+  @Column(name = "cache_hit", updatable = false)
+  private boolean cacheHit;
 
   protected RequestLogEntity() {
     // JPA requires a no-arg constructor
@@ -69,11 +75,13 @@ class RequestLogEntity {
     this.totalTokens = log.totalTokens();
     this.latencyMs = log.latencyMs();
     this.clientId = log.clientId();
+    this.cacheHit = log.cacheHit();
 
     GreenMetrics green = log.green() != null ? log.green() : GreenMetrics.ZERO;
     this.costEur = green.costEur();
     this.energyKwh = green.energyKwh();
     this.gramsCo2 = green.gramsCo2();
+    this.costAvoidedEur = green.costAvoidedEur();
     this.gramsCo2Avoided = green.gramsCo2Avoided();
   }
 
@@ -82,7 +90,9 @@ class RequestLogEntity {
         id, timestamp, model, promptHash,
         promptTokens, completionTokens, totalTokens, latencyMs,
         clientId,
-        new GreenMetrics(costEur, energyKwh, gramsCo2, gramsCo2Avoided)
+        new GreenMetrics(costEur, energyKwh, gramsCo2,
+            costAvoidedEur, gramsCo2Avoided),
+        cacheHit
     );
   }
 }
