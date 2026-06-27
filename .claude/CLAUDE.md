@@ -101,7 +101,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 5.0 — socle : projet Svelte, `frontend-maven-plugin`, serving statique, `SecurityConfig`, shell + clé API + 3 KPI
   - [x] 5.1 — admin des clés d'API : rôle admin + seed au démarrage, CRUD `/v1/admin/clients`, UI (liste/créer/révoquer)
   - [x] 5.2 — config du routage à chaud : seuils/mots-clés configurables, `/v1/admin/routing` GET/PUT, UI
-  - [ ] 5.3 — metrics live (consomme `/v1/reports/green`)
+  - [x] 5.3 — metrics live : série temporelle `/v1/reports/green/series`, sparklines SVG + répartition modèles
   - [ ] 5.4 — rapports (téléchargement CSV/PDF)
 
 ## Build front (mono-repo)

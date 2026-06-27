@@ -1,6 +1,7 @@
 package com.example.gatewai.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,5 +49,28 @@ class GreenReportServiceTest {
     assertEquals(FROM, report.from());
     assertEquals(0.013, report.totalCostAvoidedEur(), 1e-9);
     verify(requestLogRepository).findBetween(FROM, TO);
+  }
+
+  @Test
+  void dailyFetchesRangeAndBucketsByDay() {
+    when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of());
+
+    List<GreenReport> series = service.daily(FROM, TO);
+
+    assertEquals(29, series.size());
+    verify(requestLogRepository).findBetween(FROM, TO);
+  }
+
+  @Test
+  void dailyRejectsInvertedRange() {
+    assertThrows(IllegalArgumentException.class, () -> service.daily(TO, FROM));
+  }
+
+  @Test
+  void dailyRejectsTooLargeRange() {
+    Instant from = Instant.parse("2024-01-01T00:00:00Z");
+    Instant to = Instant.parse("2026-01-01T00:00:00Z");
+
+    assertThrows(IllegalArgumentException.class, () -> service.daily(from, to));
   }
 }

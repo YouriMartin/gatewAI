@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     fetchGreenReport,
+    fetchGreenSeries,
     listClients,
     createClient,
     revokeClient,
@@ -10,12 +11,14 @@
     type ApiClientView,
     type RoutingConfig,
   } from './lib/api';
+  import Sparkline from './lib/Sparkline.svelte';
 
   const STORAGE_KEY = 'gatewai.apiKey';
 
   let apiKey = $state(localStorage.getItem(STORAGE_KEY) ?? '');
   let status = $state<'idle' | 'loading' | 'ok' | 'error'>('idle');
   let report = $state<GreenReport | null>(null);
+  let series = $state<GreenReport[]>([]);
   let error = $state('');
 
   let clients = $state<ApiClientView[]>([]);
@@ -39,6 +42,14 @@
     return e instanceof Error ? e.message : String(e);
   }
 
+  function barWidth(count: number): number {
+    if (!report) {
+      return 0;
+    }
+    const max = Math.max(...Object.values(report.model_mix), 1);
+    return (count / max) * 100;
+  }
+
   async function connect() {
     localStorage.setItem(STORAGE_KEY, apiKey);
     status = 'loading';
@@ -46,6 +57,7 @@
     try {
       const { from, to } = lastThirtyDays();
       report = await fetchGreenReport(apiKey, from, to);
+      series = await fetchGreenSeries(apiKey, from, to);
       status = 'ok';
       await loadClients();
       await loadRouting();
@@ -163,6 +175,42 @@
         <strong>{(report.cache_hit_rate * 100).toFixed(1)}%</strong>
       </div>
     </section>
+
+    {#if series.length > 0}
+      <section class="trends">
+        <h2>Tendances (30 jours)</h2>
+        <div class="cards">
+          <div class="card">
+            <span class="label">€ économisés / jour</span>
+            <Sparkline values={series.map((p) => p.total_cost_avoided_eur)} />
+          </div>
+          <div class="card">
+            <span class="label">gCO₂ évités / jour</span>
+            <Sparkline
+              values={series.map((p) => p.total_grams_co2_avoided)}
+              color="#58a6ff"
+            />
+          </div>
+        </div>
+      </section>
+    {/if}
+
+    {#if Object.keys(report.model_mix).length > 0}
+      <section class="trends">
+        <h2>Répartition des modèles</h2>
+        <div class="mix">
+          {#each Object.entries(report.model_mix) as [model, count] (model)}
+            <div class="mix-row">
+              <span class="mix-name">{model}</span>
+              <div class="mix-bar">
+                <div class="mix-fill" style={`width: ${barWidth(count)}%`}></div>
+              </div>
+              <span class="mix-count">{count}</span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <section class="admin">
       <h2>Clés API</h2>

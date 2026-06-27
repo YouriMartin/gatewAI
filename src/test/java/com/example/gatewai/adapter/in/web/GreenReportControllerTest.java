@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import com.example.gatewai.domain.model.GreenReport;
@@ -93,6 +94,29 @@ class GreenReportControllerTest {
   void returns400ForInvalidDate() throws Exception {
     mockMvc.perform(get("/v1/reports/green")
             .param("from", "not-a-date").param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void seriesReturnsDailyPoints() throws Exception {
+    when(useCase.daily(any(), any())).thenReturn(List.of(report(), report()));
+
+    mockMvc.perform(get("/v1/reports/green/series")
+            .param("from", FROM).param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[0].total_requests").value(3));
+  }
+
+  @Test
+  void seriesReturns400ForTooLargeRange() throws Exception {
+    when(useCase.daily(any(), any()))
+        .thenThrow(new IllegalArgumentException("range too large"));
+
+    mockMvc.perform(get("/v1/reports/green/series")
+            .param("from", FROM).param("to", TO)
             .with(authentication(auth())))
         .andExpect(status().isBadRequest());
   }

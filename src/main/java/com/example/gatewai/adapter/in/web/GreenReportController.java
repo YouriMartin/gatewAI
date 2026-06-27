@@ -2,6 +2,7 @@ package com.example.gatewai.adapter.in.web;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
 
 import com.example.gatewai.domain.model.GreenReport;
@@ -57,5 +58,25 @@ class GreenReportController {
           .body(GreenReportPdfWriter.toPdf(report));
       default -> ResponseEntity.ok(GreenReportResponse.of(report));
     };
+  }
+
+  @GetMapping("/v1/reports/green/series")
+  ResponseEntity<?> series(@RequestParam String from,
+                           @RequestParam String to) {
+    Instant fromInstant;
+    Instant toInstant;
+    try {
+      fromInstant = Instant.parse(from);
+      toInstant = Instant.parse(to);
+    } catch (DateTimeParseException e) {
+      return ResponseEntity.badRequest().build();
+    }
+    try {
+      List<GreenReportResponse> points = useCase.daily(fromInstant, toInstant)
+          .stream().map(GreenReportResponse::of).toList();
+      return ResponseEntity.ok(points);
+    } catch (IllegalArgumentException e) {
+      return ResponseEntity.badRequest().build();
+    }
   }
 }

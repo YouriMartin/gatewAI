@@ -1,6 +1,8 @@
 package com.example.gatewai.application.service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import com.example.gatewai.domain.model.GreenReport;
 import com.example.gatewai.domain.model.ReportAggregator;
@@ -27,9 +29,25 @@ class GreenReportService implements GenerateGreenReportUseCase {
     this.requestLogRepository = requestLogRepository;
   }
 
+  private static final long MAX_DAYS = 366;
+
   @Override
   public GreenReport generate(Instant from, Instant to) {
     return aggregator.aggregate(
+        requestLogRepository.findBetween(from, to), from, to);
+  }
+
+  @Override
+  public List<GreenReport> daily(Instant from, Instant to) {
+    if (!from.isBefore(to)) {
+      throw new IllegalArgumentException("from must be before to");
+    }
+    long days = ChronoUnit.DAYS.between(
+        from.truncatedTo(ChronoUnit.DAYS), to.truncatedTo(ChronoUnit.DAYS)) + 1;
+    if (days > MAX_DAYS) {
+      throw new IllegalArgumentException("range too large (max 366 days)");
+    }
+    return aggregator.aggregateDaily(
         requestLogRepository.findBetween(from, to), from, to);
   }
 }

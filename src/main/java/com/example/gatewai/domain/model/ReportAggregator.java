@@ -1,6 +1,9 @@
 package com.example.gatewai.domain.model;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,5 +50,27 @@ public final class ReportAggregator {
 
     return new GreenReport(from, to, logs.size(), cacheHits,
         costEur, costAvoidedEur, energyKwh, gramsCo2, gramsCo2Avoided, modelMix);
+  }
+
+  /**
+   * One {@link GreenReport} per UTC day in {@code [from, to)} (empty days
+   * included, so charts have continuous points).
+   */
+  public List<GreenReport> aggregateDaily(List<RequestLog> logs,
+                                          Instant from, Instant to) {
+    Map<Instant, List<RequestLog>> byDay = new HashMap<>();
+    for (RequestLog log : logs) {
+      Instant day = log.timestamp().truncatedTo(ChronoUnit.DAYS);
+      byDay.computeIfAbsent(day, d -> new ArrayList<>()).add(log);
+    }
+
+    List<GreenReport> series = new ArrayList<>();
+    Instant day = from.truncatedTo(ChronoUnit.DAYS);
+    while (day.isBefore(to)) {
+      Instant next = day.plus(1, ChronoUnit.DAYS);
+      series.add(aggregate(byDay.getOrDefault(day, List.of()), day, next));
+      day = next;
+    }
+    return series;
   }
 }

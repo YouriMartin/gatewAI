@@ -51,6 +51,19 @@ export async function fetchGreenReport(
   return (await (await ensureOk(response)).json()) as GreenReport;
 }
 
+export async function fetchGreenSeries(
+  apiKey: string,
+  from: string,
+  to: string,
+): Promise<GreenReport[]> {
+  const params = new URLSearchParams({ from, to });
+  const response = await fetch(
+    `/v1/reports/green/series?${params.toString()}`,
+    { headers: authHeaders(apiKey) },
+  );
+  return (await (await ensureOk(response)).json()) as GreenReport[];
+}
+
 export async function listClients(apiKey: string): Promise<ApiClientView[]> {
   const response = await fetch('/v1/admin/clients', {
     headers: authHeaders(apiKey),
