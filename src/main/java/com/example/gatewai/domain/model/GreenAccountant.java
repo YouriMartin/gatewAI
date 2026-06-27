@@ -22,18 +22,36 @@ public final class GreenAccountant {
   /**
    * Accounts for a single served request.
    *
-   * @param used                     the model that actually served the request
+   * <p>On a cache hit no inference happens: real cost, energy and emissions are
+   * zero, and the whole premium-default call is credited as avoided. This is the
+   * cache's headline saving, which would otherwise be invisible.
+   *
+   * @param used                     the model that served the request, or
+   *                                 {@code null} (ignored on a cache hit)
    * @param premiumBaseline          the premium-default model, or {@code null}
    * @param totalTokens              total tokens billed (prompt + completion)
    * @param gridIntensityGramsPerKwh grid carbon intensity, in gCO2/kWh
-   * @return the metrics, never {@code null}; {@link GreenMetrics#ZERO} when the
-   *     used model is unknown or no tokens were consumed
+   * @param cacheHit                 whether the response was served from cache
+   * @return the metrics, never {@code null}; {@link GreenMetrics#ZERO} when no
+   *     tokens were consumed or the used model is unknown (on a miss)
    */
   public GreenMetrics account(ModelDefinition used,
                               ModelDefinition premiumBaseline,
                               long totalTokens,
-                              double gridIntensityGramsPerKwh) {
-    if (used == null || totalTokens <= 0) {
+                              double gridIntensityGramsPerKwh,
+                              boolean cacheHit) {
+    if (totalTokens <= 0) {
+      return GreenMetrics.ZERO;
+    }
+
+    if (cacheHit) {
+      double avoided = premiumBaseline == null ? 0.0 : carbonCalculator
+          .estimate(premiumBaseline, totalTokens, gridIntensityGramsPerKwh)
+          .gramsCo2();
+      return new GreenMetrics(0.0, 0.0, 0.0, avoided);
+    }
+
+    if (used == null) {
       return GreenMetrics.ZERO;
     }
 

@@ -83,7 +83,8 @@ class ChatCompletionService implements ChatCompletionUseCase {
     double gridIntensity = carbonIntensityProvider.gramsCo2PerKwh();
 
     return greenAccountant.account(
-        used, premiumBaseline, response.totalTokens(), gridIntensity);
+        used, premiumBaseline, response.totalTokens(), gridIntensity,
+        response.cacheHit());
   }
 
   private static String resolveClientId() {

@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.model.RequestContext;
 
 import org.slf4j.Logger;
@@ -21,6 +22,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
@@ -39,6 +41,8 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   static final String CACHE_RESPONSE_KEY = "cached_response";
   static final String CACHE_MODEL_KEY = "cached_model";
   static final String CACHE_FINISH_REASON_KEY = "cached_finish_reason";
+  static final String CACHE_PROMPT_TOKENS_KEY = "cached_prompt_tokens";
+  static final String CACHE_COMPLETION_TOKENS_KEY = "cached_completion_tokens";
   static final String CREATED_AT_KEY = "created_at";
   static final String CLIENT_ID_KEY = "client_id";
 
@@ -168,6 +172,13 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       metadata.put(CACHE_FINISH_REASON_KEY, resultMetadata.getFinishReason());
     }
 
+    if (responseMetadata != null && responseMetadata.getUsage() != null) {
+      Usage usage = responseMetadata.getUsage();
+      metadata.put(CACHE_PROMPT_TOKENS_KEY, intOrZero(usage.getPromptTokens()));
+      metadata.put(CACHE_COMPLETION_TOKENS_KEY,
+          intOrZero(usage.getCompletionTokens()));
+    }
+
     if (RequestContext.CURRENT.isBound()) {
       String clientId = RequestContext.CURRENT.get().clientId();
       if (clientId != null) {
@@ -186,6 +197,9 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     String finishReason = (String) metadata.getOrDefault(
         CACHE_FINISH_REASON_KEY, "stop");
 
+    int promptTokens = intOrZero(metadata.get(CACHE_PROMPT_TOKENS_KEY));
+    int completionTokens = intOrZero(metadata.get(CACHE_COMPLETION_TOKENS_KEY));
+
     Generation generation = new Generation(
         new AssistantMessage(responseText),
         ChatGenerationMetadata.builder()
@@ -193,9 +207,12 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
             .build()
     );
 
+    // Replay the original token counts and flag the hit, so green accounting
+    // can credit the avoided premium inference (real emission stays zero).
     ChatResponseMetadata responseMeta = ChatResponseMetadata.builder()
         .model(model)
-        .usage(new DefaultUsage(0, 0))
+        .usage(new DefaultUsage(promptTokens, completionTokens))
+        .keyValue(LlmResponse.CACHE_HIT_METADATA_KEY, Boolean.TRUE)
         .build();
 
     ChatResponse chatResponse = new ChatResponse(
@@ -205,6 +222,10 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
         .chatResponse(chatResponse)
         .context(context)
         .build();
+  }
+
+  private static int intOrZero(Object value) {
+    return value instanceof Number number ? number.intValue() : 0;
   }
 
   private static String truncate(String text) {

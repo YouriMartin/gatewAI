@@ -61,7 +61,7 @@ class ChatCompletionServiceTest {
     LlmRequest request = new LlmRequest(
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse expected = new LlmResponse(
-        "claude-3", "Hi there!", "end_turn", 10, 5, 15);
+        "claude-3", "Hi there!", "end_turn", 10, 5, 15, false);
 
     when(llmClient.call(request)).thenReturn(expected);
     doNothing().when(requestLogRepository).save(any());
@@ -77,7 +77,7 @@ class ChatCompletionServiceTest {
     LlmRequest request = new LlmRequest(
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse response = new LlmResponse(
-        "claude-3-real", "Hi!", "end_turn", 12, 8, 20);
+        "claude-3-real", "Hi!", "end_turn", 12, 8, 20, false);
 
     when(llmClient.call(request)).thenReturn(response);
     doNothing().when(requestLogRepository).save(any());
@@ -114,7 +114,7 @@ class ChatCompletionServiceTest {
     LlmRequest request = new LlmRequest(
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse response = new LlmResponse(
-        "claude-3", "Hi!", "end_turn", 10, 5, 15);
+        "claude-3", "Hi!", "end_turn", 10, 5, 15, false);
 
     when(llmClient.call(request)).thenReturn(response);
     doNothing().when(requestLogRepository).save(any());
@@ -130,7 +130,7 @@ class ChatCompletionServiceTest {
     LlmRequest request = new LlmRequest(
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse response = new LlmResponse(
-        "claude-3", "Hi!", "end_turn", 10, 5, 15);
+        "claude-3", "Hi!", "end_turn", 10, 5, 15, false);
 
     when(llmClient.call(request)).thenReturn(response);
     doNothing().when(requestLogRepository).save(any());
@@ -149,12 +149,12 @@ class ChatCompletionServiceTest {
     LlmRequest request = new LlmRequest(
         "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
     LlmResponse response = new LlmResponse(
-        "claude-haiku-4", "Hi!", "end_turn", 12, 8, 20);
+        "claude-haiku-4", "Hi!", "end_turn", 12, 8, 20, false);
     GreenMetrics metrics = new GreenMetrics(0.04, 0.00004, 0.0092, 0.092);
 
     when(llmClient.call(request)).thenReturn(response);
     when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
-    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0)))
+    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(false)))
         .thenReturn(metrics);
     doNothing().when(requestLogRepository).save(any());
 
@@ -162,5 +162,25 @@ class ChatCompletionServiceTest {
 
     verify(requestLogRepository).save(logCaptor.capture());
     assertEquals(metrics, logCaptor.getValue().green());
+  }
+
+  @Test
+  void propagatesCacheHitFlagToAccountant() {
+    LlmRequest request = new LlmRequest(
+        "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
+    LlmResponse cached = new LlmResponse(
+        "claude-sonnet-4", "Hi!", "stop", 12, 8, 20, true);
+    GreenMetrics metrics = new GreenMetrics(0.0, 0.0, 0.0, 0.69);
+
+    when(llmClient.call(request)).thenReturn(cached);
+    when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
+    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(true)))
+        .thenReturn(metrics);
+    doNothing().when(requestLogRepository).save(any());
+
+    service.complete(request);
+
+    verify(requestLogRepository).save(logCaptor.capture());
+    assertEquals(0.69, logCaptor.getValue().green().gramsCo2Avoided());
   }
 }

@@ -1,7 +1,9 @@
 package com.example.gatewai.infrastructure.llm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
@@ -99,6 +101,25 @@ class SpringAiLlmClientTest {
     assertEquals(10, response.promptTokens());
     assertEquals(5, response.completionTokens());
     assertEquals(15, response.totalTokens());
+    assertFalse(response.cacheHit());
+  }
+
+  @Test
+  void callDetectsCacheHitFlagFromMetadata() {
+    ChatResponseMetadata meta = ChatResponseMetadata.builder()
+        .model("claude-3-sonnet")
+        .usage(new DefaultUsage(10, 5))
+        .keyValue(LlmResponse.CACHE_HIT_METADATA_KEY, Boolean.TRUE)
+        .build();
+    Generation generation = new Generation(
+        new AssistantMessage("From cache"),
+        ChatGenerationMetadata.builder().finishReason("stop").build());
+    stubFluentChain(new ChatResponse(List.of(generation), meta));
+
+    LlmResponse response = llmClient.call(new LlmRequest("claude-3",
+        List.of(new LlmMessage("user", "Hello")), null, null));
+
+    assertTrue(response.cacheHit());
   }
 
   private static ChatResponse buildChatResponse() {

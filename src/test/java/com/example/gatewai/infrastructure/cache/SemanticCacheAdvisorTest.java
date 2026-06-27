@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Map;
 
+import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.model.RequestContext;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -146,6 +147,33 @@ class SemanticCacheAdvisorTest {
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY));
     assertNotNull(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY));
     assertTrue(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY) instanceof Long);
+    assertEquals(10,
+        doc.getMetadata().get(SemanticCacheAdvisor.CACHE_PROMPT_TOKENS_KEY));
+    assertEquals(5,
+        doc.getMetadata().get(SemanticCacheAdvisor.CACHE_COMPLETION_TOKENS_KEY));
+  }
+
+  @Test
+  void cacheHitReplaysStoredTokensAndFlagsHit() {
+    ChatClientRequest request = buildRequest("What is Spring?");
+    Document cachedDoc = new Document("What is Spring?", Map.of(
+        SemanticCacheAdvisor.CACHE_RESPONSE_KEY, "Spring is a framework.",
+        SemanticCacheAdvisor.CACHE_MODEL_KEY, "claude-3-sonnet",
+        SemanticCacheAdvisor.CACHE_PROMPT_TOKENS_KEY, 10,
+        SemanticCacheAdvisor.CACHE_COMPLETION_TOKENS_KEY, 5
+    ));
+
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(List.of(cachedDoc));
+
+    ChatClientResponse result = advisor.adviseCall(request, callChain);
+
+    assertEquals(10,
+        result.chatResponse().getMetadata().getUsage().getPromptTokens());
+    assertEquals(15,
+        result.chatResponse().getMetadata().getUsage().getTotalTokens());
+    assertEquals(Boolean.TRUE, result.chatResponse().getMetadata()
+        .get(LlmResponse.CACHE_HIT_METADATA_KEY));
   }
 
   @Test

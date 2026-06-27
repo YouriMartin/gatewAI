@@ -46,7 +46,7 @@ class ChatCompletionControllerTest {
   @Test
   void postReturnsValidOpenAiResponse() throws Exception {
     LlmResponse llmResponse = new LlmResponse(
-        "claude-3-sonnet", "Hello!", "end_turn", 10, 5, 15);
+        "claude-3-sonnet", "Hello!", "end_turn", 10, 5, 15, false);
     when(useCase.complete(any())).thenReturn(llmResponse);
 
     mockMvc.perform(post("/v1/chat/completions")
@@ -71,7 +71,7 @@ class ChatCompletionControllerTest {
   @Test
   void postDeserializesSnakeCaseFields() throws Exception {
     LlmResponse llmResponse = new LlmResponse(
-        "gpt-4", "OK", "stop", 1, 1, 2);
+        "gpt-4", "OK", "stop", 1, 1, 2, false);
     when(useCase.complete(any())).thenReturn(llmResponse);
 
     String requestJson = """

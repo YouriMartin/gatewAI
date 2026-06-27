@@ -80,8 +80,12 @@ class SpringAiLlmClient implements LlmClient {
     int totalTokens = usage.getTotalTokens() != null
         ? usage.getTotalTokens() : 0;
 
+    Boolean cacheHitFlag =
+        chatResponse.getMetadata().get(LlmResponse.CACHE_HIT_METADATA_KEY);
+    boolean cacheHit = Boolean.TRUE.equals(cacheHitFlag);
+
     return new LlmResponse(
         model, content, finishReason,
-        promptTokens, completionTokens, totalTokens);
+        promptTokens, completionTokens, totalTokens, cacheHit);
   }
 }
