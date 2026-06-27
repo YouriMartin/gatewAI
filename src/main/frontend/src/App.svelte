@@ -2,6 +2,7 @@
   import {
     fetchGreenReport,
     fetchGreenSeries,
+    downloadReport,
     listClients,
     createClient,
     revokeClient,
@@ -32,6 +33,14 @@
   let routingError = $state('');
   let routingSaved = $state(false);
 
+  let reportFrom = $state(isoDate(new Date(Date.now() - 30 * 86400000)));
+  let reportTo = $state(isoDate(new Date()));
+  let exportError = $state('');
+
+  function isoDate(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
   function lastThirtyDays(): { from: string; to: string } {
     const to = new Date();
     const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -48,6 +57,28 @@
     }
     const max = Math.max(...Object.values(report.model_mix), 1);
     return (count / max) * 100;
+  }
+
+  async function download(format: 'csv' | 'pdf') {
+    exportError = '';
+    try {
+      const blob = await downloadReport(
+        apiKey,
+        `${reportFrom}T00:00:00Z`,
+        `${reportTo}T23:59:59Z`,
+        format,
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `green-report.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      exportError = message(e);
+    }
   }
 
   async function connect() {
@@ -211,6 +242,25 @@
         </div>
       </section>
     {/if}
+
+    <section class="trends">
+      <h2>Rapports CSRD</h2>
+      {#if exportError}
+        <p class="error">Export impossible : {exportError}</p>
+      {/if}
+      <div class="export">
+        <label>
+          Du
+          <input type="date" bind:value={reportFrom} />
+        </label>
+        <label>
+          Au
+          <input type="date" bind:value={reportTo} />
+        </label>
+        <button onclick={() => download('csv')}>Télécharger CSV</button>
+        <button onclick={() => download('pdf')}>Télécharger PDF</button>
+      </div>
+    </section>
 
     <section class="admin">
       <h2>Clés API</h2>

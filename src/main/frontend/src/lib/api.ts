@@ -51,6 +51,19 @@ export async function fetchGreenReport(
   return (await (await ensureOk(response)).json()) as GreenReport;
 }
 
+export async function downloadReport(
+  apiKey: string,
+  from: string,
+  to: string,
+  format: 'csv' | 'pdf',
+): Promise<Blob> {
+  const params = new URLSearchParams({ from, to, format });
+  const response = await fetch(`/v1/reports/green?${params.toString()}`, {
+    headers: authHeaders(apiKey),
+  });
+  return (await ensureOk(response)).blob();
+}
+
 export async function fetchGreenSeries(
   apiKey: string,
   from: string,
