@@ -1,5 +1,6 @@
 package com.example.gatewai.infrastructure.cache;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +8,8 @@ import java.util.Map;
 
 import com.example.gatewai.domain.model.RequestContext;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
@@ -23,6 +26,8 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
@@ -34,13 +39,19 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   static final String CACHE_RESPONSE_KEY = "cached_response";
   static final String CACHE_MODEL_KEY = "cached_model";
   static final String CACHE_FINISH_REASON_KEY = "cached_finish_reason";
-  static final double SIMILARITY_THRESHOLD = 0.92;
-  static final int TOP_K = 1;
+  static final String CREATED_AT_KEY = "created_at";
+  static final String CLIENT_ID_KEY = "client_id";
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SemanticCacheAdvisor.class);
 
   private final VectorStore vectorStore;
+  private final SemanticCacheProperties properties;
 
-  SemanticCacheAdvisor(VectorStore vectorStore) {
+  SemanticCacheAdvisor(VectorStore vectorStore,
+                       SemanticCacheProperties properties) {
     this.vectorStore = vectorStore;
+    this.properties = properties;
   }
 
   @Override
@@ -51,17 +62,25 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextCall(request);
     }
 
-    List<Document> hits = vectorStore.similaritySearch(
-        SearchRequest.builder()
-            .query(userText)
-            .topK(TOP_K)
-            .similarityThreshold(SIMILARITY_THRESHOLD)
-            .build()
-    );
+    SearchRequest.Builder searchBuilder = SearchRequest.builder()
+        .query(userText)
+        .topK(properties.getTopK())
+        .similarityThreshold(properties.getSimilarityThreshold());
+
+    Filter.Expression filter = buildFilterExpression();
+    if (filter != null) {
+      searchBuilder.filterExpression(filter);
+    }
+
+    List<Document> hits = vectorStore.similaritySearch(searchBuilder.build());
 
     if (!hits.isEmpty()) {
+      LOG.info("Cache HIT for query [{}] (score={})",
+          truncate(userText), hits.getFirst().getScore());
       return buildCachedResponse(hits.getFirst(), request.context());
     }
+
+    LOG.info("Cache MISS for query [{}]", truncate(userText));
 
     ChatClientResponse response = chain.nextCall(request);
     cacheStore(userText, response);
@@ -92,6 +111,28 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     return userMessage.getText();
   }
 
+  Filter.Expression buildFilterExpression() {
+    FilterExpressionBuilder b = new FilterExpressionBuilder();
+    FilterExpressionBuilder.Op combined = null;
+
+    if (properties.isClientNamespacing() && RequestContext.CURRENT.isBound()) {
+      String clientId = RequestContext.CURRENT.get().clientId();
+      if (clientId != null) {
+        combined = b.eq(CLIENT_ID_KEY, clientId);
+      }
+    }
+
+    if (properties.getTtlMinutes() > 0) {
+      long cutoff = Instant.now()
+          .minus(Duration.ofMinutes(properties.getTtlMinutes()))
+          .toEpochMilli();
+      FilterExpressionBuilder.Op ttlFilter = b.gte(CREATED_AT_KEY, cutoff);
+      combined = combined != null ? b.and(combined, ttlFilter) : ttlFilter;
+    }
+
+    return combined != null ? combined.build() : null;
+  }
+
   private void cacheStore(String userText, ChatClientResponse response) {
     ChatResponse chatResponse = response.chatResponse();
     if (chatResponse == null || chatResponse.getResult() == null) {
@@ -105,7 +146,7 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
 
     Map<String, Object> metadata = new HashMap<>();
     metadata.put(CACHE_RESPONSE_KEY, responseText);
-    metadata.put("created_at", Instant.now().toString());
+    metadata.put(CREATED_AT_KEY, Instant.now().toEpochMilli());
 
     if (chatResponse.getMetadata() != null
         && chatResponse.getMetadata().getModel() != null) {
@@ -121,7 +162,7 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     if (RequestContext.CURRENT.isBound()) {
       String clientId = RequestContext.CURRENT.get().clientId();
       if (clientId != null) {
-        metadata.put("client_id", clientId);
+        metadata.put(CLIENT_ID_KEY, clientId);
       }
     }
 
@@ -155,5 +196,13 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
         .chatResponse(chatResponse)
         .context(context)
         .build();
+  }
+
+  private static String truncate(String text) {
+    int maxLen = 80;
+    if (text.length() <= maxLen) {
+      return text;
+    }
+    return text.substring(0, maxLen) + "...";
   }
 }

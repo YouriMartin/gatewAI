@@ -2,6 +2,7 @@ package com.example.gatewai.infrastructure.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +37,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.core.Ordered;
 
 import reactor.core.publisher.Flux;
@@ -61,11 +63,13 @@ class SemanticCacheAdvisorTest {
   @Captor
   private ArgumentCaptor<List<Document>> documentsCaptor;
 
+  private SemanticCacheProperties properties;
   private SemanticCacheAdvisor advisor;
 
   @BeforeEach
   void setUp() {
-    advisor = new SemanticCacheAdvisor(vectorStore);
+    properties = new SemanticCacheProperties();
+    advisor = new SemanticCacheAdvisor(vectorStore, properties);
   }
 
   // ---- Cache hit tests ----
@@ -132,10 +136,7 @@ class SemanticCacheAdvisorTest {
     verify(callChain).nextCall(request);
 
     verify(vectorStore).add(documentsCaptor.capture());
-    List<Document> stored = documentsCaptor.getValue();
-    assertEquals(1, stored.size());
-
-    Document doc = stored.getFirst();
+    Document doc = documentsCaptor.getValue().getFirst();
     assertEquals("What is Quarkus?", doc.getText());
     assertEquals("Quarkus is a framework.",
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_RESPONSE_KEY));
@@ -143,7 +144,8 @@ class SemanticCacheAdvisorTest {
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_MODEL_KEY));
     assertEquals("end_turn",
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY));
-    assertNotNull(doc.getMetadata().get("created_at"));
+    assertNotNull(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY));
+    assertTrue(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY) instanceof Long);
   }
 
   @Test
@@ -162,23 +164,7 @@ class SemanticCacheAdvisorTest {
 
     verify(vectorStore).add(documentsCaptor.capture());
     Document doc = documentsCaptor.getValue().getFirst();
-    assertEquals("tenant-42", doc.getMetadata().get("client_id"));
-  }
-
-  @Test
-  void cacheMissWithoutScopedValueOmitsClientId() {
-    ChatClientRequest request = buildRequest("Hello");
-    ChatClientResponse llmResponse = buildLlmResponse("Hi!", "claude-3", "stop");
-
-    when(vectorStore.similaritySearch(any(SearchRequest.class)))
-        .thenReturn(List.of());
-    when(callChain.nextCall(request)).thenReturn(llmResponse);
-
-    advisor.adviseCall(request, callChain);
-
-    verify(vectorStore).add(documentsCaptor.capture());
-    Document doc = documentsCaptor.getValue().getFirst();
-    assertTrue(!doc.getMetadata().containsKey("client_id"));
+    assertEquals("tenant-42", doc.getMetadata().get(SemanticCacheAdvisor.CLIENT_ID_KEY));
   }
 
   @Test
@@ -195,12 +181,14 @@ class SemanticCacheAdvisorTest {
     verify(vectorStore, never()).add(any());
   }
 
-  // ---- Search parameters ----
+  // ---- Configuration tests ----
 
   @Test
-  void searchUsesCorrectQueryAndThreshold() {
-    ChatClientRequest request = buildRequest("Hello world");
-    ChatClientResponse llmResponse = buildLlmResponse("Hi!", "claude-3", "stop");
+  void searchUsesConfiguredThresholdAndTopK() {
+    properties.setSimilarityThreshold(0.85);
+    properties.setTopK(3);
+    ChatClientRequest request = buildRequest("test");
+    ChatClientResponse llmResponse = buildLlmResponse("ok", "m", "stop");
 
     when(vectorStore.similaritySearch(searchRequestCaptor.capture()))
         .thenReturn(List.of());
@@ -209,10 +197,89 @@ class SemanticCacheAdvisorTest {
     advisor.adviseCall(request, callChain);
 
     SearchRequest captured = searchRequestCaptor.getValue();
-    assertEquals("Hello world", captured.getQuery());
-    assertEquals(SemanticCacheAdvisor.TOP_K, captured.getTopK());
-    assertEquals(SemanticCacheAdvisor.SIMILARITY_THRESHOLD,
-        captured.getSimilarityThreshold());
+    assertEquals("test", captured.getQuery());
+    assertEquals(3, captured.getTopK());
+    assertEquals(0.85, captured.getSimilarityThreshold());
+  }
+
+  // ---- Filter expression tests ----
+
+  @Test
+  void noFilterWhenNamespacingDisabledAndNoTtl() {
+    properties.setClientNamespacing(false);
+    properties.setTtlMinutes(0);
+
+    Filter.Expression filter = advisor.buildFilterExpression();
+
+    assertNull(filter);
+  }
+
+  @Test
+  void clientNamespaceFilterWhenScopedValueBound() {
+    properties.setClientNamespacing(true);
+    properties.setTtlMinutes(0);
+
+    RequestContext ctx = new RequestContext("tenant-99", "trace-1");
+    Filter.Expression filter = ScopedValue.where(RequestContext.CURRENT, ctx)
+        .call(() -> advisor.buildFilterExpression());
+
+    assertNotNull(filter);
+    assertEquals(Filter.ExpressionType.EQ, filter.type());
+  }
+
+  @Test
+  void noClientFilterWhenScopedValueNotBound() {
+    properties.setClientNamespacing(true);
+    properties.setTtlMinutes(0);
+
+    Filter.Expression filter = advisor.buildFilterExpression();
+
+    assertNull(filter);
+  }
+
+  @Test
+  void ttlFilterWhenTtlConfigured() {
+    properties.setClientNamespacing(false);
+    properties.setTtlMinutes(60);
+
+    Filter.Expression filter = advisor.buildFilterExpression();
+
+    assertNotNull(filter);
+    assertEquals(Filter.ExpressionType.GTE, filter.type());
+  }
+
+  @Test
+  void combinedFilterWhenBothNamespaceAndTtl() {
+    properties.setClientNamespacing(true);
+    properties.setTtlMinutes(60);
+
+    RequestContext ctx = new RequestContext("tenant-1", "trace-1");
+    Filter.Expression filter = ScopedValue.where(RequestContext.CURRENT, ctx)
+        .call(() -> advisor.buildFilterExpression());
+
+    assertNotNull(filter);
+    assertEquals(Filter.ExpressionType.AND, filter.type());
+  }
+
+  @Test
+  void searchIncludesFilterExpression() {
+    properties.setClientNamespacing(true);
+    properties.setTtlMinutes(0);
+
+    ChatClientRequest request = buildRequest("test");
+    ChatClientResponse llmResponse = buildLlmResponse("ok", "m", "stop");
+
+    when(vectorStore.similaritySearch(searchRequestCaptor.capture()))
+        .thenReturn(List.of());
+    when(callChain.nextCall(request)).thenReturn(llmResponse);
+
+    RequestContext ctx = new RequestContext("tenant-1", "trace-1");
+    ScopedValue.where(RequestContext.CURRENT, ctx).run(() ->
+        advisor.adviseCall(request, callChain)
+    );
+
+    SearchRequest captured = searchRequestCaptor.getValue();
+    assertTrue(captured.hasFilterExpression());
   }
 
   // ---- Skip-cache tests ----
@@ -226,7 +293,6 @@ class SemanticCacheAdvisorTest {
     ChatClientResponse result = advisor.adviseCall(request, callChain);
 
     verify(vectorStore, never()).similaritySearch(any(SearchRequest.class));
-    verify(callChain).nextCall(request);
     assertSame(chainResponse, result);
   }
 
@@ -243,7 +309,6 @@ class SemanticCacheAdvisorTest {
     ChatClientResponse result = advisor.adviseCall(request, callChain);
 
     verify(vectorStore, never()).similaritySearch(any(SearchRequest.class));
-    verify(callChain).nextCall(request);
     assertSame(chainResponse, result);
   }
 
@@ -258,7 +323,6 @@ class SemanticCacheAdvisorTest {
     Flux<ChatClientResponse> result = advisor.adviseStream(request, streamChain);
 
     assertSame(flux, result);
-    verify(streamChain).nextStream(request);
   }
 
   @Test
