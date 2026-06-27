@@ -2,6 +2,7 @@ package com.example.gatewai.adapter.in.web;
 
 import com.example.gatewai.domain.port.out.ApiClientRepository;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -11,11 +12,19 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@EnableConfigurationProperties(RateLimitProperties.class)
 class SecurityConfig {
 
   @Bean
+  RateLimiter rateLimiter(RateLimitProperties rateLimitProperties) {
+    return new RateLimiter(rateLimitProperties);
+  }
+
+  @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                          ApiClientRepository apiClientRepository)
+                                          ApiClientRepository apiClientRepository,
+                                          RateLimiter rateLimiter,
+                                          RateLimitProperties rateLimitProperties)
       throws Exception {
     http
         .csrf(csrf -> csrf.disable())
@@ -24,6 +33,9 @@ class SecurityConfig {
         .addFilterBefore(
             new ApiKeyAuthenticationFilter(apiClientRepository),
             UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(
+            new RateLimitFilter(rateLimiter, rateLimitProperties),
+            ApiKeyAuthenticationFilter.class)
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/actuator/info",
                 "/actuator/prometheus").permitAll()

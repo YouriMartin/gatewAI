@@ -105,7 +105,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 5.4 — rapports : sélecteur de période + téléchargement CSV/PDF (fetch+Blob, header Bearer)
 - [~] Phase 6 — valorisation d'ingénierie (polish)
   - [x] 6.1 — observabilité : Micrometer → `/actuator/prometheus`, métriques natives Spring AI + `gatewai_*` custom, stack Prometheus/Grafana séparée
-  - [ ] 6.2 — rate limiting
+  - [x] 6.2 — rate limiting : Bucket4j par client API, 429 + Retry-After sur POST /v1/chat/completions*
   - [ ] 6.3 — image native GraalVM
   - [ ] 6.4 — exposition MCP
   - [ ] 6.5 — packaging final
