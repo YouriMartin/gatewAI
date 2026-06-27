@@ -2,12 +2,14 @@ package com.example.gatewai.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
+import com.example.gatewai.domain.port.out.ApiClientRepository;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,26 +29,31 @@ class ChatCompletionControllerTest {
   @MockitoBean
   private ChatCompletionUseCase useCase;
 
+  @MockitoBean
+  private ApiClientRepository apiClientRepository;
+
+  private static final String REQUEST_JSON = """
+      {
+        "model": "claude-3-sonnet",
+        "messages": [
+          {"role": "user", "content": "Hi"}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 256
+      }
+      """;
+
   @Test
   void postReturnsValidOpenAiResponse() throws Exception {
     LlmResponse llmResponse = new LlmResponse(
         "claude-3-sonnet", "Hello!", "end_turn", 10, 5, 15);
     when(useCase.complete(any())).thenReturn(llmResponse);
 
-    String requestJson = """
-        {
-          "model": "claude-3-sonnet",
-          "messages": [
-            {"role": "user", "content": "Hi"}
-          ],
-          "temperature": 0.7,
-          "max_tokens": 256
-        }
-        """;
-
     mockMvc.perform(post("/v1/chat/completions")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(requestJson))
+            .content(REQUEST_JSON)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.startsWith("chatcmpl-")))
         .andExpect(jsonPath("$.object").value("chat.completion"))
@@ -79,8 +86,18 @@ class ChatCompletionControllerTest {
 
     mockMvc.perform(post("/v1/chat/completions")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(requestJson))
+            .content(requestJson)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.model").value("gpt-4"));
+  }
+
+  @Test
+  void postWithoutAuthenticationReturns401() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(REQUEST_JSON))
+        .andExpect(status().isUnauthorized());
   }
 }

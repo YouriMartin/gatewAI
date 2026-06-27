@@ -11,5 +11,6 @@ public record RequestLog(
     int promptTokens,
     int completionTokens,
     int totalTokens,
-    long latencyMs
+    long latencyMs,
+    String clientId
 ) {}

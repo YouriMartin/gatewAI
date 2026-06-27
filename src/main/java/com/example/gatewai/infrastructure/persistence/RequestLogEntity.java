@@ -39,6 +39,9 @@ class RequestLogEntity {
   @Column(name = "latency_ms", updatable = false, nullable = false)
   private long latencyMs;
 
+  @Column(name = "client_id", updatable = false)
+  private String clientId;
+
   protected RequestLogEntity() {
     // JPA requires a no-arg constructor
   }
@@ -52,12 +55,14 @@ class RequestLogEntity {
     this.completionTokens = log.completionTokens();
     this.totalTokens = log.totalTokens();
     this.latencyMs = log.latencyMs();
+    this.clientId = log.clientId();
   }
 
   RequestLog toDomain() {
     return new RequestLog(
         id, timestamp, model, promptHash,
-        promptTokens, completionTokens, totalTokens, latencyMs
+        promptTokens, completionTokens, totalTokens, latencyMs,
+        clientId
     );
   }
 }

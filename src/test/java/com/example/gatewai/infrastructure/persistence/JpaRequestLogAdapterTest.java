@@ -34,7 +34,7 @@ class JpaRequestLogAdapterTest {
   void saveDelegatesToSpringData() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), Instant.now(), "claude-3",
-        "a".repeat(64), 10, 5, 15, 200L
+        "a".repeat(64), 10, 5, 15, 200L, "client-1"
     );
 
     when(jpaRepository.save(any(RequestLogEntity.class)))
@@ -46,6 +46,7 @@ class JpaRequestLogAdapterTest {
     RequestLogEntity captured = entityCaptor.getValue();
     assertEquals(log.id(), captured.toDomain().id());
     assertEquals(log.model(), captured.toDomain().model());
+    assertEquals(log.clientId(), captured.toDomain().clientId());
   }
 
   @Test
@@ -53,7 +54,21 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3-opus", "b".repeat(64),
-        100, 50, 150, 1234L
+        100, 50, 150, 1234L, "tenant-42"
+    );
+
+    RequestLogEntity entity = new RequestLogEntity(original);
+    RequestLog restored = entity.toDomain();
+
+    assertEquals(original, restored);
+  }
+
+  @Test
+  void roundTripWithNullClientId() {
+    RequestLog original = new RequestLog(
+        UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
+        "claude-3", "c".repeat(64),
+        10, 5, 15, 100L, null
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);

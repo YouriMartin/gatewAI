@@ -1,6 +1,7 @@
 package com.example.gatewai.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,6 +14,7 @@ import java.util.List;
 import com.example.gatewai.domain.model.LlmMessage;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.out.LlmClient;
 import com.example.gatewai.domain.port.out.RequestLogRepository;
@@ -91,5 +93,40 @@ class ChatCompletionServiceTest {
 
     assertEquals(hash1, hash2);
     assertEquals(64, hash1.length());
+  }
+
+  @Test
+  void clientIdIsNullWhenScopedValueNotBound() {
+    LlmRequest request = new LlmRequest(
+        "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
+    LlmResponse response = new LlmResponse(
+        "claude-3", "Hi!", "end_turn", 10, 5, 15);
+
+    when(llmClient.call(request)).thenReturn(response);
+    doNothing().when(requestLogRepository).save(any());
+
+    service.complete(request);
+
+    verify(requestLogRepository).save(logCaptor.capture());
+    assertNull(logCaptor.getValue().clientId());
+  }
+
+  @Test
+  void clientIdIsCapturedFromScopedValue() {
+    LlmRequest request = new LlmRequest(
+        "claude-3", List.of(new LlmMessage("user", "hello")), 0.7, 256);
+    LlmResponse response = new LlmResponse(
+        "claude-3", "Hi!", "end_turn", 10, 5, 15);
+
+    when(llmClient.call(request)).thenReturn(response);
+    doNothing().when(requestLogRepository).save(any());
+
+    RequestContext ctx = new RequestContext("tenant-42", "trace-1");
+    ScopedValue.where(RequestContext.CURRENT, ctx).run(() ->
+        service.complete(request)
+    );
+
+    verify(requestLogRepository).save(logCaptor.capture());
+    assertEquals("tenant-42", logCaptor.getValue().clientId());
   }
 }

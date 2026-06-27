@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
 import com.example.gatewai.domain.port.out.LlmClient;
@@ -37,6 +38,7 @@ class ChatCompletionService implements ChatCompletionUseCase {
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     String promptHash = hashPrompt(request);
+    String clientId = resolveClientId();
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
@@ -46,11 +48,19 @@ class ChatCompletionService implements ChatCompletionUseCase {
         response.promptTokens(),
         response.completionTokens(),
         response.totalTokens(),
-        latencyMs
+        latencyMs,
+        clientId
     );
     requestLogRepository.save(log);
 
     return response;
+  }
+
+  private static String resolveClientId() {
+    if (RequestContext.CURRENT.isBound()) {
+      return RequestContext.CURRENT.get().clientId();
+    }
+    return null;
   }
 
   static String hashPrompt(LlmRequest request) {
