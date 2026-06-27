@@ -5,11 +5,13 @@ import com.example.gatewai.domain.model.ModelTier;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@RegisterReflectionForBinding(ClassificationResult.class)
 class ChatClientConfiguration {
 
   @Bean

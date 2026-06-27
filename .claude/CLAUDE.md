@@ -106,7 +106,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
 - [~] Phase 6 — valorisation d'ingénierie (polish)
   - [x] 6.1 — observabilité : Micrometer → `/actuator/prometheus`, métriques natives Spring AI + `gatewai_*` custom, stack Prometheus/Grafana séparée
   - [x] 6.2 — rate limiting : Bucket4j par client API, 429 + Retry-After sur POST /v1/chat/completions*
-  - [ ] 6.3 — image native GraalVM
+  - [x] 6.3 — image native GraalVM : native-ready (profil parent `native`, runtime hints réflexion testés, `docs/native.md`). Compilation complète à valider en CI GraalVM
   - [ ] 6.4 — exposition MCP
   - [ ] 6.5 — packaging final
 
