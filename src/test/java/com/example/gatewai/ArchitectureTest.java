@@ -22,5 +22,6 @@ class ArchitectureTest {
             .adapter("web", "com.example.gatewai.adapter.in.web..")
             .adapter("persistence", "com.example.gatewai.infrastructure.persistence..")
             .adapter("llm", "com.example.gatewai.infrastructure.llm..")
-            .adapter("vectorstore", "com.example.gatewai.infrastructure.vectorstore..");
+            .adapter("vectorstore", "com.example.gatewai.infrastructure.vectorstore..")
+            .adapter("cache", "com.example.gatewai.infrastructure.cache..");
 }

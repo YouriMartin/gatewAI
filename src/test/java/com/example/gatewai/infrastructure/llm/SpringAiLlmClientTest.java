@@ -50,8 +50,9 @@ class SpringAiLlmClientTest {
 
   @BeforeEach
   void setUp() {
+    when(chatClientBuilder.defaultAdvisors(anyList())).thenReturn(chatClientBuilder);
     when(chatClientBuilder.build()).thenReturn(chatClient);
-    llmClient = new SpringAiLlmClient(chatClientBuilder);
+    llmClient = new SpringAiLlmClient(chatClientBuilder, List.of());
   }
 
   private void stubFluentChain(ChatResponse response) {

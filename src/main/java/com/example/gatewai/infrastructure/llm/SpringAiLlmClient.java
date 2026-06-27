@@ -9,6 +9,7 @@ import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.port.out.LlmClient;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -23,8 +24,11 @@ class SpringAiLlmClient implements LlmClient {
 
   private final ChatClient chatClient;
 
-  SpringAiLlmClient(ChatClient.Builder chatClientBuilder) {
-    this.chatClient = chatClientBuilder.build();
+  SpringAiLlmClient(ChatClient.Builder chatClientBuilder,
+                     List<Advisor> advisors) {
+    this.chatClient = chatClientBuilder
+        .defaultAdvisors(advisors)
+        .build();
   }
 
   @Override
