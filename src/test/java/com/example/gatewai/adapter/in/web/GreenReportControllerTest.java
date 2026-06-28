@@ -76,7 +76,7 @@ class GreenReportControllerTest {
         .andExpect(content().contentTypeCompatibleWith(
             MediaType.parseMediaType("text/csv")))
         .andExpect(content().string(
-            org.hamcrest.Matchers.containsString("total_cost_avoided_eur")));
+            org.hamcrest.Matchers.containsString("section,metric,value,unit,reference")));
   }
 
   @Test

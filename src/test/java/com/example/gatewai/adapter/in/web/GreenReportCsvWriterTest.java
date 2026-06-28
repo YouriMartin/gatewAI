@@ -20,14 +20,19 @@ class GreenReportCsvWriterTest {
   }
 
   @Test
-  void producesKeyValueCsvWithModelMix() {
+  void producesCsrdStructuredCsvWithModelMix() {
     String csv = GreenReportCsvWriter.toCsv(report());
 
-    assertTrue(csv.startsWith("metric,value\n"), csv);
-    assertTrue(csv.contains("total_requests,3\n"), csv);
-    assertTrue(csv.contains("cache_hits,1\n"), csv);
-    assertTrue(csv.contains("total_cost_avoided_eur,0.028000\n"), csv);
-    assertTrue(csv.contains("model:haiku,1\n"), csv);
-    assertTrue(csv.contains("model:sonnet,2\n"), csv);
+    assertTrue(csv.startsWith("section,metric,value,unit,reference\n"), csv);
+    // ESRS-referenced sections with units
+    assertTrue(csv.contains(
+        "Energy consumption,Total energy consumed,0.003000,kWh,ESRS E1-5\n"), csv);
+    assertTrue(csv.contains(",kg CO2e,ESRS E1-6\n"), csv);
+    // Activity + efficiency
+    assertTrue(csv.contains("Resource efficiency,Requests served,3,count,\n"), csv);
+    assertTrue(csv.contains("Avoided emissions (non-inventory)"), csv);
+    // Model mix rows
+    assertTrue(csv.contains("Model mix,haiku,1,requests,\n"), csv);
+    assertTrue(csv.contains("Model mix,sonnet,2,requests,\n"), csv);
   }
 }
