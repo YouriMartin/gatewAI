@@ -107,7 +107,7 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 6.1 — observabilité : Micrometer → `/actuator/prometheus`, métriques natives Spring AI + `gatewai_*` custom, stack Prometheus/Grafana séparée
   - [x] 6.2 — rate limiting : Bucket4j par client API, 429 + Retry-After sur POST /v1/chat/completions*
   - [x] 6.3 — image native GraalVM : native-ready (profil parent `native`, runtime hints réflexion testés, `docs/native.md`). Compilation complète à valider en CI GraalVM
-  - [ ] 6.4 — exposition MCP
+  - [x] 6.4 — exposition MCP : serveur MCP (Spring AI, transport streamable-HTTP `/mcp`), outils `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, auth Bearer partagée, hints natifs (`docs/mcp.md`)
   - [ ] 6.5 — packaging final
 
 ## Build front (mono-repo)

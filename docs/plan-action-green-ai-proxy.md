@@ -196,7 +196,7 @@ src/main/
 | 6.1 | Observabilité | Observabilité native Spring AI (tokens, latence, modèle) → Micrometer → Prometheus + Grafana | Maturité MLOps |
 | 6.2 | Rate limiting | Bucket4j ou les limites de concurrence natives de Boot 4 | Robustesse |
 | 6.3 | Image native GraalVM | Compilation native optionnelle | Démarrage rapide + RAM minimale = cohérent avec le discours « green », double win |
-| 6.4 | Exposition MCP | Spring AI 2.0 intègre MCP dans le cœur : exposer la passerelle comme serveur MCP | Différenciation forte |
+| 6.4 | Exposition MCP ✅ | Spring AI 2.0 intègre MCP dans le cœur : exposer la passerelle comme serveur MCP (voir `docs/mcp.md`) | Différenciation forte |
 | 6.5 | Packaging final | `docker-compose.yml` « plug & play » complet + README + schéma d'archi | Démontre l'archi end-to-end |
 
 ---

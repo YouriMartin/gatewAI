@@ -20,6 +20,7 @@ class ArchitectureTest {
             .domainServices("com.example.gatewai.domain.port..")
             .applicationServices("com.example.gatewai.application..")
             .adapter("web", "com.example.gatewai.adapter.in.web..")
+            .adapter("mcp", "com.example.gatewai.adapter.in.mcp..")
             .adapter("persistence", "com.example.gatewai.infrastructure.persistence..")
             .adapter("llm", "com.example.gatewai.infrastructure.llm..")
             .adapter("vectorstore", "com.example.gatewai.infrastructure.vectorstore..")

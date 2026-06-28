@@ -44,6 +44,8 @@ class SecurityConfig {
                 "/favicon.ico", "/favicon.svg", "/vite.svg").permitAll()
             .requestMatchers("/v1/admin/**").hasRole("ADMIN")
             .requestMatchers("/v1/**").authenticated()
+            // MCP server endpoint (Phase 6.4): same Bearer API key as /v1/**.
+            .requestMatchers("/mcp/**", "/mcp").authenticated()
             .anyRequest().authenticated());
     return http.build();
   }
