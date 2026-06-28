@@ -17,6 +17,8 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
   private static final List<Class<?>> BOUND_DTOS = List.of(
       ChatCompletionRequest.class,
       ChatCompletionResponse.class,
+      ChatCompletionChunk.class,
+      ChunkChoice.class,
       ChatMessage.class,
       ChatChoice.class,
       TokenUsage.class,

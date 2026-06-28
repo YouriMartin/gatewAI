@@ -2,9 +2,11 @@ package com.example.gatewai.infrastructure.cache;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.gatewai.domain.model.LlmResponse;
 import com.example.gatewai.domain.model.RequestContext;
@@ -94,7 +96,48 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   @Override
   public Flux<ChatClientResponse> adviseStream(ChatClientRequest request,
                                                StreamAdvisorChain chain) {
-    return chain.nextStream(request);
+    String userText = extractUserText(request);
+    if (userText == null || userText.isBlank()) {
+      return chain.nextStream(request);
+    }
+
+    SearchRequest.Builder searchBuilder = SearchRequest.builder()
+        .query(userText)
+        .topK(properties.getTopK())
+        .similarityThreshold(properties.getSimilarityThreshold());
+    Filter.Expression filter = buildFilterExpression();
+    if (filter != null) {
+      searchBuilder.filterExpression(filter);
+    }
+
+    // similaritySearch runs eagerly here (Scoped Value still bound), so the
+    // per-client filter is applied; the deferred store below captures clientId.
+    List<Document> hits = vectorStore.similaritySearch(searchBuilder.build());
+
+    if (!hits.isEmpty()) {
+      LOG.info("Cache HIT (stream) for query [{}] (score={})",
+          truncate(userText), hits.getFirst().getScore());
+      return syntheticStream(hits.getFirst(), request.context());
+    }
+
+    LOG.info("Cache MISS (stream) for query [{}]", truncate(userText));
+    String clientId = boundClientId();
+    StringBuilder aggregate = new StringBuilder();
+    AtomicReference<ChatResponse> lastResponse = new AtomicReference<>();
+
+    return chain.nextStream(request)
+        .doOnNext(response -> {
+          ChatResponse cr = response.chatResponse();
+          if (cr != null) {
+            lastResponse.set(cr);
+            String delta = deltaText(cr);
+            if (delta != null) {
+              aggregate.append(delta);
+            }
+          }
+        })
+        .doOnComplete(() ->
+            storeStreamed(userText, aggregate.toString(), lastResponse.get(), clientId));
   }
 
   @Override
@@ -222,6 +265,114 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
         .chatResponse(chatResponse)
         .context(context)
         .build();
+  }
+
+  // --- streaming helpers (Phase 7.5) ---
+
+  /** Replays a cached answer as a synthetic chunk stream (no model call). */
+  private static Flux<ChatClientResponse> syntheticStream(
+      Document hit, Map<String, Object> context) {
+    Map<String, Object> metadata = hit.getMetadata();
+    String responseText = (String) metadata.getOrDefault(CACHE_RESPONSE_KEY, "");
+    String model = (String) metadata.getOrDefault(CACHE_MODEL_KEY, "cache");
+    String finishReason =
+        (String) metadata.getOrDefault(CACHE_FINISH_REASON_KEY, "stop");
+    int promptTokens = intOrZero(metadata.get(CACHE_PROMPT_TOKENS_KEY));
+    int completionTokens = intOrZero(metadata.get(CACHE_COMPLETION_TOKENS_KEY));
+
+    List<String> pieces = splitForStreaming(responseText);
+    List<ChatClientResponse> chunks = new ArrayList<>();
+    for (int i = 0; i < pieces.size(); i++) {
+      boolean last = i == pieces.size() - 1;
+      chunks.add(chunkResponse(pieces.get(i), model, last ? finishReason : "",
+          last, promptTokens, completionTokens, context));
+    }
+    if (chunks.isEmpty()) {
+      chunks.add(chunkResponse("", model, finishReason, true,
+          promptTokens, completionTokens, context));
+    }
+    return Flux.fromIterable(chunks);
+  }
+
+  private static ChatClientResponse chunkResponse(String text, String model,
+      String finishReason, boolean last, int promptTokens, int completionTokens,
+      Map<String, Object> context) {
+    Generation generation = new Generation(
+        new AssistantMessage(text),
+        ChatGenerationMetadata.builder()
+            .finishReason(finishReason == null ? "" : finishReason)
+            .build());
+
+    var metaBuilder = ChatResponseMetadata.builder().model(model);
+    if (last) {
+      metaBuilder.usage(new DefaultUsage(promptTokens, completionTokens))
+          .keyValue(LlmResponse.CACHE_HIT_METADATA_KEY, Boolean.TRUE);
+    }
+
+    ChatResponse chatResponse =
+        new ChatResponse(List.of(generation), metaBuilder.build());
+    return ChatClientResponse.builder()
+        .chatResponse(chatResponse)
+        .context(context)
+        .build();
+  }
+
+  /** Fixed-size pieces so the deltas concatenate back to the exact answer. */
+  private static List<String> splitForStreaming(String text) {
+    if (text == null || text.isEmpty()) {
+      return List.of();
+    }
+    int size = 24;
+    List<String> pieces = new ArrayList<>();
+    for (int i = 0; i < text.length(); i += size) {
+      pieces.add(text.substring(i, Math.min(text.length(), i + size)));
+    }
+    return pieces;
+  }
+
+  /** Stores a streamed miss once aggregated (clientId captured up the stack). */
+  private void storeStreamed(String userText, String responseText,
+                             ChatResponse lastResponse, String clientId) {
+    if (responseText == null || responseText.isEmpty() || lastResponse == null) {
+      return;
+    }
+    Map<String, Object> metadata = new HashMap<>();
+    metadata.put(CACHE_RESPONSE_KEY, responseText);
+    metadata.put(CREATED_AT_KEY, Instant.now().toEpochMilli());
+
+    ChatResponseMetadata responseMetadata = lastResponse.getMetadata();
+    if (responseMetadata != null && responseMetadata.getModel() != null) {
+      metadata.put(CACHE_MODEL_KEY, responseMetadata.getModel());
+    }
+    Generation result = lastResponse.getResult();
+    if (result != null && result.getMetadata() != null
+        && result.getMetadata().getFinishReason() != null) {
+      metadata.put(CACHE_FINISH_REASON_KEY, result.getMetadata().getFinishReason());
+    }
+    if (responseMetadata != null && responseMetadata.getUsage() != null) {
+      Usage usage = responseMetadata.getUsage();
+      metadata.put(CACHE_PROMPT_TOKENS_KEY, intOrZero(usage.getPromptTokens()));
+      metadata.put(CACHE_COMPLETION_TOKENS_KEY,
+          intOrZero(usage.getCompletionTokens()));
+    }
+    if (clientId != null) {
+      metadata.put(CLIENT_ID_KEY, clientId);
+    }
+    vectorStore.add(List.of(new Document(userText, metadata)));
+  }
+
+  private static String deltaText(ChatResponse chatResponse) {
+    Generation result = chatResponse.getResult();
+    if (result == null) {
+      return null;
+    }
+    AssistantMessage output = result.getOutput();
+    return output != null ? output.getText() : null;
+  }
+
+  private static String boundClientId() {
+    return RequestContext.CURRENT.isBound()
+        ? RequestContext.CURRENT.get().clientId() : null;
   }
 
   private static int intOrZero(Object value) {

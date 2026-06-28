@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.example.gatewai.domain.model.LlmMessage;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.LlmStreamChunk;
 
 /** Maps between the OpenAI-shaped web DTOs and the domain request/response. */
 final class OpenAiMapper {
@@ -20,6 +21,16 @@ final class OpenAiMapper {
         .toList();
     return new LlmRequest(request.model(), messages,
         request.temperature(), request.maxTokens());
+  }
+
+  /** Maps a domain stream chunk to an OpenAI {@code chat.completion.chunk}. */
+  static ChatCompletionChunk toChunk(String id, long created, LlmStreamChunk chunk) {
+    String finishReason = chunk.finishReason() == null || chunk.finishReason().isBlank()
+        ? null : chunk.finishReason();
+    ChatMessage delta = new ChatMessage("assistant", chunk.contentDelta());
+    return new ChatCompletionChunk(
+        id, "chat.completion.chunk", created, chunk.model(),
+        List.of(new ChunkChoice(0, delta, finishReason)));
   }
 
   static ChatCompletionResponse toCompletionResponse(LlmResponse response) {

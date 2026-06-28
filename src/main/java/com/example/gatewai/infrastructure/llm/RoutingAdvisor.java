@@ -71,7 +71,28 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   @Override
   public Flux<ChatClientResponse> adviseStream(ChatClientRequest request,
                                                StreamAdvisorChain chain) {
-    return chain.nextStream(request);
+    String userText = extractUserText(request);
+    if (userText == null || userText.isBlank()) {
+      return chain.nextStream(request);
+    }
+
+    ModelTier tier = classifier.classify(userText);
+    List<ModelDefinition> candidates = modelRegistry.findByTier(tier);
+    if (candidates.isEmpty()) {
+      return chain.nextStream(request);
+    }
+
+    ModelDefinition target = candidates.getFirst();
+    LOG.info("Routing (stream) to {} (tier={}, model={})",
+        target.provider(), tier, target.modelId());
+
+    Prompt routedPrompt = reroutePrompt(request.prompt(), target.modelId());
+    ChatClientRequest routedRequest = ChatClientRequest.builder()
+        .prompt(routedPrompt)
+        .context(request.context())
+        .build();
+
+    return chain.nextStream(routedRequest);
   }
 
   @Override

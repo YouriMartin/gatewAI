@@ -2,10 +2,12 @@ package com.example.gatewai.infrastructure.llm;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.example.gatewai.domain.model.LlmMessage;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.LlmStreamChunk;
 import com.example.gatewai.domain.port.out.LlmClient;
 
 import org.springframework.ai.chat.client.ChatClient;
@@ -54,6 +56,62 @@ class SpringAiLlmClient implements LlmClient {
         "ChatResponse must not be null");
 
     return toLlmResponse(chatResponse);
+  }
+
+  @Override
+  public void stream(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
+    List<Message> springMessages = request.messages().stream()
+        .map(SpringAiLlmClient::toSpringMessage)
+        .toList();
+
+    var optionsBuilder = ChatOptions.builder().model(request.model());
+    if (request.temperature() != null) {
+      optionsBuilder.temperature(request.temperature());
+    }
+    if (request.maxTokens() != null) {
+      optionsBuilder.maxTokens(request.maxTokens());
+    }
+
+    // toStream() drains the reactive pipeline (incl. the cache/routing advisors)
+    // on the calling thread, so Reactor stays confined to this adapter.
+    chatClient.prompt()
+        .messages(springMessages)
+        .options(optionsBuilder)
+        .stream()
+        .chatResponse()
+        .toStream()
+        .forEach(chatResponse -> onChunk.accept(toChunk(chatResponse)));
+  }
+
+  private static LlmStreamChunk toChunk(ChatResponse chatResponse) {
+    var result = chatResponse.getResult();
+    String delta = result != null && result.getOutput() != null
+        && result.getOutput().getText() != null
+        ? result.getOutput().getText() : "";
+
+    var responseMeta = chatResponse.getMetadata();
+    String model = responseMeta != null ? responseMeta.getModel() : null;
+    String finishReason = result != null && result.getMetadata() != null
+        ? result.getMetadata().getFinishReason() : null;
+    boolean last = finishReason != null && !finishReason.isBlank();
+
+    int promptTokens = 0;
+    int completionTokens = 0;
+    int totalTokens = 0;
+    if (responseMeta != null && responseMeta.getUsage() != null) {
+      Usage usage = responseMeta.getUsage();
+      promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
+      completionTokens =
+          usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
+      totalTokens = usage.getTotalTokens() != null
+          ? usage.getTotalTokens() : promptTokens + completionTokens;
+    }
+
+    boolean cacheHit = responseMeta != null
+        && Boolean.TRUE.equals(responseMeta.get(LlmResponse.CACHE_HIT_METADATA_KEY));
+
+    return new LlmStreamChunk(model, delta, finishReason, cacheHit,
+        promptTokens, completionTokens, totalTokens, last);
   }
 
   private static Message toSpringMessage(LlmMessage msg) {

@@ -38,12 +38,13 @@ intensity, real multi-region execution and a documented methodology.
 ## Many OpenAI request fields are accepted but ignored
 
 The ingress DTO accepts the common OpenAI fields (`top_p`, `stream`, `n`, `stop`,
-`presence_penalty`, `frequency_penalty`, `user`), but only **`model`,
-`messages`, `temperature` and `max_tokens`** are forwarded to the provider. In
+`presence_penalty`, `frequency_penalty`, `user`); `model`, `messages`,
+`temperature`, `max_tokens` and **`stream`** are honored, the rest are not. In
 particular:
 
-- **No streaming.** `stream: true` is accepted but ignored; responses are always
-  returned as a single, complete completion.
+- **Streaming is supported** (Phase 7.5): `stream: true` returns Server-Sent
+  Events (`chat.completion.chunk` deltas + `[DONE]`), including a synthetic stream
+  on a cache hit.
 - `n`, `stop`, `top_p`, the penalties and `user` are not applied.
 - No tool/function calling, no `response_format`/structured outputs on the public
   chat endpoint, no images/audio. Only `/v1/chat/completions` is implemented from

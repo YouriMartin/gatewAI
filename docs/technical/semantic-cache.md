@@ -89,9 +89,12 @@ The two filters are AND-combined when both apply.
 
 - **Reversibility**: the advisor depends only on `VectorStore`, not pgvector. The
   whole class is unchanged if you switch to Qdrant.
-- **Streaming is a no-op today**: `adviseStream(...)` simply delegates
-  (`chain.nextStream`). The synthetic-`Flux` short-circuit for streaming is future
-  work; the non-streaming `call` path is the implemented one.
+- **Streaming (Phase 7.5)**: `adviseStream(...)` is fully implemented. On a **hit**
+  it returns a **synthetic `Flux`** — the cached answer split into chunks — so the
+  client gets the streaming UX with no model call. On a **miss** it streams through
+  while aggregating the deltas, then stores the full answer on completion. The
+  per-client store captures `clientId` eagerly (the `doOnComplete` runs on a
+  reactive thread where the Scoped Value would be unbound).
 - **False hits**: a high similarity can match a differently-intended prompt. The
   conservative `0.92` default mitigates this; correctness-critical deployments
   should raise it and/or set a TTL. See the functional

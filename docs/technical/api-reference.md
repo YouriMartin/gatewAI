@@ -19,12 +19,16 @@ Request (`ChatCompletionRequest`):
 }
 ```
 
-Accepted but **currently ignored**: `top_p`, `stream`, `n`, `stop`,
-`presence_penalty`, `frequency_penalty`, `user`. Only `model`, `messages`,
-`temperature`, `max_tokens` are forwarded; `model` is a **hint** (the router may
-override it). There is **no streaming**.
+Honored: `model`, `messages`, `temperature`, `max_tokens`, and **`stream`**
+(`model` is a **hint** — the router may override it). Accepted but ignored:
+`top_p`, `n`, `stop`, `presence_penalty`, `frequency_penalty`, `user`.
 
-Response (`ChatCompletionResponse`):
+**Streaming** (`"stream": true`): the response is `text/event-stream` — a series of
+`data: {chat.completion.chunk}` events (each `choices[0].delta.content` is a token
+delta; the terminal event sets `finish_reason`), ending with `data: [DONE]`. Cache
+hits are replayed as a synthetic stream (no model call).
+
+Response (`ChatCompletionResponse`, non-streaming):
 
 ```json
 {

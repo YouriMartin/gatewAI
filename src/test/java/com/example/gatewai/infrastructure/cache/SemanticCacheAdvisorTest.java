@@ -343,14 +343,58 @@ class SemanticCacheAdvisorTest {
   // ---- Stream / metadata tests ----
 
   @Test
-  void adviseStreamDelegatesToChain() {
-    ChatClientRequest request = buildRequest("stream test");
-    Flux<ChatClientResponse> flux = Flux.just(chainResponse);
-    when(streamChain.nextStream(request)).thenReturn(flux);
+  void adviseStreamMissDelegatesAndStoresAggregatedAnswer() {
+    ChatClientRequest request = buildRequest("stream miss");
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(List.of());
+    ChatResponse chunk = streamChunk("Hello world", "claude-3-sonnet", "stop", 5, 2);
+    when(streamChain.nextStream(request)).thenReturn(Flux.just(
+        ChatClientResponse.builder().chatResponse(chunk).context(Map.of()).build()));
 
-    Flux<ChatClientResponse> result = advisor.adviseStream(request, streamChain);
+    List<ChatClientResponse> emitted =
+        advisor.adviseStream(request, streamChain).collectList().block();
 
-    assertSame(flux, result);
+    assertNotNull(emitted);
+    assertEquals(1, emitted.size());
+    verify(vectorStore).add(documentsCaptor.capture());
+    Document stored = documentsCaptor.getValue().getFirst();
+    assertEquals("Hello world",
+        stored.getMetadata().get(SemanticCacheAdvisor.CACHE_RESPONSE_KEY));
+  }
+
+  @Test
+  void adviseStreamHitReplaysSyntheticStreamWithoutCallingChain() {
+    ChatClientRequest request = buildRequest("What is Spring?");
+    java.util.Map<String, Object> meta = new java.util.HashMap<>();
+    meta.put(SemanticCacheAdvisor.CACHE_RESPONSE_KEY, "Spring is a framework.");
+    meta.put(SemanticCacheAdvisor.CACHE_MODEL_KEY, "claude-3-sonnet");
+    meta.put(SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY, "stop");
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(List.of(new Document("What is Spring?", meta)));
+
+    List<ChatClientResponse> emitted =
+        advisor.adviseStream(request, streamChain).collectList().block();
+
+    assertNotNull(emitted);
+    StringBuilder full = new StringBuilder();
+    emitted.forEach(r -> full.append(r.chatResponse().getResult().getOutput().getText()));
+    assertEquals("Spring is a framework.", full.toString());
+    ChatClientResponse last = emitted.getLast();
+    assertEquals("stop",
+        last.chatResponse().getResult().getMetadata().getFinishReason());
+    assertTrue(Boolean.TRUE.equals(
+        last.chatResponse().getMetadata().get(LlmResponse.CACHE_HIT_METADATA_KEY)));
+    verify(streamChain, never()).nextStream(any());
+    verify(vectorStore, never()).add(any());
+  }
+
+  private static ChatResponse streamChunk(String text, String model,
+                                          String finishReason, int pt, int ct) {
+    Generation generation = new Generation(new AssistantMessage(text),
+        ChatGenerationMetadata.builder().finishReason(finishReason).build());
+    ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+        .model(model).usage(new DefaultUsage(pt, ct)).build();
+    return new ChatResponse(List.of(generation), metadata);
   }
 
   @Test

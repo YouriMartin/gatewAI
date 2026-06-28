@@ -1,14 +1,22 @@
 package com.example.gatewai.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.function.Consumer;
+
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.LlmStreamChunk;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
+import com.example.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import com.example.gatewai.domain.port.out.ApiClientRepository;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @WebMvcTest(ChatCompletionController.class)
 @Import(SecurityConfig.class)
@@ -28,6 +37,9 @@ class ChatCompletionControllerTest {
 
   @MockitoBean
   private ChatCompletionUseCase useCase;
+
+  @MockitoBean
+  private StreamChatCompletionUseCase streamUseCase;
 
   @MockitoBean
   private ApiClientRepository apiClientRepository;
@@ -91,6 +103,39 @@ class ChatCompletionControllerTest {
                 new ApiKeyAuthentication("test-client-id", "test-client"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.model").value("gpt-4"));
+  }
+
+  @Test
+  void postWithStreamTrueReturnsSseChunks() throws Exception {
+    doAnswer(invocation -> {
+      Consumer<LlmStreamChunk> sink = invocation.getArgument(1);
+      sink.accept(new LlmStreamChunk("claude-haiku-4-5", "Hel", "", false, 0, 0, 0, false));
+      sink.accept(new LlmStreamChunk("claude-haiku-4-5", "lo", "stop", false, 4, 1, 5, true));
+      return null;
+    }).when(streamUseCase).streamComplete(any(), any());
+
+    String streamJson = """
+        {
+          "model": "auto",
+          "messages": [{"role": "user", "content": "Hi"}],
+          "stream": true
+        }
+        """;
+
+    MvcResult result = mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(streamJson)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+        .andExpect(content().string(
+            org.hamcrest.Matchers.containsString("chat.completion.chunk")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("[DONE]")));
   }
 
   @Test

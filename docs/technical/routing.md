@@ -70,7 +70,8 @@ system prompt and rules.
    `chain.nextCall(routedRequest)`.
 
 So the **requested `model` is a hint**: the router overrides it with the tier's
-configured model id. Streaming delegates unchanged.
+configured model id. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
+streamed prompt the same way.
 
 ## Hot configuration
 

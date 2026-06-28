@@ -7,17 +7,21 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.example.gatewai.domain.model.CarbonZoneContext;
 import com.example.gatewai.domain.model.GreenAccountant;
 import com.example.gatewai.domain.model.GreenMetrics;
 import com.example.gatewai.domain.model.LlmRequest;
 import com.example.gatewai.domain.model.LlmResponse;
+import com.example.gatewai.domain.model.LlmStreamChunk;
 import com.example.gatewai.domain.model.ModelDefinition;
 import com.example.gatewai.domain.model.ModelTier;
 import com.example.gatewai.domain.model.RequestContext;
 import com.example.gatewai.domain.model.RequestLog;
 import com.example.gatewai.domain.port.in.ChatCompletionUseCase;
+import com.example.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 import com.example.gatewai.domain.port.out.LlmClient;
 import com.example.gatewai.domain.port.out.MetricsRecorder;
@@ -27,7 +31,8 @@ import com.example.gatewai.domain.port.out.RequestLogRepository;
 import org.springframework.stereotype.Service;
 
 @Service
-class ChatCompletionService implements ChatCompletionUseCase {
+class ChatCompletionService
+    implements ChatCompletionUseCase, StreamChatCompletionUseCase {
 
   private final LlmClient llmClient;
   private final RequestLogRepository requestLogRepository;
@@ -80,9 +85,54 @@ class ChatCompletionService implements ChatCompletionUseCase {
     return response;
   }
 
+  /**
+   * Streams the response (Phase 7.5). Forwards each chunk to {@code onChunk} and,
+   * once the stream completes, records the same green accounting / persistence /
+   * metrics as the blocking path — from the terminal chunk's model + token usage.
+   */
+  @Override
+  public void streamComplete(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
+    long startNanos = System.nanoTime();
+    String clientId = resolveClientId();
+    AtomicReference<LlmStreamChunk> lastChunk = new AtomicReference<>();
+
+    llmClient.stream(request, chunk -> {
+      lastChunk.set(chunk);
+      onChunk.accept(chunk);
+    });
+
+    LlmStreamChunk last = lastChunk.get();
+    if (last == null) {
+      return;
+    }
+
+    long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    GreenMetrics green =
+        accountGreen(last.model(), last.totalTokens(), last.cacheHit());
+
+    RequestLog log = new RequestLog(
+        UUID.randomUUID(),
+        Instant.now(),
+        last.model(),
+        hashPrompt(request),
+        last.promptTokens(),
+        last.completionTokens(),
+        last.totalTokens(),
+        latencyMs,
+        clientId,
+        green,
+        last.cacheHit()
+    );
+    requestLogRepository.save(log);
+    metricsRecorder.record(log);
+  }
+
   private GreenMetrics accountGreen(LlmResponse response) {
-    ModelDefinition used =
-        modelRegistry.findByModelId(response.model()).orElse(null);
+    return accountGreen(response.model(), response.totalTokens(), response.cacheHit());
+  }
+
+  private GreenMetrics accountGreen(String model, int totalTokens, boolean cacheHit) {
+    ModelDefinition used = modelRegistry.findByModelId(model).orElse(null);
     ModelDefinition premiumBaseline =
         modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
             .findFirst()
@@ -92,8 +142,7 @@ class ChatCompletionService implements ChatCompletionUseCase {
         : carbonIntensityProvider.gramsCo2PerKwh();
 
     return greenAccountant.account(
-        used, premiumBaseline, response.totalTokens(), gridIntensity,
-        response.cacheHit());
+        used, premiumBaseline, totalTokens, gridIntensity, cacheHit);
   }
 
   private static String resolveClientId() {

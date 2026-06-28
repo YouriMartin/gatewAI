@@ -15,6 +15,9 @@ touching client code.
 - The `model` you pass is a **hint**; the router may override it (see Routing).
 - Responses are OpenAI-shaped, including `usage` token counts. The `model` field
   reports the model that actually served the request.
+- **Streaming** is supported: pass `"stream": true` and the gateway returns
+  Server-Sent Events (token-by-token deltas, then `[DONE]`) — exactly like the
+  OpenAI API. Even cache hits stream (replayed instantly, no model call).
 
 ## Semantic cache
 
