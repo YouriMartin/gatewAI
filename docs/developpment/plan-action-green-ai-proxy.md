@@ -201,6 +201,31 @@ src/main/
 
 ---
 
+## Phase 7 — v1 release readiness (pre-launch hardening)
+
+Came out of a post-v1 review (2026-06-28). The first full boot revealed that the
+default configuration cannot actually serve a request against today's Anthropic
+API, and that wiring regressions slip through the default test run. **7.1–7.3 are
+blocking — they must be cleared before calling this a shippable v1.** 7.4+ are
+hardening that overlaps [`roadmap-post-v1.md`](roadmap-post-v1.md).
+
+| Task | Severity | Detail |
+|---|---|---|
+| 7.1 | **Blocking** | **Fix the model-registry IDs.** The defaults are stale/invalid: `claude-sonnet-4-20250514` (premium) is deprecated/retired (~2026-06-15) and `claude-haiku-4-20250506` (entry) never existed — both 404. Replace with current aliases (no date suffix): premium `claude-opus-4-8` or `claude-sonnet-4-6`, entry `claude-haiku-4-5`. Verify against the live Models API. |
+| 7.2 | **Blocking** | **Repair `LOCAL`-tier routing.** Short prompts classify as `LOCAL`; the router rewrites the model to `llama3` and sends it to the Anthropic egress (no local ChatClient is wired) → 404. Either wire the Ollama chat egress (re-enable `OllamaChatAutoConfiguration` + the commented-out `localClient` in `ChatClientConfiguration`, pull a small model) **or** repoint the local tier to a served model **or** drop the tier. Wiring Ollama also unlocks free local testing (7.4). |
+| 7.3 | **Blocking** | **End-to-end context test in CI.** The full Spring context had never booted before v1 — two startup bugs (MCP bean cycle, missing `CarbonAwareZoneSelector` bean) only surfaced on first container run. The default `./mvnw test` never refreshes the context (`GatewaiApplicationTests` just does `new`). Run the `@SpringBootTest` smoke tests in CI (`./mvnw -Pit test`, needs Postgres + Ollama) and/or add a lightweight context-load test so wiring regressions fail the build. |
+| 7.4 | Hardening | **Cheap/offline testing.** Free path: route to a tiny local Ollama model (depends on 7.2) to exercise cache + routing + green accounting at zero API cost. Optional: a mock/"echo" `LlmClient` behind a Spring profile for pure plumbing tests with no provider. |
+| 7.5 | Hardening | **Streaming.** Honor `stream: true` end to end, including a synthetic-`Flux` short-circuit in the cache advisor (today `adviseStream` just delegates and the controller only does `call`). |
+| 7.6 | Hardening | **Carbon calibration.** Replace the placeholder per-model `energyIntensity` coefficients with measured values; consider marginal grid intensity (WattTime) for trustworthy figures. |
+| 7.7 | Hardening | **Cluster-readiness.** Replace the in-memory pieces that assume a single node: persistent deferred-job store + distributed rate limiter (Redis/Hazelcast); move from `ddl-auto=update` to versioned migrations (Flyway/Liquibase). |
+
+**Acceptance for "v1 shippable":** with default config, a fresh `docker compose
+up` serves a real `POST /v1/chat/completions` for short, medium and long prompts
+(all three tiers resolve to a served model), and CI runs an end-to-end context
+check.
+
+---
+
 ## Platform notes (pitfalls to know from the start)
 
 **Java 25**
