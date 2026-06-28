@@ -45,8 +45,8 @@ A thin gateway built on a chain of Spring AI **Advisors**. End-to-end view:
 
 **Ingress** (OpenAI or MCP format) and **egress** (LLM provider) are
 independent. Any existing client SDK works by only changing the `base_url`.
-Per-layer details: see [`docs/`](docs/) (carbon, observability, MCP, native
-image).
+Per-layer details: see [`docs/`](docs/README.md) (carbon, observability, MCP,
+native image).
 
 ## Tech stack
 
@@ -89,7 +89,7 @@ docker compose -f docker-compose.yml up --build
 
 - Dashboard: <http://localhost:8080/>
 - OpenAI API: `POST http://localhost:8080/v1/chat/completions`
-- MCP server: `http://localhost:8080/mcp` (see [`docs/mcp.md`](docs/mcp.md))
+- MCP server: `http://localhost:8080/mcp` (see [`docs/technical/mcp.md`](docs/technical/mcp.md))
 - Health: <http://localhost:8080/actuator/health>
 
 On the **first** start, the gateway downloads the embedding model

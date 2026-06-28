@@ -80,7 +80,7 @@ com.example.gatewai
 - `./mvnw verify` runs all three (Checkstyle + Tests + SpotBugs)
 
 ## Status / roadmap
-MVP = Phases 0 to 2 + part of Phase 3 (details in `plan-action-green-ai-proxy.md`).
+MVP = Phases 0 to 2 + part of Phase 3 (details in `docs/developpment/plan-action-green-ai-proxy.md`).
 Progress: _(to be kept up to date)_
 - [x] Phase 0 — skeleton + local infra
 - [x] Phase 1 — pass-through gateway (OpenAI ingress → Claude egress)
@@ -106,8 +106,8 @@ Progress: _(to be kept up to date)_
 - [x] Phase 6 — engineering polish
   - [x] 6.1 — observability: Micrometer → `/actuator/prometheus`, native Spring AI metrics + custom `gatewai_*`, separate Prometheus/Grafana stack
   - [x] 6.2 — rate limiting: Bucket4j per API client, 429 + Retry-After on POST /v1/chat/completions*
-  - [x] 6.3 — GraalVM native image: native-ready (parent `native` profile, reflection runtime hints tested, `docs/native.md`). Full compilation to validate in a GraalVM CI
-  - [x] 6.4 — MCP exposure: MCP server (Spring AI, streamable-HTTP transport `/mcp`), tools `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, shared Bearer auth, native hints (`docs/mcp.md`)
+  - [x] 6.3 — GraalVM native image: native-ready (parent `native` profile, reflection runtime hints tested, `docs/technical/native.md`). Full compilation to validate in a GraalVM CI
+  - [x] 6.4 — MCP exposure: MCP server (Spring AI, streamable-HTTP transport `/mcp`), tools `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, shared Bearer auth, native hints (`docs/technical/mcp.md`)
   - [x] 6.5 — final packaging: multi-stage `Dockerfile` (front+back), plug & play `docker-compose.yml` (gateway + pgvector + Ollama), `.env.example`, `.dockerignore`, README + end-to-end architecture diagram
 
 ## Frontend build (mono-repo)
