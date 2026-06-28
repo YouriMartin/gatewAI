@@ -120,6 +120,6 @@ Gathers the documents tied to developing the app.
 ## Tracking
 
 - [x] D0 — reorganization + index
-- [ ] D1 — functional documentation
+- [x] D1 — functional documentation
 - [ ] D2 — technical documentation
 - [ ] D3 — development documents

@@ -22,9 +22,13 @@ for the project overview and quick start.
 
 ## Functional ([`functional/`](functional/))
 
-> Planned (overview, getting started, features, dashboard guide, limitations,
-> functional choices, vLLM Semantic Router comparison) — see the documentation
-> action plan.
+- [`overview.md`](functional/overview.md) — problem, value proposition, audience, vocabulary
+- [`getting-started.md`](functional/getting-started.md) — deploy, get a key, first request (OpenAI + MCP), dashboard
+- [`features.md`](functional/features.md) — every capability explained from a usage angle
+- [`dashboard-guide.md`](functional/dashboard-guide.md) — screen-by-screen tour
+- [`limitations.md`](functional/limitations.md) — owned limitations and trade-offs
+- [`functional-choices.md`](functional/functional-choices.md) — functional decisions and their why
+- [`vllm-semantic-router-comparison.md`](functional/vllm-semantic-router-comparison.md) — inspiration from vLLM Semantic Router and differences
 
 ## Development ([`developpment/`](developpment/))
 
