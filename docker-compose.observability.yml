@@ -9,7 +9,8 @@ services:
     ports:
       - '9090:9090'
     volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # ':z' relabels the file for SELinux (needed on Fedora/RHEL, harmless elsewhere)
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
     extra_hosts:
       - 'host.docker.internal:host-gateway'
 

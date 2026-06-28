@@ -24,7 +24,8 @@ services:
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev}'
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # ':z' relabels the file for SELinux (needed on Fedora/RHEL, harmless elsewhere)
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-greenaiproxy}"]
       interval: 5s
