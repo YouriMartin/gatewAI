@@ -26,6 +26,28 @@ first.
 [`../technical/testing-and-quality.md`](../technical/testing-and-quality.md) and
 [`../technical/build-and-packaging.md`](../technical/build-and-packaging.md).
 
+### Dev environment script
+
+`scripts/dev.sh` manages a local dev environment (infra + backend) in one place:
+
+```bash
+scripts/dev.sh start      # start Postgres + Ollama (compose.yaml) then the backend
+scripts/dev.sh restart    # bounce the backend only (infra stays up — fast iteration)
+scripts/dev.sh stop       # stop backend, then stop infra (data volumes kept)
+scripts/dev.sh status     # infra + backend status and URLs
+scripts/dev.sh logs       # tail the backend log
+scripts/dev.sh clean      # stop all and wipe the data volumes (asks first)
+```
+
+It reads secrets from `.env`, runs the app with Boot's docker-compose support
+disabled (so it owns the infra lifecycle), and stops the forked JVM cleanly via
+its process group. The Svelte dashboard hot-reload stays separate
+(`npm --prefix src/main/frontend run dev`, Vite on `:5173`).
+
+> Use the dev script **or** the full container stack (`docker compose -f
+> docker-compose.yml up`), not both at once — they bind the same ports and Compose
+> project name.
+
 ## Conventions
 
 - **English only.** All code, comments, docs, commit messages and UI strings are in

@@ -31,8 +31,9 @@ the health check a minute to go green.
 
 > `compose.yaml` (infra only) is used in development mode and takes precedence
 > when you run `docker compose` without `-f`; the full stack is therefore invoked
-> explicitly with `-f docker-compose.yml`. See the root `README.md` for the
-> development mode (`./mvnw spring-boot:run`).
+> explicitly with `-f docker-compose.yml`. For local development (run the app on
+> the JVM with hot iteration), use `scripts/dev.sh start` — see the root
+> `README.md` and [`../developpment/contributing.md`](../developpment/contributing.md).
 
 Check it is up:
 
