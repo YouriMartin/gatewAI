@@ -22,6 +22,7 @@ may override.
 - A new ingress is a new inbound adapter calling the same `in` ports (this is how
   MCP was added without touching business logic).
 - A new egress is a starter + bean behind the `LlmClient` out port.
-- Honest nuance: only the Anthropic egress is wired by default; the local (Ollama)
-  egress is intentionally not active out of the box (see
-  [`../routing.md`](../routing.md) and the functional limitations).
+- Multi-provider egress (Phase 7.2): a `@Primary` `DelegatingChatModel` dispatches
+  per request to the Anthropic or Ollama `ChatModel` based on the routed model id's
+  provider — so cloud tiers hit Claude and the `LOCAL` tier hits a local Ollama
+  model, both behind one advisor chain (see [`../routing.md`](../routing.md)).

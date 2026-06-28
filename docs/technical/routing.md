@@ -17,7 +17,7 @@ intensity (kWh/1k tokens), and tier. Default registry:
 |---|---|---|---|---|---|
 | `claude-opus` | anthropic | claude-opus-4-8 | `CLOUD_PREMIUM` | 0.015 | 0.005 |
 | `claude-haiku` | anthropic | claude-haiku-4-5 | `CLOUD_ENTRY` | 0.003 | 0.002 |
-| `llama3` | ollama | llama3 | `LOCAL` | 0.0 | 0.001 |
+| `ollama-local` | ollama | qwen2.5:0.5b | `LOCAL` | 0.0 | 0.001 |
 
 > The energy intensities are **placeholders** (see
 > [`green-accounting.md`](green-accounting.md)). The model ids are configurable.
@@ -84,18 +84,25 @@ The router config is changeable at runtime (no restart):
 - Exposed via `GET/PUT /v1/admin/routing` and the dashboard (see
   [`api-reference.md`](api-reference.md)).
 
-## Important caveat: single egress by default
+## Multi-provider egress (Phase 7.2)
 
-The egress `ChatModel` auto-configured by default is **Anthropic**. The wired
-`ChatClient`s are `premiumClient` and `cheapCloudClient` (both Claude); the
-**local (Ollama) client is intentionally commented out** in
-`ChatClientConfiguration` (it needs a running Ollama chat model). Practically:
+Both Anthropic **and** Ollama chat models are auto-configured, and a `@Primary`
+`DelegatingChatModel` (`infrastructure/llm`) is what the Spring AI `ChatClient` is
+built on. The router only rewrites the prompt's **model id**; the delegating model
+then resolves that id's **provider** via the `ModelRegistry` and dispatches to the
+matching real `ChatModel`:
 
-- `CLOUD_PREMIUM`/`CLOUD_ENTRY` route to Claude models and work out of the box.
-- `LOCAL` routing has **no local egress by default** — enabling it requires
-  running Ollama with a chat model and re-enabling its auto-config. Until then,
-  keep registry tiers pointing at models the active provider serves. See
-  [`../functional/limitations.md`](../functional/limitations.md).
+- `CLOUD_PREMIUM`/`CLOUD_ENTRY` → the Anthropic `ChatModel` (Claude).
+- `LOCAL` → the Ollama `ChatModel` (a small local model, `qwen2.5:0.5b` by
+  default) — genuine on-prem, zero-cost inference. Routing simple prompts here is
+  the project's local/cloud arbitration made real.
+
+Implementation note: `OllamaChatModel` hard-casts the prompt options to
+`OllamaChatOptions`, so the delegating model rebuilds the prompt with native
+Ollama options (model, temperature, top-p, num-predict) before delegating;
+Anthropic accepts the generic options as-is. Unknown/blank model ids fall back to
+Anthropic. (The vestigial `premiumClient`/`cheapCloudClient` beans in
+`ChatClientConfiguration` are unused — routing is the advisor + delegating model.)
 
 ## Configuration reference
 

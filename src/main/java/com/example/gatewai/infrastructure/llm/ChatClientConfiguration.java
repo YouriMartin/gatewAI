@@ -34,9 +34,10 @@ class ChatClientConfiguration {
         .build();
   }
 
-  // Local client (Ollama) will be added here when
-  // OllamaChatAutoConfiguration is re-enabled (requires a running
-  // Ollama instance with a chat model pulled).
+  // Multi-provider egress (Phase 7.2) is handled by DelegatingChatModel, not by
+  // per-tier ChatClients: routing rewrites the model id and the delegating model
+  // dispatches to Anthropic or Ollama by provider. premiumClient/cheapCloudClient
+  // above are vestigial (unused); classifierClient is the only one still wired.
 
   @Bean
   @Qualifier("classifierClient")

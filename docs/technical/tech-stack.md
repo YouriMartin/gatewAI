@@ -53,15 +53,15 @@ on the same Spring Boot 4 baseline.
 - Config: HNSW index, cosine distance, 768-dimension vectors (matching the
   embedding model), `initialize-schema=true`.
 
-## Ollama (local embeddings)
+## Ollama (local embeddings + local chat egress)
 
 - `nomic-embed-text` (768 dims) runs **locally** via Ollama. Embeddings — the one
   step that sees raw prompt text for the cache — never leave the deployment, which
   is core to the privacy pillar.
-- The model is pulled on first start (`pull-model-strategy=when_missing`).
-- Note: only Ollama **embeddings** are auto-configured by default; Ollama **chat**
-  auto-config is excluded (see [`routing.md`](routing.md) and the functional
-  [`limitations.md`](../functional/limitations.md)).
+- Since Phase 7.2, Ollama also serves a **local chat model** (`qwen2.5:0.5b` by
+  default) as the egress for the `LOCAL` routing tier — real on-prem, zero-cost
+  inference for simple prompts (see [`routing.md`](routing.md)).
+- Both models are pulled on first start (`pull-model-strategy=when_missing`).
 
 ## Build & tooling
 
