@@ -62,6 +62,33 @@ is_running() {
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
+port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "sport = :$port" 2>/dev/null | grep -q LISTEN
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null \
+      && { exec 3>&- 3<&- 2>/dev/null; return 0; } || return 1
+  fi
+}
+
+# Refuse to start the dev backend when :8080 is already taken — otherwise mvnw
+# crashes on bind while you keep hitting whatever else holds the port (typically
+# the full-stack container), so your code changes never show up.
+ensure_port_free() {
+  port_in_use 8080 || return 0
+  if docker ps --filter name=gatewai-gateway --filter status=running -q \
+      2>/dev/null | grep -q .; then
+    warn "Port 8080 is held by the full-stack gateway CONTAINER (docker-compose.yml)."
+    warn "Dev mode and the container stack are mutually exclusive — stop the stack:"
+    warn "    docker compose -f docker-compose.yml down"
+    die  "then run 'scripts/dev.sh start' again."
+  fi
+  die "Port 8080 is already in use — free it before starting the dev backend."
+}
+
 infra_up() {
   info "starting infra (Postgres + Ollama)…"
   "${COMPOSE[@]}" up -d
@@ -83,6 +110,7 @@ backend_start() {
   if is_running "$BACK_PID"; then
     warn "backend already running (pid $(cat "$BACK_PID"))"; return
   fi
+  ensure_port_free
   [ -n "${ANTHROPIC_API_KEY:-}" ] \
     || warn "ANTHROPIC_API_KEY is not set — Claude calls will fail (set it in .env)"
   info "starting backend (mvnw spring-boot:run)…"
@@ -141,6 +169,7 @@ EOF
 # --- commands -------------------------------------------------------------
 cmd_start() {
   require_docker; mkdir -p "$DEV_DIR"; load_env
+  ensure_port_free   # bail before touching infra if the container stack is up
   infra_up
   backend_start
   print_urls
@@ -158,6 +187,7 @@ cmd_stop() {
 cmd_restart() {
   require_docker; mkdir -p "$DEV_DIR"; load_env
   stop_proc "$BACK_PID" "backend"
+  ensure_port_free   # after stopping the dev backend, :8080 must be free
   # Make sure infra is up (it usually still is); cheap if already running.
   infra_up
   backend_start
