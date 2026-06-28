@@ -1,42 +1,42 @@
-# Exposition MCP (Phase 6.4)
+# MCP exposure (Phase 6.4)
 
-La passerelle s'expose comme **serveur MCP** (Model Context Protocol) en plus de
-son ingress REST OpenAI. Un assistant compatible MCP (Claude Desktop, IDE, agent)
-peut ainsi piloter le proxy : compléter un prompt **routé/caché/comptabilisé** et
-lire l'empreinte coût + carbone — le tout sans transiter par un tiers.
+The gateway exposes itself as an **MCP server** (Model Context Protocol) on top of
+its OpenAI REST ingress. An MCP-capable assistant (Claude Desktop, IDE, agent) can
+thus drive the proxy: complete a **routed/cached/accounted** prompt and read the
+cost + carbon footprint — all without going through a third party.
 
 ## Architecture
 
-MCP est un **second ingress**, traité comme le web OpenAI : un adapter entrant
-`com.example.gatewai.adapter.in.mcp` qui ne contient aucune logique métier et
-réutilise les ports `in`/`out` existants. La chaîne d'advisors verte (cache →
-routeur → comptabilité) reste l'unique source de vérité.
+MCP is a **second ingress**, treated like the OpenAI web one: an inbound adapter
+`com.example.gatewai.adapter.in.mcp` that holds no business logic and reuses the
+existing `in`/`out` ports. The green advisor chain (cache → router → accounting)
+stays the single source of truth.
 
 ```
 adapter/in/mcp
-├── GatewayMcpTools          # méthodes @Tool (ingress MCP)
-├── McpServerConfiguration   # ToolCallbackProvider + hints natifs
-├── *ToolResult              # records exposés (schéma JSON des outils)
-└── McpNativeRuntimeHints    # reflection hints GraalVM
+├── GatewayMcpTools          # @Tool methods (MCP ingress)
+├── McpServerConfiguration   # ToolCallbackProvider + native hints
+├── *ToolResult              # exposed records (tools' JSON schema)
+└── McpNativeRuntimeHints    # GraalVM reflection hints
 ```
 
-- Dépendance : `spring-ai-starter-mcp-server-webmvc` (transport streamable-HTTP
-  réutilisant Spring MVC, pas de serveur séparé).
-- Les `@Tool` sont publiés via un bean `ToolCallbackProvider`
-  (`MethodToolCallbackProvider`) découvert par l'auto-configuration du starter.
-- Validé par `ArchitectureTest` (ArchUnit) comme adapter de la couche onion.
+- Dependency: `spring-ai-starter-mcp-server-webmvc` (streamable-HTTP transport
+  reusing Spring MVC, no separate server).
+- The `@Tool`s are published via a `ToolCallbackProvider` bean
+  (`MethodToolCallbackProvider`) discovered by the starter's auto-configuration.
+- Validated by `ArchitectureTest` (ArchUnit) as an onion-layer adapter.
 
-## Outils exposés
+## Exposed tools
 
-| Outil | Rôle | Port sous-jacent |
+| Tool | Role | Underlying port |
 |---|---|---|
-| `routed_chat` | Complète un prompt à travers la passerelle ; renvoie la réponse, **le modèle réellement choisi**, le cache-hit et les tokens | `ChatCompletionUseCase` |
-| `green_report` | Coût (€) et empreinte (gCO2) agrégés sur une plage ISO-8601 (par défaut 30 j), + coût/CO2 évités, taux de hit, mix modèles | `GenerateGreenReportUseCase` |
-| `carbon_intensity` | Intensité carbone réseau courante (gCO2-eq/kWh) pour une zone | `CarbonIntensityProvider` |
+| `routed_chat` | Completes a prompt through the gateway; returns the answer, **the model actually selected**, the cache hit and the tokens | `ChatCompletionUseCase` |
+| `green_report` | Cost (€) and footprint (gCO2) aggregated over an ISO-8601 range (default 30 days), + avoided cost/CO2, hit rate, model mix | `GenerateGreenReportUseCase` |
+| `carbon_intensity` | Current grid carbon intensity (gCO2-eq/kWh) for a zone | `CarbonIntensityProvider` |
 
 ## Configuration
 
-`application.properties` :
+`application.properties`:
 
 ```properties
 spring.ai.mcp.server.enabled=true
@@ -45,32 +45,31 @@ spring.ai.mcp.server.version=0.1.0
 spring.ai.mcp.server.instructions=...
 ```
 
-Mettre `spring.ai.mcp.server.enabled=false` pour désactiver complètement
-l'exposition MCP.
+Set `spring.ai.mcp.server.enabled=false` to fully disable the MCP exposure.
 
-## Sécurité
+## Security
 
-L'endpoint `/mcp` est protégé par le **même** `ApiKeyAuthenticationFilter` que
-`/v1/**` : le client MCP envoie `Authorization: Bearer <clé API gatewai>`. Une clé
-valide lie aussi le `RequestContext` (clientId), donc la comptabilité verte et le
-namespacing du cache fonctionnent à l'identique sur le canal MCP. Cohérent avec la
-posture on-premise zéro-transit du projet.
+The `/mcp` endpoint is protected by the **same** `ApiKeyAuthenticationFilter` as
+`/v1/**`: the MCP client sends `Authorization: Bearer <gatewai API key>`. A valid
+key also binds the `RequestContext` (clientId), so green accounting and cache
+namespacing work identically over the MCP channel. Consistent with the project's
+on-premise zero-transit posture.
 
-## Exemple de client (Claude Desktop)
+## Client example (Claude Desktop)
 
 ```json
 {
   "mcpServers": {
     "gatewai": {
       "url": "http://localhost:8080/mcp",
-      "headers": { "Authorization": "Bearer <votre-clé-API-gatewai>" }
+      "headers": { "Authorization": "Bearer <your-gatewai-API-key>" }
     }
   }
 }
 ```
 
-## Image native (6.3)
+## Native image (6.3)
 
-Les records de résultat des outils sont (dé)sérialisés par réflexion par MCP :
-`McpNativeRuntimeHints` enregistre leurs binding hints pour GraalVM, à l'image de
-`NativeRuntimeHints` côté web.
+The tool result records are (de)serialized by reflection by MCP:
+`McpNativeRuntimeHints` registers their binding hints for GraalVM, mirroring
+`NativeRuntimeHints` on the web side.

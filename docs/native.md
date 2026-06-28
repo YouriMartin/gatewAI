@@ -1,56 +1,55 @@
-# Image native GraalVM (Phase 6.3)
+# GraalVM native image (Phase 6.3)
 
-Compilation native **optionnelle**. Le double gain colle au discours green :
-**démarrage en dizaines de ms** et **empreinte mémoire fortement réduite** vs la
-JVM — moins de ressources = moins d'énergie.
+Native compilation is **optional**. The double win fits the green narrative:
+**startup in tens of ms** and **sharply reduced memory footprint** vs the JVM —
+fewer resources = less energy.
 
 ## Builds
 
-Le `spring-boot-starter-parent` fournit le profil `native` (AOT + GraalVM). Deux
-chemins :
+`spring-boot-starter-parent` provides the `native` profile (AOT + GraalVM). Two
+paths:
 
 ```bash
-# 1. Exécutable natif local — nécessite un JDK GraalVM (ex. liberica-nik)
+# 1. Local native executable — requires a GraalVM JDK (e.g. liberica-nik)
 ./mvnw -Pnative native:compile
 ./target/gatewai
 
-# 2. Conteneur natif via buildpacks — pas de GraalVM local requis
+# 2. Native container via buildpacks — no local GraalVM required
 ./mvnw -Pnative spring-boot:build-image
 docker run --rm -p 8080:8080 gatewai:0.0.1-SNAPSHOT
 ```
 
-> Le build natif lance d'abord `process-aot` puis `native:compile` : prévoir
-> plusieurs minutes et beaucoup de RAM. Le profil `frontend` (actif par défaut)
-> bundle le dashboard dans le binaire ; les ressources `static/**` sont incluses
-> par les hints natifs de Spring Boot.
+> The native build first runs `process-aot` then `native:compile`: expect
+> several minutes and a lot of RAM. The `frontend` profile (active by default)
+> bundles the dashboard into the binary; the `static/**` resources are included
+> by Spring Boot's native hints.
 
-## Runtime hints (réflexion)
+## Runtime hints (reflection)
 
-L'AOT couvre la majorité, mais quelques types (de)sérialisés par réflexion sont
-déclarés explicitement :
+AOT covers most of it, but a few types (de)serialized by reflection are declared
+explicitly:
 
-| Type | Pourquoi | Où |
+| Type | Why | Where |
 |---|---|---|
-| DTO web (OpenAI, admin, reports…) | binding Jackson contrôleurs | `NativeRuntimeHints` (`@ImportRuntimeHints`) |
-| `ClassificationResult` | Structured Output Spring AI | `@RegisterReflectionForBinding` sur `ChatClientConfiguration` |
-| `ElectricityMapsResponse` | corps RestClient | `@RegisterReflectionForBinding` sur `CarbonConfiguration` |
+| Web DTOs (OpenAI, admin, reports…) | controller Jackson binding | `NativeRuntimeHints` (`@ImportRuntimeHints`) |
+| `ClassificationResult` | Spring AI Structured Output | `@RegisterReflectionForBinding` on `ChatClientConfiguration` |
+| `ElectricityMapsResponse` | RestClient body | `@RegisterReflectionForBinding` on `CarbonConfiguration` |
 
-Test : `NativeRuntimeHintsTest` vérifie l'enregistrement via
+Test: `NativeRuntimeHintsTest` checks the registration via
 `RuntimeHintsPredicates`.
 
-## Caveats à valider en CI GraalVM
+## Caveats to validate in a GraalVM CI
 
-La compilation native complète n'est **pas** exécutée ici (pas de GraalVM dans
-l'environnement de dev). À vérifier dans une CI dédiée :
+The full native compilation is **not** run here (no GraalVM in the dev
+environment). To verify in a dedicated CI:
 
-- **OpenPDF** (export PDF) charge des polices/ressources par réflexion ; l'image
-  native peut nécessiter des hints ressources supplémentaires
-  (`com/lowagie/text/pdf/fonts/**`). Sinon, l'export PDF risque d'échouer au
-  runtime natif alors que le JSON/CSV fonctionnent.
-- **Hibernate/JPA** : `process-aot` refresh le contexte → la base doit être
-  joignable au moment du build (ou utiliser un profil de build sans DataSource).
-- Ajouter `org.graalvm.buildtools:native-maven-plugin` reachability metadata
-  (déjà branché par le parent via `add-reachability-metadata`).
+- **OpenPDF** (PDF export) loads fonts/resources by reflection; the native image
+  may need extra resource hints (`com/lowagie/text/pdf/fonts/**`). Otherwise PDF
+  export may fail at native runtime while JSON/CSV work.
+- **Hibernate/JPA**: `process-aot` refreshes the context → the database must be
+  reachable at build time (or use a build profile without a DataSource).
+- Add `org.graalvm.buildtools:native-maven-plugin` reachability metadata
+  (already wired by the parent via `add-reachability-metadata`).
 
-Statut : **native-ready** (config + hints + doc). Validation de l'image complète
-à faire sur un runner GraalVM.
+Status: **native-ready** (config + hints + docs). Full-image validation to be
+done on a GraalVM runner.

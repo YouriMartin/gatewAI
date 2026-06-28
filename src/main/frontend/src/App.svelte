@@ -167,11 +167,11 @@
 <main>
   <header>
     <h1>🌱 Green AI Proxy</h1>
-    <p class="subtitle">Dashboard d'empreinte carbone</p>
+    <p class="subtitle">Carbon footprint dashboard</p>
   </header>
 
   <section class="connect">
-    <label for="api-key">Clé API</label>
+    <label for="api-key">API key</label>
     <input
       id="api-key"
       type="password"
@@ -180,43 +180,43 @@
       autocomplete="off"
     />
     <button onclick={connect} disabled={!apiKey || status === 'loading'}>
-      {status === 'loading' ? 'Connexion…' : 'Tester la connexion'}
+      {status === 'loading' ? 'Connecting…' : 'Test connection'}
     </button>
   </section>
 
   {#if status === 'error'}
-    <p class="error">Échec de connexion : {error}</p>
+    <p class="error">Connection failed: {error}</p>
   {/if}
 
   {#if status === 'ok' && report}
     <p class="ok">
-      Connecté ✓ — {report.total_requests} requête(s) sur les 30 derniers jours.
+      Connected ✓ — {report.total_requests} request(s) over the last 30 days.
     </p>
     <section class="cards">
       <div class="card">
-        <span class="label">€ économisés</span>
+        <span class="label">€ saved</span>
         <strong>{report.total_cost_avoided_eur.toFixed(4)}</strong>
       </div>
       <div class="card">
-        <span class="label">gCO₂ évités</span>
+        <span class="label">gCO₂ avoided</span>
         <strong>{report.total_grams_co2_avoided.toFixed(1)}</strong>
       </div>
       <div class="card">
-        <span class="label">Taux de hit cache</span>
+        <span class="label">Cache hit rate</span>
         <strong>{(report.cache_hit_rate * 100).toFixed(1)}%</strong>
       </div>
     </section>
 
     {#if series.length > 0}
       <section class="trends">
-        <h2>Tendances (30 jours)</h2>
+        <h2>Trends (30 days)</h2>
         <div class="cards">
           <div class="card">
-            <span class="label">€ économisés / jour</span>
+            <span class="label">€ saved / day</span>
             <Sparkline values={series.map((p) => p.total_cost_avoided_eur)} />
           </div>
           <div class="card">
-            <span class="label">gCO₂ évités / jour</span>
+            <span class="label">gCO₂ avoided / day</span>
             <Sparkline
               values={series.map((p) => p.total_grams_co2_avoided)}
               color="#58a6ff"
@@ -228,7 +228,7 @@
 
     {#if Object.keys(report.model_mix).length > 0}
       <section class="trends">
-        <h2>Répartition des modèles</h2>
+        <h2>Model mix</h2>
         <div class="mix">
           {#each Object.entries(report.model_mix) as [model, count] (model)}
             <div class="mix-row">
@@ -244,61 +244,61 @@
     {/if}
 
     <section class="trends">
-      <h2>Rapports CSRD</h2>
+      <h2>CSRD reports</h2>
       {#if exportError}
-        <p class="error">Export impossible : {exportError}</p>
+        <p class="error">Export failed: {exportError}</p>
       {/if}
       <div class="export">
         <label>
-          Du
+          From
           <input type="date" bind:value={reportFrom} />
         </label>
         <label>
-          Au
+          To
           <input type="date" bind:value={reportTo} />
         </label>
-        <button onclick={() => download('csv')}>Télécharger CSV</button>
-        <button onclick={() => download('pdf')}>Télécharger PDF</button>
+        <button onclick={() => download('csv')}>Download CSV</button>
+        <button onclick={() => download('pdf')}>Download PDF</button>
       </div>
     </section>
 
     <section class="admin">
-      <h2>Clés API</h2>
+      <h2>API keys</h2>
 
       {#if adminError}
-        <p class="error">Admin indisponible : {adminError} (clé admin requise)</p>
+        <p class="error">Admin unavailable: {adminError} (admin key required)</p>
       {/if}
 
       {#if createdKey}
         <p class="ok created-key">
-          Clé créée (copie-la, affichée une seule fois) :
+          Key created (copy it, shown only once):
           <code>{createdKey}</code>
         </p>
       {/if}
 
       <div class="create">
-        <input bind:value={newName} placeholder="Nom du client" />
+        <input bind:value={newName} placeholder="Client name" />
         <label class="checkbox">
           <input type="checkbox" bind:checked={newAdmin} /> admin
         </label>
-        <button onclick={create} disabled={!newName}>Créer une clé</button>
+        <button onclick={create} disabled={!newName}>Create a key</button>
       </div>
 
       {#if clients.length > 0}
         <table>
           <thead>
-            <tr><th>Nom</th><th>Rôle</th><th>État</th><th></th></tr>
+            <tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {#each clients as client (client.id)}
               <tr class:disabled={!client.enabled}>
                 <td>{client.name}</td>
                 <td>{client.admin ? 'admin' : 'user'}</td>
-                <td>{client.enabled ? 'actif' : 'révoqué'}</td>
+                <td>{client.enabled ? 'active' : 'revoked'}</td>
                 <td>
                   {#if client.enabled}
                     <button class="link" onclick={() => revoke(client.id)}>
-                      Révoquer
+                      Revoke
                     </button>
                   {/if}
                 </td>
@@ -310,23 +310,23 @@
     </section>
 
     <section class="admin">
-      <h2>Config du routage</h2>
+      <h2>Routing config</h2>
 
       {#if routingError}
-        <p class="error">Config indisponible : {routingError} (clé admin requise)</p>
+        <p class="error">Config unavailable: {routingError} (admin key required)</p>
       {/if}
 
       {#if routing}
         <div class="routing-form">
           <label>
-            Stratégie
+            Strategy
             <select bind:value={routing.strategy}>
               <option value="heuristic">heuristic</option>
               <option value="llm">llm</option>
             </select>
           </label>
           <label>
-            Seuil entrée (chars)
+            Entry threshold (chars)
             <input
               type="number"
               min="0"
@@ -334,7 +334,7 @@
             />
           </label>
           <label>
-            Seuil premium (chars)
+            Premium threshold (chars)
             <input
               type="number"
               min="0"
@@ -342,12 +342,12 @@
             />
           </label>
           <label class="wide">
-            Mots-clés premium (séparés par des virgules)
+            Premium keywords (comma-separated)
             <input type="text" bind:value={keywordsText} />
           </label>
           <div class="actions">
-            <button onclick={saveRouting}>Enregistrer</button>
-            {#if routingSaved}<span class="ok">Enregistré ✓</span>{/if}
+            <button onclick={saveRouting}>Save</button>
+            {#if routingSaved}<span class="ok">Saved ✓</span>{/if}
           </div>
         </div>
       {/if}

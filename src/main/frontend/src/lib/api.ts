@@ -34,7 +34,7 @@ function authHeaders(apiKey: string): HeadersInit {
 
 async function ensureOk(response: Response): Promise<Response> {
   if (!response.ok) {
-    throw new Error(`Réponse ${response.status} de l'API`);
+    throw new Error(`API responded with ${response.status}`);
   }
   return response;
 }
