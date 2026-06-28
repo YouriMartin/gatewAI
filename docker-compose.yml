@@ -58,6 +58,7 @@ services:
       - 'SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-dev}'
       - 'SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434'
       - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}'
+      - 'GATEWAI_ADMIN_API_KEY=${GATEWAI_ADMIN_API_KEY:-}'
     ports:
       - '8080:8080'
 

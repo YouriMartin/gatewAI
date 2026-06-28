@@ -93,12 +93,17 @@ docker compose -f docker-compose.yml up --build
 - Health: <http://localhost:8080/actuator/health>
 
 On the **first** start, the gateway downloads the embedding model
-(`nomic-embed-text`) from Ollama — give the health check time to pass. The
-bootstrap **admin API key** is printed once in the logs:
+(`nomic-embed-text`) from Ollama — give the health check time to pass.
 
-```bash
-docker compose -f docker-compose.yml logs gateway | grep "Admin API key"
-```
+Your **admin API key** is simply the `GATEWAI_ADMIN_API_KEY` you set in `.env` —
+the gateway seeds an admin client with that exact key at startup. Use it as the
+`Authorization: Bearer …` token for `/v1/admin/**`.
+
+> If you leave `GATEWAI_ADMIN_API_KEY` blank, a random admin key is generated and
+> printed **once** in the logs instead:
+> `docker compose -f docker-compose.yml logs gateway | grep "Admin API key"`.
+> (A `Using generated security password: <uuid>` line, if present, is an unrelated
+> Spring default — not your API key.)
 
 ## Development mode (local JDK, hot reload)
 

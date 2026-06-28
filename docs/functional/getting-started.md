@@ -43,17 +43,28 @@ curl http://localhost:8080/actuator/health
 
 ## 3. Get an API key
 
-Every `/v1/**` call must carry a **Bearer API key**. On the very first start,
-gatewAI creates a **bootstrap admin** client and prints its key **once** in the
-logs:
+Every `/v1/**` call must carry a **Bearer API key**. The simplest path is to set
+your own **admin key** in `.env`:
 
 ```bash
-docker compose -f docker-compose.yml logs gateway | grep "Admin API key"
-# ... Admin API key (shown ONCE, copy it now): gw_XXXXXXXXXXXXXXXXXXXXXXXX
+# in .env
+GATEWAI_ADMIN_API_KEY=gw_a-long-random-secret-you-choose
 ```
 
-Copy that key — it is never shown again (only a hash is stored). Keys look like
-`gw_` followed by a URL-safe random string.
+At startup, gatewAI seeds an admin client with that exact key (idempotently, so
+restarts are safe). That value **is** your admin Bearer token — use it directly
+for `/v1/admin/**`. Only its hash is stored. Prefix with `gw_` for consistency.
+
+> **Random-key fallback.** If you leave `GATEWAI_ADMIN_API_KEY` blank, a random
+> admin key is generated and logged **once** at first start:
+> ```bash
+> docker compose -f docker-compose.yml logs gateway | grep "Admin API key"
+> # ... Admin API key (shown ONCE, copy it now): gw_XXXXXXXXXXXXXXXXXXXXXXXX
+> ```
+> A separate `Using generated security password: <uuid>` line, if present, is an
+> unrelated Spring default — **not** your API key. If the grep is empty, an admin
+> already exists; set `GATEWAI_ADMIN_API_KEY` and restart, or reset with
+> `psql -U dev -d greenaiproxy -c "DELETE FROM api_client;"` then restart.
 
 Use the admin key directly, or better, create a **dedicated client key** for your
 application (admin role required):

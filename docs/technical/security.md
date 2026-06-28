@@ -48,11 +48,20 @@ authority in the auth filter.
 
 ## Bootstrap admin
 
-`AdminSeedRunner` (an `ApplicationRunner`) creates a `bootstrap-admin` client at
-first start **if no admin exists**, and logs its raw key **once**
-(`WARN: "...Admin API key (shown ONCE, copy it now): gw_…"`). Copy it from the logs
-— it is never shown again. This makes the system usable without hand-inserting a
-key.
+`AdminSeedRunner` (an `ApplicationRunner`) seeds a `bootstrap-admin` client so the
+system is usable without hand-inserting a key. Two modes:
+
+- **Configured key** — when `gatewai.admin.api-key` (`GATEWAI_ADMIN_API_KEY`) is
+  set, an admin is seeded with that exact key. **Idempotent**: created only if no
+  client already has that key's hash, so restarts are safe and the key is the one
+  you chose. The key value is not logged (you already have it).
+- **Random key** — when unset, and only if no admin exists, one is created with a
+  generated key logged **once** (`WARN: "...Admin API key (shown ONCE, copy it now):
+  gw_…"`). Copy it; it is never shown again.
+
+The default in-memory user from Spring's `UserDetailsServiceAutoConfiguration` is
+**excluded** (auth is API-key based), so the misleading `Using generated security
+password` log does not appear.
 
 ## Rate limiting
 
