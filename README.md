@@ -107,14 +107,32 @@ the gateway seeds an admin client with that exact key at startup. Use it as the
 
 ## Development mode (local JDK, hot reload)
 
+The quickest way is the dev environment script (manages infra + backend):
+
+```bash
+scripts/dev.sh start      # Postgres + Ollama (compose.yaml) + backend (mvnw spring-boot:run)
+scripts/dev.sh restart    # bounce the backend only (infra stays up)
+scripts/dev.sh stop       # stop backend + infra (data kept)
+scripts/dev.sh status     # status, URLs; `logs` to tail, `clean` to wipe volumes
+```
+
+It reads secrets from `.env`. Equivalent manual steps:
+
 ```bash
 # Boot starts Postgres + Ollama via compose.yaml; the app runs on the JVM
 export ANTHROPIC_API_KEY=sk-ant-...
 ./mvnw spring-boot:run
-
-# Dashboard with hot reload (Vite, proxies /v1 → :8080)
-cd src/main/frontend && npm run dev
 ```
+
+For the dashboard with **hot reload** (separate, in either case):
+
+```bash
+cd src/main/frontend && npm run dev   # Vite on :5173, proxies /v1 → :8080
+```
+
+> Use the dev script **or** the full container stack
+> (`docker compose -f docker-compose.yml up`), not both — they share ports and the
+> Compose project name.
 
 ## Useful commands
 
