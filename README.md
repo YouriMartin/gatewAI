@@ -144,6 +144,24 @@ local (Ollama) for simple tasks, cloud premium for complex ones.
 Measures the footprint (tokens → kWh → gCO2) and computes the CO2 avoided thanks
 to the cache and routing. CSRD-compatible reporting export.
 
+## Documentation
+
+Full index: [`docs/`](docs/README.md). Curated entry points:
+
+**Using it** (`docs/functional/`)
+- [Getting started](docs/functional/getting-started.md) — deploy, get a key, first request (OpenAI + MCP)
+- [Overview](docs/functional/overview.md) · [Features](docs/functional/features.md) · [Dashboard guide](docs/functional/dashboard-guide.md)
+- [Limitations](docs/functional/limitations.md) — what it does *not* do (read before relying on the numbers)
+
+**Understanding it** (`docs/technical/`)
+- [Architecture](docs/technical/architecture.md) — start here: hexagonal layers, advisor chain, request lifecycle
+- [API reference](docs/technical/api-reference.md) · [Semantic cache](docs/technical/semantic-cache.md) · [Routing](docs/technical/routing.md) · [Green accounting](docs/technical/green-accounting.md)
+- [Security](docs/technical/security.md) · [Build & packaging](docs/technical/build-and-packaging.md) · [Decision records (ADRs)](docs/technical/adr/README.md)
+
+**Working on it** (`docs/developpment/`)
+- [Contributing](docs/developpment/contributing.md) — build, test, conventions, how to make common changes
+- [Post-v1 roadmap](docs/developpment/roadmap-post-v1.md)
+
 ## License
 
 [MIT](LICENSE)
