@@ -197,7 +197,7 @@ src/main/
 | 6.2 | Rate limiting | Bucket4j ou les limites de concurrence natives de Boot 4 | Robustesse |
 | 6.3 | Image native GraalVM | Compilation native optionnelle | Démarrage rapide + RAM minimale = cohérent avec le discours « green », double win |
 | 6.4 | Exposition MCP ✅ | Spring AI 2.0 intègre MCP dans le cœur : exposer la passerelle comme serveur MCP (voir `docs/mcp.md`) | Différenciation forte |
-| 6.5 | Packaging final | `docker-compose.yml` « plug & play » complet + README + schéma d'archi | Démontre l'archi end-to-end |
+| 6.5 | Packaging final ✅ | `Dockerfile` multi-stage + `docker-compose.yml` « plug & play » (gateway + pgvector + Ollama), `.env.example`, README + schéma d'archi end-to-end | Démontre l'archi end-to-end |
 
 ---
 

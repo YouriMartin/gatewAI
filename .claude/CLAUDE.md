@@ -103,12 +103,12 @@ Avancement : _(à mettre à jour au fil de l'eau)_
   - [x] 5.2 — config du routage à chaud : seuils/mots-clés configurables, `/v1/admin/routing` GET/PUT, UI
   - [x] 5.3 — metrics live : série temporelle `/v1/reports/green/series`, sparklines SVG + répartition modèles
   - [x] 5.4 — rapports : sélecteur de période + téléchargement CSV/PDF (fetch+Blob, header Bearer)
-- [~] Phase 6 — valorisation d'ingénierie (polish)
+- [x] Phase 6 — valorisation d'ingénierie (polish)
   - [x] 6.1 — observabilité : Micrometer → `/actuator/prometheus`, métriques natives Spring AI + `gatewai_*` custom, stack Prometheus/Grafana séparée
   - [x] 6.2 — rate limiting : Bucket4j par client API, 429 + Retry-After sur POST /v1/chat/completions*
   - [x] 6.3 — image native GraalVM : native-ready (profil parent `native`, runtime hints réflexion testés, `docs/native.md`). Compilation complète à valider en CI GraalVM
   - [x] 6.4 — exposition MCP : serveur MCP (Spring AI, transport streamable-HTTP `/mcp`), outils `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, auth Bearer partagée, hints natifs (`docs/mcp.md`)
-  - [ ] 6.5 — packaging final
+  - [x] 6.5 — packaging final : `Dockerfile` multi-stage (front+back), `docker-compose.yml` plug & play (gateway + pgvector + Ollama), `.env.example`, `.dockerignore`, README + schéma d'archi end-to-end
 
 ## Build front (mono-repo)
 - App Svelte+Vite dans `src/main/frontend`, buildée vers `target/classes/static` (bundlée dans le jar).

@@ -1,0 +1,21 @@
+# Build outputs — rebuilt inside the image
+target/
+src/main/frontend/node_modules/
+src/main/frontend/dist/
+
+# VCS & IDE
+.git/
+.gitignore
+.idea/
+*.iml
+.vscode/
+
+# Local env & secrets — never bake into an image
+.env
+
+# Docs, compose files & runtime-only assets — not needed in the build context
+docs/
+*.md
+docker-compose*.yml
+compose.yaml
+docker/
