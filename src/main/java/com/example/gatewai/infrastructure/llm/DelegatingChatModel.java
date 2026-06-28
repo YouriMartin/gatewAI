@@ -10,6 +10,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
@@ -32,6 +33,7 @@ import reactor.core.publisher.Flux;
  */
 @Component
 @Primary
+@Profile("!mock")
 class DelegatingChatModel implements ChatModel {
 
   private static final String PROVIDER_OLLAMA = "ollama";

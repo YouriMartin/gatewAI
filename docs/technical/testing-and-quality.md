@@ -56,6 +56,24 @@ when no key is set.
 > has no `init.sql` mounted); the `dev` service-container user is a superuser, so
 > this succeeds.
 
+## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
+
+Activate the `mock` Spring profile (`SPRING_PROFILES_ACTIVE=mock`) to swap the
+egress for `MockEchoChatModel` — a deterministic echo. The mock sits at the
+`ChatModel` level (not `LlmClient`), so the **advisor chain still runs**: the
+semantic cache and the router execute around it, the response carries the routed
+model id and token counts, and green accounting / persistence / reporting behave
+realistically. The only thing skipped is the paid provider call.
+
+```bash
+docker run -e SPRING_PROFILES_ACTIVE=mock … gatewai   # no ANTHROPIC_API_KEY needed
+```
+
+Use it for demos, dashboard/UI work, and plumbing tests. It still needs the local
+embedding model (for the cache) and Postgres; it just never calls Anthropic or a
+real Ollama chat model. (`DelegatingChatModel` is `@Profile("!mock")`, so exactly
+one `@Primary` egress is active.)
+
 ## Architecture tests (ArchUnit)
 
 `ArchitectureTest` declares the onion architecture (`domainModels`,

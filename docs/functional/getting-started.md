@@ -42,6 +42,11 @@ curl http://localhost:8080/actuator/health
 # {"status":"UP", ...}
 ```
 
+> **Try it with no API key / no cost.** Set `SPRING_PROFILES_ACTIVE=mock` (e.g. in
+> `.env` / the compose `gateway` environment) to use a deterministic echo egress.
+> The cache, router, green accounting, reports and dashboard all work — only the
+> paid provider call is replaced. Great for a first look, demos, and UI work.
+
 ## 3. Get an API key
 
 Every `/v1/**` call must carry a **Bearer API key**. The simplest path is to set
