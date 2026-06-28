@@ -31,7 +31,7 @@ Response (`ChatCompletionResponse`):
   "id": "chatcmpl-…",
   "object": "chat.completion",
   "created": 1735680000,
-  "model": "claude-haiku-…",
+  "model": "claude-haiku-4-5",
   "choices": [
     {"index": 0,
      "message": {"role": "assistant", "content": "Hi!"},
@@ -72,7 +72,7 @@ Unknown id → `404`, malformed id → `400`. Requires dispatch enabled to progr
   "total_cost_eur": 3.91, "total_cost_avoided_eur": 5.12,
   "total_energy_kwh": 0.84, "total_grams_co2": 193.2,
   "total_grams_co2_avoided": 256.7,
-  "model_mix": {"claude-haiku-…": 900, "claude-sonnet-…": 380}
+  "model_mix": {"claude-haiku-4-5": 900, "claude-opus-4-8": 380}
 }
 ```
 

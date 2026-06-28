@@ -15,8 +15,8 @@ intensity (kWh/1k tokens), and tier. Default registry:
 
 | Key | Provider | Model id | Tier | €/1k | kWh/1k |
 |---|---|---|---|---|---|
-| `claude-sonnet` | anthropic | claude-sonnet-… | `CLOUD_PREMIUM` | 0.015 | 0.005 |
-| `claude-haiku` | anthropic | claude-haiku-… | `CLOUD_ENTRY` | 0.002 | 0.002 |
+| `claude-opus` | anthropic | claude-opus-4-8 | `CLOUD_PREMIUM` | 0.015 | 0.005 |
+| `claude-haiku` | anthropic | claude-haiku-4-5 | `CLOUD_ENTRY` | 0.003 | 0.002 |
 | `llama3` | ollama | llama3 | `LOCAL` | 0.0 | 0.001 |
 
 > The energy intensities are **placeholders** (see
