@@ -42,5 +42,7 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 
 ## Development ([`developpment/`](developpment/))
 
+- [`contributing.md`](developpment/contributing.md) — build, test, conventions, how to make common changes
+- [`roadmap-post-v1.md`](developpment/roadmap-post-v1.md) — directional backlog after v1
 - [`plan-action-green-ai-proxy.md`](developpment/plan-action-green-ai-proxy.md) — product action plan (phases 0–6)
 - [`plan-action-documentation.md`](developpment/plan-action-documentation.md) — this documentation effort's action plan

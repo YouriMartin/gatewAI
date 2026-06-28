@@ -122,4 +122,4 @@ Gathers the documents tied to developing the app.
 - [x] D0 — reorganization + index
 - [x] D1 — functional documentation
 - [x] D2 — technical documentation
-- [ ] D3 — development documents
+- [x] D3 — development documents
