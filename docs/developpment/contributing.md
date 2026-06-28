@@ -111,3 +111,8 @@ get an ADR in [`../technical/adr/`](../technical/adr/).
 2. New/changed behaviour is covered by tests and reflected in the docs.
 3. No secrets committed; no French prose introduced.
 4. ArchUnit passes (layering respected, new adapters registered).
+
+CI (`.github/workflows/ci.yml`) runs the same `verify` plus the `-Pit`
+integration suite (full-context boot) against Postgres + Ollama — so a wiring
+regression fails the build. See
+[`../technical/testing-and-quality.md`](../technical/testing-and-quality.md).

@@ -22,13 +22,39 @@ tested**; everything else has unit coverage.
 
 Tests that need **external services** (Postgres/pgvector, Ollama, a real model)
 are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `EmbeddingModelSmokeTest`,
-`ChatClientSmokeTest`, `ActuatorHealthSmokeTest`.
+`ChatClientSmokeTest`, `ActuatorHealthSmokeTest`, and `ContextLoadsTest`.
 
 - Default (`./mvnw test` / `verify`) **excludes** the `integration` group
   (`maven-surefire-plugin` `<excludedGroups>integration</excludedGroups>`), so the
   standard build needs **no Node and no containers** and stays fast.
 - The **`it` profile** flips this (`<groups>integration</groups>`) to run only the
-  smoke tests against real infra: `./mvnw -Pit test`.
+  integration tests against real infra: `./mvnw -Pit test`.
+
+`ContextLoadsTest` (Phase 7.3) boots the **full Spring context** and asserts the
+bean graph wires — it makes no provider call. It exists because the default suite
+never refreshes the context, so two startup bugs (an MCP `ToolCallbackProvider`
+cycle and a missing `CarbonAwareZoneSelector` bean) once slipped through to the
+first container run. `ChatClientSmokeTest` additionally carries
+`@EnabledIfEnvironmentVariable(ANTHROPIC_API_KEY)`, so it is skipped (no paid call)
+when no key is set.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs two jobs on push/PR:
+
+- **build** — `./mvnw -DskipFrontend verify` (unit tests + Checkstyle + SpotBugs),
+  fast and infra-free.
+- **integration** — `./mvnw -Pit test` against **Postgres (pgvector) + Ollama**
+  service containers (the embedding and a tiny chat model are pulled first). This
+  is the wiring-regression guard: a context that fails to refresh fails the build.
+  `ANTHROPIC_API_KEY` is intentionally unset, so the Claude-calling smoke test is
+  skipped — the context still loads (the Anthropic model bean is created without
+  calling out).
+
+> Note: the integration job relies on Spring AI's pgvector store
+> (`initialize-schema=true`) to `CREATE EXTENSION vector` itself (the CI Postgres
+> has no `init.sql` mounted); the `dev` service-container user is a superuser, so
+> this succeeds.
 
 ## Architecture tests (ArchUnit)
 
