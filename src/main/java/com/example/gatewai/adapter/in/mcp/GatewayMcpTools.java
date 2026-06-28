@@ -14,6 +14,7 @@ import com.example.gatewai.domain.port.out.CarbonIntensityProvider;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,9 +33,13 @@ class GatewayMcpTools {
   private final CarbonIntensityProvider carbonIntensityProvider;
   private final ChatCompletionUseCase chatCompletionUseCase;
 
+  // @Lazy breaks a startup bean cycle: the MCP ToolCallbackProvider is collected
+  // by Spring AI's tool-calling auto-config into the ChatModel, while this tool's
+  // routed_chat depends (transitively) on that same ChatModel. A lazy proxy defers
+  // resolving ChatCompletionUseCase until the first tool call (request time).
   GatewayMcpTools(GenerateGreenReportUseCase greenReportUseCase,
                   CarbonIntensityProvider carbonIntensityProvider,
-                  ChatCompletionUseCase chatCompletionUseCase) {
+                  @Lazy ChatCompletionUseCase chatCompletionUseCase) {
     this.greenReportUseCase = greenReportUseCase;
     this.carbonIntensityProvider = carbonIntensityProvider;
     this.chatCompletionUseCase = chatCompletionUseCase;

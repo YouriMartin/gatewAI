@@ -1,5 +1,6 @@
 package com.example.gatewai.infrastructure.carbon;
 
+import com.example.gatewai.domain.model.CarbonAwareZoneSelector;
 import com.example.gatewai.domain.model.CarbonCalculator;
 import com.example.gatewai.domain.model.GreenAccountant;
 
@@ -27,5 +28,10 @@ class CarbonConfiguration {
   @Bean
   GreenAccountant greenAccountant(CarbonCalculator carbonCalculator) {
     return new GreenAccountant(carbonCalculator);
+  }
+
+  @Bean
+  CarbonAwareZoneSelector carbonAwareZoneSelector() {
+    return new CarbonAwareZoneSelector();
   }
 }
