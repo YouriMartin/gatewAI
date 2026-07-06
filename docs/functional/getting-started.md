@@ -15,7 +15,7 @@ That is all. No JDK is required for the container mode; the image builds the app
 ## 2. Deploy (plug & play)
 
 ```bash
-git clone https://github.com/your-user/gatewAI.git
+git clone https://github.com/YouriMartin/gatewAI.git
 cd gatewAI
 
 cp .env.example .env

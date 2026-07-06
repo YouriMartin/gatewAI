@@ -1,7 +1,15 @@
 # gatewAI
 
+[![CI](https://github.com/YouriMartin/gatewAI/actions/workflows/ci.yml/badge.svg)](https://github.com/YouriMartin/gatewAI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Java 25](https://img.shields.io/badge/Java-25-orange.svg)
+![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0-6db33f.svg)
+
 Open-source, self-hosted LLM proxy for enterprises.
 It secures, caches, routes and measures the carbon footprint of AI requests.
+
+
+![gatewAI dashboard](docs/assets/dashboard.png)
 
 ## Why gatewAI?
 
@@ -72,7 +80,7 @@ stack.
 
 ```bash
 # 1. Clone the project
-git clone https://github.com/your-user/gatewAI.git
+git clone https://github.com/YouriMartin/gatewAI.git
 cd gatewAI
 
 # 2. Configure the secrets
