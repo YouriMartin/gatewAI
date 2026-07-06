@@ -87,22 +87,25 @@ The router config is changeable at runtime (no restart):
 
 ## Multi-provider egress (Phase 7.2)
 
-Both Anthropic **and** Ollama chat models are auto-configured, and a `@Primary`
-`DelegatingChatModel` (`infrastructure/llm`) is what the Spring AI `ChatClient` is
-built on. The router only rewrites the prompt's **model id**; the delegating model
-then resolves that id's **provider** via the `ModelRegistry` and dispatches to the
-matching real `ChatModel`:
+The Anthropic, Ollama **and** OpenAI chat models are auto-configured, and a
+`@Primary` `DelegatingChatModel` (`infrastructure/llm`) is what the Spring AI
+`ChatClient` is built on. The router only rewrites the prompt's **model id**; the
+delegating model then resolves that id's **provider** via the `ModelRegistry` and
+dispatches to the matching real `ChatModel`:
 
-- `CLOUD_PREMIUM`/`CLOUD_ENTRY` → the Anthropic `ChatModel` (Claude).
+- `CLOUD_PREMIUM`/`CLOUD_ENTRY` → the Anthropic `ChatModel` (Claude), by default.
 - `LOCAL` → the Ollama `ChatModel` (a small local model, `qwen2.5:0.5b` by
   default) — genuine on-prem, zero-cost inference. Routing simple prompts here is
   the project's local/cloud arbitration made real.
+- `provider=openai` → the OpenAI `ChatModel`. **Opt-in**: no default tier points
+  at it, so it stays dormant (built in no-auth mode when `OPENAI_API_KEY` is empty)
+  until a registry entry routes a tier to a `provider=openai` model.
 
 Implementation note: `OllamaChatModel` hard-casts the prompt options to
 `OllamaChatOptions`, so the delegating model rebuilds the prompt with native
 Ollama options (model, temperature, top-p, num-predict) before delegating;
-Anthropic accepts the generic options as-is. Unknown/blank model ids fall back to
-Anthropic. (The vestigial `premiumClient`/`cheapCloudClient` beans in
+Anthropic and OpenAI merge the generic options as-is. Unknown/blank model ids fall
+back to Anthropic. (The vestigial `premiumClient`/`cheapCloudClient` beans in
 `ChatClientConfiguration` are unused — routing is the advisor + delegating model.)
 
 ## Configuration reference

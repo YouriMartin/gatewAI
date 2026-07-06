@@ -27,9 +27,13 @@ import reactor.core.publisher.Flux;
  * Anthropic.
  *
  * <p>The advisor chain sets generic {@code ChatOptions} on the prompt; Anthropic
- * accepts those, but {@code OllamaChatModel} hard-casts to {@code
- * OllamaChatOptions}, so for Ollama we rebuild the prompt with provider-native
- * options (model, temperature, top-p, num-predict).
+ * and OpenAI merge those portable options natively, but {@code OllamaChatModel}
+ * hard-casts to {@code OllamaChatOptions}, so for Ollama we rebuild the prompt
+ * with provider-native options (model, temperature, top-p, num-predict).
+ *
+ * <p>OpenAI is an opt-in egress: no default tier points at it, so the OpenAI bean
+ * (built in no-auth mode when {@code OPENAI_API_KEY} is empty) sits unused until
+ * the model registry routes a tier to a {@code provider=openai} model.
  */
 @Component
 @Primary
@@ -37,31 +41,39 @@ import reactor.core.publisher.Flux;
 class DelegatingChatModel implements ChatModel {
 
   private static final String PROVIDER_OLLAMA = "ollama";
+  private static final String PROVIDER_OPENAI = "openai";
 
   private final ChatModel anthropic;
   private final ChatModel ollama;
+  private final ChatModel openAi;
   private final ModelRegistry modelRegistry;
 
   DelegatingChatModel(@Qualifier("anthropicChatModel") ChatModel anthropic,
                       @Qualifier("ollamaChatModel") ChatModel ollama,
+                      @Qualifier("openAiChatModel") ChatModel openAi,
                       ModelRegistry modelRegistry) {
     this.anthropic = anthropic;
     this.ollama = ollama;
+    this.openAi = openAi;
     this.modelRegistry = modelRegistry;
   }
 
   @Override
   public ChatResponse call(Prompt prompt) {
-    return routesToOllama(prompt)
-        ? ollama.call(withOllamaOptions(prompt))
-        : anthropic.call(prompt);
+    return switch (providerFor(prompt)) {
+      case PROVIDER_OLLAMA -> ollama.call(withOllamaOptions(prompt));
+      case PROVIDER_OPENAI -> openAi.call(prompt);
+      default -> anthropic.call(prompt);
+    };
   }
 
   @Override
   public Flux<ChatResponse> stream(Prompt prompt) {
-    return routesToOllama(prompt)
-        ? ollama.stream(withOllamaOptions(prompt))
-        : anthropic.stream(prompt);
+    return switch (providerFor(prompt)) {
+      case PROVIDER_OLLAMA -> ollama.stream(withOllamaOptions(prompt));
+      case PROVIDER_OPENAI -> openAi.stream(prompt);
+      default -> anthropic.stream(prompt);
+    };
   }
 
   @Override
@@ -70,15 +82,17 @@ class DelegatingChatModel implements ChatModel {
     return ChatOptions.builder().build();
   }
 
-  private boolean routesToOllama(Prompt prompt) {
+  /** Resolves the target provider (lowercased) for the prompt's model id. */
+  private String providerFor(Prompt prompt) {
     ChatOptions options = prompt.getOptions();
     String modelId = options != null ? options.getModel() : null;
     if (modelId == null) {
-      return false;
+      return "";
     }
-    return PROVIDER_OLLAMA.equalsIgnoreCase(modelRegistry.findByModelId(modelId)
+    return modelRegistry.findByModelId(modelId)
         .map(ModelDefinition::provider)
-        .orElse(null));
+        .map(provider -> provider.toLowerCase(java.util.Locale.ROOT))
+        .orElse("");
   }
 
   /** Rebuilds the prompt with {@link OllamaChatOptions} (Ollama hard-casts). */

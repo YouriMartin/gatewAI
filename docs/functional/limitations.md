@@ -23,15 +23,20 @@ Full discussion:
 For audited CSRD claims you would need measured energy factors, marginal
 intensity, real multi-region execution and a documented methodology.
 
-## Egress providers: Claude (cloud) + Ollama (local) by default; OpenAI not wired
+## Egress providers: Claude (cloud) + Ollama (local) by default; OpenAI opt-in
 
 - Out of the box the active egress is **multi-provider**: `CLOUD_PREMIUM` →
   Anthropic `claude-opus-4-8`, `CLOUD_ENTRY` → `claude-haiku-4-5`, and **`LOCAL` →
   a local Ollama model** (`qwen2.5:0.5b` by default), pulled at startup. So simple
   prompts are genuinely served locally at zero API cost. (See
   [`../technical/routing.md`](../technical/routing.md) for the `DelegatingChatModel`.)
-- The OpenAI starter is present but its chat egress is **not** auto-configured;
-  adding OpenAI as a provider is a config + bean change.
+- **OpenAI is a wired but opt-in egress.** The delegating chat model dispatches
+  `provider=openai` to the OpenAI chat model; no default tier points at it, so it
+  stays dormant (built in no-auth mode) until you enable it. To use it: set
+  `OPENAI_API_KEY` and repoint a tier's model-registry entry to a `provider=openai`
+  model (e.g. `gpt-4o`) — see the commented example in `application.properties`.
+- **DeepSeek** is not wired. Its API is OpenAI-compatible, so it can be reached by
+  pointing the OpenAI base URL at DeepSeek, but that is not configured by default.
 - The default local model is tiny (chosen for speed/cost); swap it for a larger
   Ollama model if you want better local quality.
 
