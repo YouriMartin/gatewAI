@@ -48,6 +48,29 @@ Response (`ChatCompletionResponse`, non-streaming):
 `model` is the model that actually served the request. On a cache hit, `usage`
 replays the original counts.
 
+### Errors
+
+Failures on `POST /v1/chat/completions` return the **OpenAI error envelope**, so
+client SDKs parse them like any other OpenAI error:
+
+```json
+{"error": {"message": "…", "type": "invalid_request_error",
+           "param": null, "code": null}}
+```
+
+| Status | `type` | When |
+|---|---|---|
+| `400` | `invalid_request_error` | Malformed JSON, or missing/empty `messages` |
+| `401` | — | Missing/invalid API key (Spring Security entry point, no body) |
+| `429` | — | Rate limit exceeded (`Retry-After` header) |
+| `502` | `api_error` | Upstream provider rejected the request (auth, unknown model) or is unreachable |
+| `503` | `api_error` | Upstream provider temporarily unavailable / rate-limited after retries |
+| `500` | `api_error` | Unexpected internal error |
+
+Upstream provider details are logged server-side but **not echoed** to the caller.
+Streaming (`"stream": true`) reports failures inline on the SSE stream rather than
+as this envelope, since the response is already committed when the egress fails.
+
 ## Asynchronous, carbon-aware completions
 
 ### `POST /v1/chat/completions/async`
@@ -140,4 +163,5 @@ Tools: `routed_chat`, `green_report`, `carbon_intensity`. See [`mcp.md`](mcp.md)
 
 `200` ok · `201` client created · `202` async accepted · `204` revoked · `400`
 bad input · `401` missing/invalid key · `403` non-admin on admin route · `404`
-unknown async id · `429` rate limited (`Retry-After`).
+unknown async id · `429` rate limited (`Retry-After`) · `500` internal error ·
+`502`/`503` upstream provider error (chat ingress, see [Errors](#errors)).

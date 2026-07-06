@@ -16,6 +16,10 @@ final class OpenAiMapper {
   }
 
   static LlmRequest toLlmRequest(ChatCompletionRequest request) {
+    if (request.messages() == null || request.messages().isEmpty()) {
+      throw new IllegalArgumentException(
+          "'messages' is a required property and must not be empty.");
+    }
     List<LlmMessage> messages = request.messages().stream()
         .map(message -> new LlmMessage(message.role(), message.content()))
         .toList();
