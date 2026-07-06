@@ -2,7 +2,7 @@
 <FindBugsFilter>
   <!-- HttpSecurity.build() forces throws Exception — Spring Security API constraint -->
   <Match>
-    <Class name="com.example.gatewai.adapter.in.web.SecurityConfig"/>
+    <Class name="io.github.yourimartin.gatewai.adapter.in.web.SecurityConfig"/>
     <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
   </Match>
 </FindBugsFilter>

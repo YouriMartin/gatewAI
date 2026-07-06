@@ -8,11 +8,11 @@
 		<version>4.1.0</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.example</groupId>
+	<groupId>io.github.yourimartin</groupId>
 	<artifactId>gatewai</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>gatewAI</name>
-	<description>Proxy LLM open-source : cache semantique, routage intelligent et comptabilite carbone</description>
+	<description>Open-source LLM proxy: semantic cache, smart routing and carbon accounting</description>
 	<properties>
 		<java.version>25</java.version>
 		<spring-ai.version>2.0.0</spring-ai.version>

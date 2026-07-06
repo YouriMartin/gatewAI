@@ -8,7 +8,7 @@ cost + carbon footprint — all without going through a third party.
 ## Architecture
 
 MCP is a **second ingress**, treated like the OpenAI web one: an inbound adapter
-`com.example.gatewai.adapter.in.mcp` that holds no business logic and reuses the
+`io.github.yourimartin.gatewai.adapter.in.mcp` that holds no business logic and reuses the
 existing `in`/`out` ports. The green advisor chain (cache → router → accounting)
 stays the single source of truth.
 

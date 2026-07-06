@@ -58,7 +58,7 @@ ports; a new egress is a starter + bean change behind the `LlmClient` out port.
 ## Hexagonal (onion) architecture
 
 ```
-com.example.gatewai
+io.github.yourimartin.gatewai
 ├── domain/
 │   ├── model/            # entities, value objects, pure domain logic — no Spring/JPA/Spring AI
 │   ├── port/in/          # inbound ports (use cases)

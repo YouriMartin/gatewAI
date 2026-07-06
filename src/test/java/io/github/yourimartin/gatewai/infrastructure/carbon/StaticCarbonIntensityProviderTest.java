@@ -1,0 +1,53 @@
+package io.github.yourimartin.gatewai.infrastructure.carbon;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
+class StaticCarbonIntensityProviderTest {
+
+  @Test
+  void returnsConfiguredValue() {
+    CarbonProperties properties = new CarbonProperties();
+    properties.setGridIntensityGramsPerKwh(56.0);
+
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    assertEquals(56.0, provider.gramsCo2PerKwh());
+  }
+
+  @Test
+  void reflectsRuntimeConfigChange() {
+    CarbonProperties properties = new CarbonProperties();
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    properties.setGridIntensityGramsPerKwh(480.0);
+
+    assertEquals(480.0, provider.gramsCo2PerKwh());
+  }
+
+  @Test
+  void returnsPerZoneIntensityWhenConfigured() {
+    CarbonProperties properties = new CarbonProperties();
+    properties.setGridIntensityGramsPerKwh(230.0);
+    properties.getZoneIntensities().put("SE", 30.0);
+
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    assertEquals(30.0, provider.gramsCo2PerKwh("SE"));
+  }
+
+  @Test
+  void fallsBackToDefaultForUnknownZone() {
+    CarbonProperties properties = new CarbonProperties();
+    properties.setGridIntensityGramsPerKwh(230.0);
+
+    StaticCarbonIntensityProvider provider =
+        new StaticCarbonIntensityProvider(properties);
+
+    assertEquals(230.0, provider.gramsCo2PerKwh("US"));
+  }
+}

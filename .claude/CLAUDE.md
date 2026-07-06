@@ -41,7 +41,7 @@ Non-negotiable principles:
 ## Hexagonal architecture (packages)
 
 ```
-com.example.gatewai
+io.github.yourimartin.gatewai
 ├── domain/model/            # Entities, value objects — zero Spring/JPA dependency
 ├── domain/port/in/          # Inbound ports (use cases)
 ├── domain/port/out/         # Outbound ports (persistence, LLM, vector store)

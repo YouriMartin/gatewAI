@@ -1,0 +1,16 @@
+package io.github.yourimartin.gatewai.adapter.in.web;
+
+import io.github.yourimartin.gatewai.domain.model.CreatedApiClient;
+
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
+
+/** Create response: the client view plus the raw key, returned exactly once. */
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record CreatedClientView(ApiClientView client, String apiKey) {
+
+  static CreatedClientView of(CreatedApiClient created) {
+    return new CreatedClientView(
+        ApiClientView.of(created.client()), created.rawKey());
+  }
+}
