@@ -1,167 +1,167 @@
 <script lang="ts">
-  import {
-    fetchGreenReport,
-    fetchGreenSeries,
-    downloadReport,
-    listClients,
-    createClient,
-    revokeClient,
-    getRoutingConfig,
-    updateRoutingConfig,
-    type GreenReport,
-    type ApiClientView,
-    type RoutingConfig,
-  } from './lib/api';
-  import Sparkline from './lib/Sparkline.svelte';
+import {
+  type ApiClientView,
+  createClient,
+  downloadReport,
+  fetchGreenReport,
+  fetchGreenSeries,
+  type GreenReport,
+  getRoutingConfig,
+  listClients,
+  type RoutingConfig,
+  revokeClient,
+  updateRoutingConfig,
+} from './lib/api';
+import Sparkline from './lib/Sparkline.svelte';
 
-  const STORAGE_KEY = 'gatewai.apiKey';
+const STORAGE_KEY = 'gatewai.apiKey';
 
-  let apiKey = $state(localStorage.getItem(STORAGE_KEY) ?? '');
-  let status = $state<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  let report = $state<GreenReport | null>(null);
-  let series = $state<GreenReport[]>([]);
-  let error = $state('');
+let apiKey = $state(localStorage.getItem(STORAGE_KEY) ?? '');
+let status = $state<'idle' | 'loading' | 'ok' | 'error'>('idle');
+let report = $state<GreenReport | null>(null);
+let series = $state<GreenReport[]>([]);
+let error = $state('');
 
-  let clients = $state<ApiClientView[]>([]);
-  let adminError = $state('');
-  let newName = $state('');
-  let newAdmin = $state(false);
-  let createdKey = $state<string | null>(null);
+let clients = $state<ApiClientView[]>([]);
+let adminError = $state('');
+let newName = $state('');
+let newAdmin = $state(false);
+let createdKey = $state<string | null>(null);
 
-  let routing = $state<RoutingConfig | null>(null);
-  let keywordsText = $state('');
-  let routingError = $state('');
-  let routingSaved = $state(false);
+let routing = $state<RoutingConfig | null>(null);
+let keywordsText = $state('');
+let routingError = $state('');
+let routingSaved = $state(false);
 
-  let reportFrom = $state(isoDate(new Date(Date.now() - 30 * 86400000)));
-  let reportTo = $state(isoDate(new Date()));
-  let exportError = $state('');
+let reportFrom = $state(isoDate(new Date(Date.now() - 30 * 86_400_000)));
+let reportTo = $state(isoDate(new Date()));
+let exportError = $state('');
 
-  function isoDate(d: Date): string {
-    return d.toISOString().slice(0, 10);
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function lastThirtyDays(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function message(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function barWidth(count: number): number {
+  if (!report) {
+    return 0;
   }
+  const max = Math.max(...Object.values(report.model_mix), 1);
+  return (count / max) * 100;
+}
 
-  function lastThirtyDays(): { from: string; to: string } {
-    const to = new Date();
-    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { from: from.toISOString(), to: to.toISOString() };
+async function download(format: 'csv' | 'pdf') {
+  exportError = '';
+  try {
+    const blob = await downloadReport(
+      apiKey,
+      `${reportFrom}T00:00:00Z`,
+      `${reportTo}T23:59:59Z`,
+      format,
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `green-report.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    exportError = message(e);
   }
+}
 
-  function message(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
+async function connect() {
+  localStorage.setItem(STORAGE_KEY, apiKey);
+  status = 'loading';
+  error = '';
+  try {
+    const { from, to } = lastThirtyDays();
+    report = await fetchGreenReport(apiKey, from, to);
+    series = await fetchGreenSeries(apiKey, from, to);
+    status = 'ok';
+    await loadClients();
+    await loadRouting();
+  } catch (e) {
+    error = message(e);
+    status = 'error';
   }
+}
 
-  function barWidth(count: number): number {
-    if (!report) {
-      return 0;
-    }
-    const max = Math.max(...Object.values(report.model_mix), 1);
-    return (count / max) * 100;
+async function loadRouting() {
+  try {
+    routing = await getRoutingConfig(apiKey);
+    keywordsText = routing.premium_keywords.join(', ');
+    routingError = '';
+  } catch (e) {
+    routing = null;
+    routingError = message(e);
   }
+}
 
-  async function download(format: 'csv' | 'pdf') {
-    exportError = '';
-    try {
-      const blob = await downloadReport(
-        apiKey,
-        `${reportFrom}T00:00:00Z`,
-        `${reportTo}T23:59:59Z`,
-        format,
-      );
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `green-report.${format}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      exportError = message(e);
-    }
+async function saveRouting() {
+  if (!routing) {
+    return;
   }
+  routingSaved = false;
+  const keywords = keywordsText
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
+  try {
+    routing = await updateRoutingConfig(apiKey, {
+      ...routing,
+      premium_keywords: keywords,
+    });
+    keywordsText = routing.premium_keywords.join(', ');
+    routingSaved = true;
+    routingError = '';
+  } catch (e) {
+    routingError = message(e);
+  }
+}
 
-  async function connect() {
-    localStorage.setItem(STORAGE_KEY, apiKey);
-    status = 'loading';
-    error = '';
-    try {
-      const { from, to } = lastThirtyDays();
-      report = await fetchGreenReport(apiKey, from, to);
-      series = await fetchGreenSeries(apiKey, from, to);
-      status = 'ok';
-      await loadClients();
-      await loadRouting();
-    } catch (e) {
-      error = message(e);
-      status = 'error';
-    }
+async function loadClients() {
+  try {
+    clients = await listClients(apiKey);
+    adminError = '';
+  } catch (e) {
+    clients = [];
+    adminError = message(e);
   }
+}
 
-  async function loadRouting() {
-    try {
-      routing = await getRoutingConfig(apiKey);
-      keywordsText = routing.premium_keywords.join(', ');
-      routingError = '';
-    } catch (e) {
-      routing = null;
-      routingError = message(e);
-    }
+async function create() {
+  createdKey = null;
+  try {
+    const created = await createClient(apiKey, newName, newAdmin);
+    createdKey = created.api_key;
+    newName = '';
+    newAdmin = false;
+    await loadClients();
+  } catch (e) {
+    adminError = message(e);
   }
+}
 
-  async function saveRouting() {
-    if (!routing) {
-      return;
-    }
-    routingSaved = false;
-    const keywords = keywordsText
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
-    try {
-      routing = await updateRoutingConfig(apiKey, {
-        ...routing,
-        premium_keywords: keywords,
-      });
-      keywordsText = routing.premium_keywords.join(', ');
-      routingSaved = true;
-      routingError = '';
-    } catch (e) {
-      routingError = message(e);
-    }
+async function revoke(id: string) {
+  try {
+    await revokeClient(apiKey, id);
+    await loadClients();
+  } catch (e) {
+    adminError = message(e);
   }
-
-  async function loadClients() {
-    try {
-      clients = await listClients(apiKey);
-      adminError = '';
-    } catch (e) {
-      clients = [];
-      adminError = message(e);
-    }
-  }
-
-  async function create() {
-    createdKey = null;
-    try {
-      const created = await createClient(apiKey, newName, newAdmin);
-      createdKey = created.api_key;
-      newName = '';
-      newAdmin = false;
-      await loadClients();
-    } catch (e) {
-      adminError = message(e);
-    }
-  }
-
-  async function revoke(id: string) {
-    try {
-      await revokeClient(apiKey, id);
-      await loadClients();
-    } catch (e) {
-      adminError = message(e);
-    }
-  }
+}
 </script>
 
 <main>

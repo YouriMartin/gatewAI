@@ -70,10 +70,9 @@ export async function fetchGreenSeries(
   to: string,
 ): Promise<GreenReport[]> {
   const params = new URLSearchParams({ from, to });
-  const response = await fetch(
-    `/v1/reports/green/series?${params.toString()}`,
-    { headers: authHeaders(apiKey) },
-  );
+  const response = await fetch(`/v1/reports/green/series?${params.toString()}`, {
+    headers: authHeaders(apiKey),
+  });
   return (await (await ensureOk(response)).json()) as GreenReport[];
 }
 

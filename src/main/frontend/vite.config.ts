@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { defineConfig } from 'vite';
 
 // Build output goes straight into the Spring Boot static resources so the SPA
 // is bundled into the jar (mono-repo, self-contained on-premise artifact).

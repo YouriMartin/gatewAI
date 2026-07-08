@@ -5,7 +5,12 @@
   --muted: #9aa0a6;
   --accent: #3fb950;
   --error: #f85149;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
 }
 
 * {
@@ -176,7 +181,7 @@ button:disabled {
   gap: 0.4rem;
 }
 
-.export input[type='date'] {
+.export input[type="date"] {
   padding: 0.4rem 0.6rem;
   border: 1px solid #2d333b;
   border-radius: 6px;
@@ -201,7 +206,7 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
-.create input[type='text'],
+.create input[type="text"],
 .create input:not([type]) {
   padding: 0.5rem 0.75rem;
   border: 1px solid #2d333b;
