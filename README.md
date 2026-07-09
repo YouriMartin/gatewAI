@@ -45,16 +45,21 @@ A thin gateway built on a chain of Spring AI **Advisors**. End-to-end view:
    ╚══════╪═══════════════════════════════╪══════════════╝
           │                               │
    ┌──────▼──────┐  ┌──────────────┐  ┌───▼──────────────────┐
-   │ Claude /     │  │ Ollama        │ │ PostgreSQL + pgvector │
-   │ OpenAI (API) │  │ (embeddings + │ │ vector cache +        │
-   │              │  │  local model) │ │ relational metrics    │
+   │ Any provider │  │ Ollama        │ │ PostgreSQL + pgvector │
+   │ mix: Ollama, │  │ (embeddings + │ │ vector cache +        │
+   │ vLLM, Claude,│  │  local models)│ │ relational metrics    │
+   │ OpenAI…      │  │               │ │                       │
    └──────────────┘  └──────────────┘  └──────────────────────┘
 ```
 
 **Ingress** (OpenAI or MCP format) and **egress** (LLM provider) are
-independent. Any existing client SDK works by only changing the `base_url`.
-Per-layer details: see [`docs/`](docs/README.md) (carbon, observability, MCP,
-native image).
+independent. Any existing client SDK works by only changing the `base_url`,
+and the egress side is **bring-your-own-model-mix**: local-first by default
+(everything runs on the bundled Ollama, zero API keys), with any combination of
+provider instances — several Ollama/vLLM servers, Anthropic, OpenAI, any
+OpenAI-compatible endpoint — declared in configuration. No vendor is required
+or privileged. Per-layer details: see [`docs/`](docs/README.md) (carbon,
+observability, MCP, native image).
 
 ## Tech stack
 
@@ -71,7 +76,10 @@ native image).
 
 - **Docker** and **Docker Compose** (enough for plug & play mode)
 - **Java 25** + Maven *(only for development mode)*
-- An Anthropic API key (`ANTHROPIC_API_KEY`)
+
+No API key is required: by default all three routing tiers run on the bundled
+Ollama. Cloud providers (Anthropic, OpenAI, any OpenAI-compatible endpoint) are
+opt-in via the model registry.
 
 ## Quick start — plug & play (all in containers)
 
@@ -83,9 +91,8 @@ stack.
 git clone https://github.com/YouriMartin/gatewAI.git
 cd gatewAI
 
-# 2. Configure the secrets
+# 2. (Optional) configure secrets — admin key, cloud API keys
 cp .env.example .env
-$EDITOR .env            # set ANTHROPIC_API_KEY
 
 # 3. Start the full stack (gateway + Postgres/pgvector + Ollama)
 docker compose -f docker-compose.yml up --build
@@ -101,7 +108,10 @@ docker compose -f docker-compose.yml up --build
 - Health: <http://localhost:8080/actuator/health>
 
 On the **first** start, the gateway downloads the embedding model
-(`nomic-embed-text`) from Ollama — give the health check time to pass.
+(`nomic-embed-text`) and the three default chat models (`qwen2.5` 0.5b/1.5b/3b,
+~3 GB total) from Ollama — give the health check time to pass. To route a tier
+to a cloud model instead, see the *Egress providers* section of
+[`application.properties`](src/main/resources/application.properties).
 
 Your **admin API key** is simply the `GATEWAI_ADMIN_API_KEY` you set in `.env` —
 the gateway seeds an admin client with that exact key at startup. Use it as the
@@ -128,7 +138,6 @@ It reads secrets from `.env`. Equivalent manual steps:
 
 ```bash
 # Boot starts Postgres + Ollama via compose.yaml; the app runs on the JVM
-export ANTHROPIC_API_KEY=sk-ant-...
 ./mvnw spring-boot:run
 ```
 

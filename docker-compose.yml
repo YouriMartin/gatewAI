@@ -1,6 +1,7 @@
 # Plug & play full stack (Phase 6.5): gateway + PostgreSQL/pgvector + Ollama.
+# Local-first: works with ZERO API keys — all three routing tiers run on Ollama.
 #
-#   cp .env.example .env      # then set ANTHROPIC_API_KEY
+#   cp .env.example .env      # optional: cloud keys, admin key
 #   docker compose up --build
 #
 # Dashboard:    http://localhost:8080/
@@ -8,9 +9,10 @@
 # MCP server:   http://localhost:8080/mcp
 # Health:       http://localhost:8080/actuator/health
 #
-# The gateway pulls the embedding model (nomic-embed-text) from Ollama on first
-# start, so the very first boot takes a little longer. The bootstrap admin API
-# key is printed once in the gateway logs — copy it from `docker compose logs`.
+# On first start the gateway pulls the embedding model (nomic-embed-text) and
+# the three default chat models (qwen2.5 0.5b/1.5b/3b, ~3 GB total) into Ollama,
+# so the very first boot takes a while. The bootstrap admin API key is printed
+# once in the gateway logs — copy it from `docker compose logs`.
 #
 # Note: `compose.yaml` (infra only) is what Spring Boot auto-starts during local
 # `./mvnw spring-boot:run`; this file runs the whole stack in containers instead.
@@ -56,8 +58,13 @@ services:
       - 'SPRING_DATASOURCE_URL=jdbc:postgresql://pgvector:5432/${POSTGRES_DB:-greenaiproxy}'
       - 'SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-dev}'
       - 'SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-dev}'
+      # Embeddings (Spring AI auto-config) and chat egress (gatewai.providers)
+      # both point at the bundled Ollama service.
       - 'SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434'
-      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}'
+      - 'OLLAMA_BASE_URL=http://ollama:11434'
+      # Optional cloud egress — only used if a registry tier references it.
+      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY:-}'
       - 'GATEWAI_ADMIN_API_KEY=${GATEWAI_ADMIN_API_KEY:-}'
     ports:
       - '8080:8080'

@@ -14,30 +14,9 @@ import org.springframework.context.annotation.Configuration;
 @RegisterReflectionForBinding(ClassificationResult.class)
 class ChatClientConfiguration {
 
-  @Bean
-  @Qualifier("premiumClient")
-  ChatClient premiumClient(ChatModel chatModel,
-                           ModelRegistryProperties properties) {
-    String modelId = resolveModelId(properties, ModelTier.CLOUD_PREMIUM);
-    return ChatClient.builder(chatModel)
-        .defaultOptions(ChatOptions.builder().model(modelId))
-        .build();
-  }
-
-  @Bean
-  @Qualifier("cheapCloudClient")
-  ChatClient cheapCloudClient(ChatModel chatModel,
-                              ModelRegistryProperties properties) {
-    String modelId = resolveModelId(properties, ModelTier.CLOUD_ENTRY);
-    return ChatClient.builder(chatModel)
-        .defaultOptions(ChatOptions.builder().model(modelId))
-        .build();
-  }
-
-  // Multi-provider egress (Phase 7.2) is handled by DelegatingChatModel, not by
-  // per-tier ChatClients: routing rewrites the model id and the delegating model
-  // dispatches to Anthropic or Ollama by provider. premiumClient/cheapCloudClient
-  // above are vestigial (unused); classifierClient is the only one still wired.
+  // Multi-provider egress is handled by DelegatingChatModel, not by per-tier
+  // ChatClients: routing rewrites the model id and the delegating model
+  // dispatches by provider. classifierClient is the only qualified client.
 
   @Bean
   @Qualifier("classifierClient")

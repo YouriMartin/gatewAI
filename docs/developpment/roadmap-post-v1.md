@@ -23,12 +23,11 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
 
 ## Provider matrix
 
-- **Wire the local (Ollama) egress** by default: re-enable Ollama chat
-  auto-config and add the local `ChatClient` (currently commented out in
-  `ChatClientConfiguration`), so `LOCAL`-classified requests are actually served
-  locally.
-- **Multi-provider routing** across a real pool (OpenAI + Anthropic + local), with
-  per-provider health/fallback.
+- ~~Wire the local (Ollama) egress by default~~ — **done** (Phase 8): local-first
+  defaults, `gatewai.providers.<name>` instances (anthropic | openai |
+  openai-compatible | ollama, N instances), no fallback provider.
+- **Per-provider health checks and failover** across the configured pool (e.g.
+  skip an unreachable instance and retry the tier's next registry entry).
 
 ## API surface
 

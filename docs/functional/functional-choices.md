@@ -13,15 +13,21 @@ by changing only the `base_url`, with no code rewrite — the single biggest dri
 of adoption. The provider actually called (egress) is deliberately decoupled from
 this format, so switching providers never breaks clients.
 
-## Claude as the primary egress
+## Local-first egress, any provider mix by configuration
 
-**Choice:** Anthropic Claude is the default provider, with `CLOUD_PREMIUM` and
-`CLOUD_ENTRY` tiers mapping to a stronger and a cheaper Claude model.
+**Choice:** the gateway ships **local-first** — all three routing tiers map to
+local Ollama models, so it works with zero API keys — and any mix of provider
+instances (several Ollama/vLLM servers, Anthropic, OpenAI, any OpenAI-compatible
+endpoint) is plain configuration. No vendor is required or privileged, and there
+is no fallback provider: every routable model is an explicit registry entry.
 
-**Why:** a single, high-quality provider keeps the default deployment simple and
-reliable. The architecture supports adding OpenAI or a local Ollama egress, but
-shipping with one well-supported provider avoids a half-working multi-provider
-matrix. See the honest note in [`limitations.md`](limitations.md).
+**Why:** the product promise is *on-premise sovereignty*: a gateway that demands
+a cloud API key before it starts undermines it. Local-first makes `docker
+compose up` a complete, working deployment; cloud quality is one commented-out
+registry entry away. The explicit provider-instance model (rather than one bean
+per hardcoded vendor) is what makes "several local models/servers" and
+"OpenAI-compatible anything" first-class. See the honest note in
+[`limitations.md`](limitations.md).
 
 ## Cheapest tier that can still answer
 

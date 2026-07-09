@@ -1,5 +1,7 @@
 package io.github.yourimartin.gatewai.adapter.in.web;
 
+import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.retry.NonTransientAiException;
@@ -35,6 +37,13 @@ class ApiExceptionHandler {
     LOG.warn("Malformed request body on /v1/chat/completions: {}", e.getMessage());
     return build(HttpStatus.BAD_REQUEST,
         "Malformed JSON request body.", INVALID_REQUEST, null);
+  }
+
+  /** Model id not in the registry (or its provider is not configured) — no fallback egress. */
+  @ExceptionHandler(UnknownModelException.class)
+  ResponseEntity<ApiError> handleUnknownModel(UnknownModelException e) {
+    LOG.warn("Unroutable model on /v1/chat/completions: {}", e.getMessage());
+    return build(HttpStatus.BAD_REQUEST, e.getMessage(), INVALID_REQUEST, "unknown_model");
   }
 
   /** Semantically invalid request (e.g. missing {@code messages}). */

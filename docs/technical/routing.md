@@ -85,33 +85,43 @@ The router config is changeable at runtime (no restart):
 - Exposed via `GET/PUT /v1/admin/routing` and the dashboard (see
   [`api-reference.md`](api-reference.md)).
 
-## Multi-provider egress (Phase 7.2)
+## Multi-provider egress (Phase 7.2, generalized in Phase 8)
 
-The Anthropic, Ollama **and** OpenAI chat models are auto-configured, and a
-`@Primary` `DelegatingChatModel` (`infrastructure/llm`) is what the Spring AI
+Egress is **bring-your-own-model-mix**. Provider *instances* are declared under
+`gatewai.providers.<name>` (`type` = `anthropic` | `openai` | `openai-compatible`
+| `ollama`, plus `api-key`/`base-url` as the type requires), and each model
+registry entry references an instance by name. `EgressProviderConfiguration`
+builds one `ChatModel` per instance **actually referenced by the registry** —
+several Ollama or vLLM servers, cloud vendors, any combination — and validates
+the whole configuration at startup (fail-fast: empty tier, duplicate model id,
+missing instance, missing credentials).
+
+A `@Primary` `DelegatingChatModel` (`infrastructure/llm`) is what the Spring AI
 `ChatClient` is built on. The router only rewrites the prompt's **model id**; the
-delegating model then resolves that id's **provider** via the `ModelRegistry` and
-dispatches to the matching real `ChatModel`:
+delegating model resolves that id's registry entry, looks up its provider
+instance and dispatches to it. By default everything is **local-first**: the
+three tiers map to three Qwen sizes on the bundled Ollama, so the gateway works
+with zero API keys. Cloud is opt-in by repointing a tier's registry entry.
 
-- `CLOUD_PREMIUM`/`CLOUD_ENTRY` → the Anthropic `ChatModel` (Claude), by default.
-- `LOCAL` → the Ollama `ChatModel` (a small local model, `qwen2.5:0.5b` by
-  default) — genuine on-prem, zero-cost inference. Routing simple prompts here is
-  the project's local/cloud arbitration made real.
-- `provider=openai` → the OpenAI `ChatModel`. **Opt-in**: no default tier points
-  at it, so it stays dormant (built in no-auth mode when `OPENAI_API_KEY` is empty)
-  until a registry entry routes a tier to a `provider=openai` model.
+There is **no fallback provider**: a model id absent from the registry (or
+mapping to an unbuilt instance) raises `UnknownModelException`, returned to the
+client as an OpenAI-style 400 (`unknown_model`). Clients may also pin any
+registered model id directly — routing only rewrites it when it classifies the
+prompt.
 
 Implementation note: `OllamaChatModel` hard-casts the prompt options to
 `OllamaChatOptions`, so the delegating model rebuilds the prompt with native
-Ollama options (model, temperature, top-p, num-predict) before delegating;
-Anthropic and OpenAI merge the generic options as-is. Unknown/blank model ids fall
-back to Anthropic. (The vestigial `premiumClient`/`cheapCloudClient` beans in
-`ChatClientConfiguration` are unused — routing is the advisor + delegating model.)
+Ollama options (model, temperature, top-p, num-predict) before delegating to an
+`ollama`-type instance; Anthropic and OpenAI merge the generic options as-is.
+Ollama instances pull their registry models at startup per
+`gatewai.providers.<name>.pull-model-strategy` (`when_missing` by default).
 
 ## Configuration reference
 
 `gatewai.classifier.*`: `strategy` (`heuristic`|`llm`), `model-id` (blank → entry
 model), `temperature`, `fallback-to-heuristic`, `entry-length-threshold`,
 `premium-length-threshold`, `premium-keywords`.
-`gatewai.models.registry.<key>.*`: `provider`, `model-id`, `cost-per-1k-tokens`,
-`energy-intensity`, `tier`.
+`gatewai.providers.<name>.*`: `type` (`anthropic`|`openai`|`openai-compatible`|`ollama`),
+`api-key`, `base-url`, `pull-model-strategy` (ollama only).
+`gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
+`model-id` (unique), `cost-per-1k-tokens`, `energy-intensity`, `tier`.

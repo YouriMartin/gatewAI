@@ -20,12 +20,16 @@ Client → OpenAI-format ingress (/v1/chat/completions) → DTO mapping → Prom
    → [Advisor 1] semantic cache    ── short-circuits on hit (does not call chain.nextCall())
    → [Advisor 2] router            ── picks the target ChatClient
    → [Advisor 3] green accounting  ── € cost + gCO2
-      → egress: real ChatModel (Claude first, then OpenAI / Ollama)
+      → egress: real ChatModel (any configured provider mix; local-first default)
    ← remap response → OpenAI DTO → Client
 ```
 
 Non-negotiable principles:
 - **Ingress** (the format clients speak = OpenAI) and **egress** (the provider called) are **independent**.
+- Egress is **provider-agnostic and local-first**: provider instances are declared under
+  `gatewai.providers.<name>` (anthropic | openai | openai-compatible | ollama), the model registry
+  references them by name, and there is **no fallback provider** (unknown model id → 400). No API
+  key is required by default — all tiers run on Ollama.
 - The custom cache implements `CallAdvisor`/`StreamAdvisor`, low `getOrder()`, short-circuits by **not calling** `chain.nextCall()`.
 - All persistence (the `RequestLog` entity + cache vectors) goes into the **same PostgreSQL**.
 - Depend on the `VectorStore` interface, **never** on pgvector directly (reversibility toward Qdrant).
@@ -109,6 +113,7 @@ Progress: _(to be kept up to date)_
   - [x] 6.3 — GraalVM native image: native-ready (parent `native` profile, reflection runtime hints tested, `docs/technical/native.md`). Full compilation to validate in a GraalVM CI
   - [x] 6.4 — MCP exposure: MCP server (Spring AI, streamable-HTTP transport `/mcp`), tools `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, shared Bearer auth, native hints (`docs/technical/mcp.md`)
   - [x] 6.5 — final packaging: multi-stage `Dockerfile` (front+back), plug & play `docker-compose.yml` (gateway + pgvector + Ollama), `.env.example`, `.dockerignore`, README + end-to-end architecture diagram
+- [x] Phase 8 — provider-agnostic egress: `gatewai.providers.<name>` instances (anthropic | openai | openai-compatible | ollama, N allowed), `EgressProviderConfiguration` factory + fail-fast validation, no fallback provider (`UnknownModelException` → 400), local-first defaults (3 Qwen tiers on Ollama, zero API keys)
 
 ## Frontend build (mono-repo)
 - Svelte+Vite app in `src/main/frontend`, built into `target/classes/static` (bundled in the jar).

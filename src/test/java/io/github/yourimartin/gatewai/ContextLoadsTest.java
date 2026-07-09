@@ -21,8 +21,10 @@ import org.springframework.context.ApplicationContext;
  * with no cycle and no missing bean. It makes <b>no</b> provider call.
  *
  * <p>Needs Postgres + Ollama, so it is {@code @Tag("integration")} — run with
- * {@code ./mvnw -Pit test}; the default {@code ./mvnw test} skips it. The
- * Anthropic key is not required (the model bean is created without calling out).
+ * {@code ./mvnw -Pit test}; the default {@code ./mvnw test} skips it. No API key
+ * is required (local-first egress). Note: booting the real context pulls the
+ * default local chat models into Ollama unless
+ * {@code gatewai.providers.ollama.pull-model-strategy=never} (as CI sets).
  */
 @SpringBootTest
 @Tag("integration")

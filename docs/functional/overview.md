@@ -46,9 +46,10 @@ yourself.
 
 - **Ingress** — the API format your clients speak to gatewAI (OpenAI-compatible,
   `/v1/chat/completions`). Also exposed over **MCP** (Model Context Protocol).
-- **Egress** — the actual provider gatewAI calls behind the scenes (Anthropic
-  Claude by default, optionally OpenAI or a local Ollama model). Ingress and
-  egress are independent.
+- **Egress** — the actual provider gatewAI calls behind the scenes: local-first
+  by default (Ollama models, zero API keys), with any configured mix of provider
+  instances — more Ollama/vLLM servers, Anthropic, OpenAI, any OpenAI-compatible
+  endpoint. Ingress and egress are independent.
 - **Semantic cache hit / miss** — a *hit* means a semantically similar prompt was
   already answered and the stored answer is returned without calling any model; a
   *miss* goes through to a model and the answer is cached.

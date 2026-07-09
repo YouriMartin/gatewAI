@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
@@ -70,6 +71,22 @@ class ApiExceptionHandlerTest {
             .with(authentication(auth())))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.type").value("invalid_request_error"));
+  }
+
+  @Test
+  void unknownModelReturns400WithUnknownModelCode() throws Exception {
+    when(useCase.complete(any()))
+        .thenThrow(new UnknownModelException("Unknown model 'mystery'."));
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(VALID_JSON)
+            .with(authentication(auth())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.type").value("invalid_request_error"))
+        .andExpect(jsonPath("$.error.code").value("unknown_model"))
+        .andExpect(jsonPath("$.error.message")
+            .value(org.hamcrest.Matchers.containsString("mystery")));
   }
 
   @Test

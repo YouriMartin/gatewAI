@@ -1,16 +1,19 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import java.util.Optional;
 
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.Test;
@@ -23,15 +26,22 @@ import org.springframework.ai.ollama.api.OllamaChatOptions;
 
 import reactor.core.publisher.Flux;
 
-/** Verifies the delegating egress dispatches to the right provider by model id. */
+/** Verifies the delegating egress dispatches by provider instance, with no fallback. */
 class DelegatingChatModelTest {
 
   private final ChatModel anthropic = mock(ChatModel.class);
   private final ChatModel ollama = mock(ChatModel.class);
   private final ChatModel openAi = mock(ChatModel.class);
   private final ModelRegistry registry = mock(ModelRegistry.class);
-  private final DelegatingChatModel delegating =
-      new DelegatingChatModel(anthropic, ollama, openAi, registry);
+  private final DelegatingChatModel delegating = new DelegatingChatModel(
+      new ProviderChatModels(Map.of(
+          "anthropic", new ProviderChatModels.ProviderInstance(
+              ProviderProperties.ProviderType.ANTHROPIC, anthropic),
+          "my-ollama", new ProviderChatModels.ProviderInstance(
+              ProviderProperties.ProviderType.OLLAMA, ollama),
+          "openai", new ProviderChatModels.ProviderInstance(
+              ProviderProperties.ProviderType.OPENAI, openAi))),
+      registry);
 
   private static Prompt promptFor(String modelId) {
     return new Prompt("hello", ChatOptions.builder().model(modelId).build());
@@ -56,7 +66,7 @@ class DelegatingChatModelTest {
   }
 
   @Test
-  void routesOpenAiCaseInsensitively() {
+  void resolvesProviderNamesCaseInsensitively() {
     register("gpt-4o", "OpenAI");
     when(openAi.call(any(Prompt.class))).thenReturn(mock(ChatResponse.class));
 
@@ -66,8 +76,8 @@ class DelegatingChatModelTest {
   }
 
   @Test
-  void routesOllamaProviderWithNativeOptions() {
-    register("qwen2.5:0.5b", "ollama");
+  void routesOllamaInstanceWithNativeOptions() {
+    register("qwen2.5:0.5b", "my-ollama");
     when(ollama.call(any(Prompt.class))).thenReturn(mock(ChatResponse.class));
 
     delegating.call(promptFor("qwen2.5:0.5b"));
@@ -92,15 +102,31 @@ class DelegatingChatModelTest {
   }
 
   @Test
-  void unknownModelIdFallsBackToAnthropic() {
+  void unknownModelIdIsRejectedWithNoFallback() {
     when(registry.findByModelId("mystery")).thenReturn(Optional.empty());
-    when(anthropic.call(any(Prompt.class))).thenReturn(mock(ChatResponse.class));
 
-    delegating.call(promptFor("mystery"));
+    assertThatThrownBy(() -> delegating.call(promptFor("mystery")))
+        .isInstanceOf(UnknownModelException.class)
+        .hasMessageContaining("mystery");
 
-    verify(anthropic).call(any(Prompt.class));
+    verify(anthropic, never()).call(any(Prompt.class));
     verify(openAi, never()).call(any(Prompt.class));
     verify(ollama, never()).call(any(Prompt.class));
+  }
+
+  @Test
+  void missingModelIdIsRejected() {
+    assertThatThrownBy(() -> delegating.call(new Prompt("hello")))
+        .isInstanceOf(UnknownModelException.class);
+  }
+
+  @Test
+  void unconfiguredProviderIsRejected() {
+    register("mistral-large", "mistral");
+
+    assertThatThrownBy(() -> delegating.call(promptFor("mistral-large")))
+        .isInstanceOf(UnknownModelException.class)
+        .hasMessageContaining("mistral");
   }
 
   @Test

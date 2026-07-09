@@ -23,22 +23,21 @@ Full discussion:
 For audited CSRD claims you would need measured energy factors, marginal
 intensity, real multi-region execution and a documented methodology.
 
-## Egress providers: Claude (cloud) + Ollama (local) by default; OpenAI opt-in
+## Egress providers: local-first by default; any mix by configuration
 
-- Out of the box the active egress is **multi-provider**: `CLOUD_PREMIUM` →
-  Anthropic `claude-opus-4-8`, `CLOUD_ENTRY` → `claude-haiku-4-5`, and **`LOCAL` →
-  a local Ollama model** (`qwen2.5:0.5b` by default), pulled at startup. So simple
-  prompts are genuinely served locally at zero API cost. (See
-  [`../technical/routing.md`](../technical/routing.md) for the `DelegatingChatModel`.)
-- **OpenAI is a wired but opt-in egress.** The delegating chat model dispatches
-  `provider=openai` to the OpenAI chat model; no default tier points at it, so it
-  stays dormant (built in no-auth mode) until you enable it. To use it: set
-  `OPENAI_API_KEY` and repoint a tier's model-registry entry to a `provider=openai`
-  model (e.g. `gpt-4o`) — see the commented example in `application.properties`.
-- **DeepSeek** is not wired. Its API is OpenAI-compatible, so it can be reached by
-  pointing the OpenAI base URL at DeepSeek, but that is not configured by default.
-- The default local model is tiny (chosen for speed/cost); swap it for a larger
-  Ollama model if you want better local quality.
+- Out of the box the egress is **100% local**: the three routing tiers map to
+  three Qwen sizes (`qwen2.5` 0.5b/1.5b/3b) on the bundled Ollama, pulled at
+  startup — the gateway needs **zero API keys**. (See
+  [`../technical/routing.md`](../technical/routing.md) for the
+  `DelegatingChatModel` and provider instances.)
+- **Any provider mix is opt-in configuration**: declare instances under
+  `gatewai.providers.<name>` (`anthropic`, `openai`, `openai-compatible` — vLLM,
+  LM Studio, llama.cpp, OpenRouter, DeepSeek… — or more `ollama` servers) and
+  point registry entries at them. Only instances referenced by the registry are
+  built, and startup fails fast on missing keys/endpoints.
+- The default local models are small (chosen for speed and pull size); swap in
+  larger local models or a cloud tier for frontier quality — see the commented
+  examples in `application.properties`.
 
 ## Many OpenAI request fields are accepted but ignored
 

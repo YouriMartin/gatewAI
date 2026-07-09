@@ -7,10 +7,12 @@ dashboard.
 ## 1. Prerequisites
 
 - **Docker** and **Docker Compose** (enough for the plug & play mode below).
-- An **Anthropic API key** (`ANTHROPIC_API_KEY`) — Claude is the default egress.
 
-That is all. No JDK is required for the container mode; the image builds the app
-(back end + dashboard) for you.
+That is all — **no API key**: by default all three routing tiers run on the
+bundled Ollama (local-first). Cloud providers (Anthropic, OpenAI, any
+OpenAI-compatible endpoint) are opt-in via the model registry. No JDK is
+required for the container mode; the image builds the app (back end +
+dashboard) for you.
 
 ## 2. Deploy (plug & play)
 
@@ -18,16 +20,16 @@ That is all. No JDK is required for the container mode; the image builds the app
 git clone https://github.com/YouriMartin/gatewAI.git
 cd gatewAI
 
-cp .env.example .env
-$EDITOR .env            # set ANTHROPIC_API_KEY
+cp .env.example .env    # optional: admin key, cloud API keys
 
 docker compose -f docker-compose.yml up --build
 ```
 
 This starts the full stack: the **gateway** (port 8080), **PostgreSQL + pgvector**
-(cache + metrics) and **Ollama** (local embeddings). On the first start the
-gateway downloads the embedding model (`nomic-embed-text`) from Ollama, so give
-the health check a minute to go green.
+(cache + metrics) and **Ollama** (local embeddings + chat models). On the first
+start the gateway downloads the embedding model (`nomic-embed-text`) and the
+three default chat models (`qwen2.5` 0.5b/1.5b/3b, ~3 GB total) from Ollama, so
+give the health check some time to go green.
 
 > `compose.yaml` (infra only) is used in development mode and takes precedence
 > when you run `docker compose` without `-f`; the full stack is therefore invoked

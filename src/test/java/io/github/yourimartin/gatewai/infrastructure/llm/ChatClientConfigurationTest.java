@@ -1,7 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.LinkedHashMap;
@@ -10,17 +9,8 @@ import java.util.Map;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
 
-@ExtendWith(MockitoExtension.class)
 class ChatClientConfigurationTest {
-
-  @Mock
-  private ChatModel chatModel;
 
   @Test
   void resolveModelIdReturnsPremiumModelId() {
@@ -53,26 +43,6 @@ class ChatClientConfigurationTest {
 
     assertEquals("No model configured for tier CLOUD_PREMIUM",
         ex.getMessage());
-  }
-
-  @Test
-  void premiumClientBeanIsCreated() {
-    ChatClientConfiguration config = new ChatClientConfiguration();
-    ModelRegistryProperties props = buildProperties();
-
-    ChatClient client = config.premiumClient(chatModel, props);
-
-    assertNotNull(client);
-  }
-
-  @Test
-  void cheapCloudClientBeanIsCreated() {
-    ChatClientConfiguration config = new ChatClientConfiguration();
-    ModelRegistryProperties props = buildProperties();
-
-    ChatClient client = config.cheapCloudClient(chatModel, props);
-
-    assertNotNull(client);
   }
 
   private static ModelRegistryProperties buildProperties() {

@@ -46,23 +46,23 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Wait for Ollama and pull models
+      - name: Wait for Ollama and pull the embedding model
         run: |
           for i in $(seq 1 30); do
             curl -fsS http://localhost:11434/api/version && break || sleep 2
           done
-          for m in nomic-embed-text qwen2.5:0.5b; do
-            echo "pulling $m"
-            curl -fsS http://localhost:11434/api/pull -d "{\"name\":\"$m\"}" -o /dev/null
-          done
+          echo "pulling nomic-embed-text"
+          curl -fsS http://localhost:11434/api/pull -d '{"name":"nomic-embed-text"}' -o /dev/null
       - name: Integration tests (full context boot)
-        # ANTHROPIC_API_KEY is intentionally unset → the Claude-calling smoke test
-        # is skipped (@EnabledIfEnvironmentVariable); the context still loads, since
-        # the Anthropic model bean is created without making a call.
+        # GATEWAI_SMOKE_MODEL is intentionally unset → the provider-calling smoke
+        # test is skipped (@EnabledIfEnvironmentVariable). The context still loads
+        # with zero API keys (local-first egress); chat-model pulls are disabled so
+        # CI does not download the ~3 GB default Qwen models it never calls.
         env:
           SPRING_DOCKER_COMPOSE_ENABLED: 'false'
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/greenaiproxy
           SPRING_DATASOURCE_USERNAME: dev
           SPRING_DATASOURCE_PASSWORD: dev
           SPRING_AI_OLLAMA_BASE_URL: http://localhost:11434
+          GATEWAI_PROVIDERS_OLLAMA_PULLMODELSTRATEGY: 'never'
         run: ./mvnw -B -Pit test

@@ -20,7 +20,7 @@ Client → OpenAI ingress (/v1/chat/completions)
                  miss → continue, store on the way back
             → [Advisor] Routing         (order HIGHEST_PRECEDENCE + 1)
                  classify complexity → pick tier → rewrite prompt's model
-            → egress: real ChatModel (Anthropic Claude by default)
+            → egress: real ChatModel (any configured provider; local-first default)
          ← LlmResponse (model used, tokens, cacheHit flag)
          → green accounting (service-level) → persist RequestLog → record metrics
    ← OpenAiMapper → OpenAI DTO → Client
@@ -50,10 +50,13 @@ Spring AI orders them by `getOrder()`.
   (`adapter/in/web`) and **MCP** (`adapter/in/mcp`). Both map to the same domain
   `LlmRequest` and inbound use cases.
 - **Egress** = the provider actually called, hidden behind Spring AI's
-  `ChatModel`/`ChatClient`. Default: Anthropic Claude.
+  `ChatModel`/`ChatClient`. Provider instances are declared under
+  `gatewai.providers.*` and dispatched per request by `DelegatingChatModel`;
+  the default is local-first (all tiers on the bundled Ollama).
 
 The two are orthogonal: a new ingress is a new adapter calling the same `in`
-ports; a new egress is a starter + bean change behind the `LlmClient` out port.
+ports; a new egress is a configuration change (a provider instance + a registry
+entry) — see [`routing.md`](routing.md).
 
 ## Hexagonal (onion) architecture
 
