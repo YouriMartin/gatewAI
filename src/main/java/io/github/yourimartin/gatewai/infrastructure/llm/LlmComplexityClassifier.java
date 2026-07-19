@@ -7,22 +7,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
  * V2 classifier: asks a small/cheap model to label the request's complexity,
  * returned as a structured {@link ClassificationResult} via Spring AI's
- * {@code entity} (Structured Outputs).
- *
- * <p>This is the {@link Primary} {@link ComplexityClassifier}. Behaviour is
- * driven by {@link ClassifierProperties} (read per call, so configurable at
- * runtime): when the strategy is {@code HEURISTIC} it simply delegates to the
- * {@link HeuristicComplexityClassifier}; when the LLM call fails it falls back
- * to the heuristic so routing never breaks because a model is unreachable.
+ * {@code entity} (Structured Outputs). Strategy selection lives in
+ * {@link DelegatingComplexityClassifier}; here, when the LLM call fails it
+ * falls back to the heuristic so routing never breaks because a model is
+ * unreachable.
  */
 @Component
-@Primary
 class LlmComplexityClassifier implements ComplexityClassifier {
 
   private static final Logger LOG =
@@ -45,10 +40,6 @@ class LlmComplexityClassifier implements ComplexityClassifier {
   public ModelTier classify(String userText) {
     if (userText == null || userText.isBlank()) {
       return ModelTier.LOCAL;
-    }
-
-    if (properties.getStrategy() != ClassifierStrategy.LLM) {
-      return heuristic.classify(userText);
     }
 
     try {

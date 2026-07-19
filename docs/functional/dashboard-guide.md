@@ -70,12 +70,19 @@ key cannot be recovered — create a new one.
 
 Read and hot-tune the router without a restart:
 
-- **Strategy** — `heuristic` (default, free) or `llm` (small-model classifier).
+- **Strategy** — `embedding` (default: semantic routes, works in any language),
+  `heuristic` (free: length + keywords) or `llm` (small-model classifier).
 - **Entry threshold (chars)** — text longer than this routes at least to the entry
-  tier.
+  tier (heuristic, and fallback of the other strategies).
 - **Premium threshold (chars)** — text longer than this routes to premium.
 - **Premium keywords (comma-separated)** — substrings that force the premium tier
-  (e.g. `refactor, architecture, security`). The list is editable inline.
+  (e.g. `refactor, architecture, security`). Heuristic only.
+- **Semantic routes** — the embedding strategy's configuration. Each route has a
+  **name**, a **target tier** and **example prompts** (one per line, any
+  language). A request follows the route whose examples are semantically
+  closest; below the **similarity threshold** (0–1, default 0.60) the heuristic
+  decides. Add examples that look like your real traffic — 5–15 short prompts
+  per route work well, and you can mix languages freely.
 
 Click **Save** to apply (`PUT /v1/admin/routing`); changes take effect on the next
 request. A `Saved ✓` confirmation appears.

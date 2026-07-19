@@ -114,6 +114,7 @@ Progress: _(to be kept up to date)_
   - [x] 6.4 — MCP exposure: MCP server (Spring AI, streamable-HTTP transport `/mcp`), tools `routed_chat`/`green_report`/`carbon_intensity` via `adapter/in/mcp`, shared Bearer auth, native hints (`docs/technical/mcp.md`)
   - [x] 6.5 — final packaging: multi-stage `Dockerfile` (front+back), plug & play `docker-compose.yml` (gateway + pgvector + Ollama), `.env.example`, `.dockerignore`, README + end-to-end architecture diagram
 - [x] Phase 8 — provider-agnostic egress: `gatewai.providers.<name>` instances (anthropic | openai | openai-compatible | ollama, N allowed), `EgressProviderConfiguration` factory + fail-fast validation, no fallback provider (`UnknownModelException` → 400), local-first defaults (3 Qwen tiers on Ollama, zero API keys)
+- [x] Phase 9 — classifier V3 (default): semantic routes — embedding similarity (max-over-utterances, local Ollama embeddings, in-memory index) over admin-editable routes (name + tier + example prompts, bilingual defaults), `DelegatingComplexityClassifier` strategy dispatch, dashboard route editor. Future: cascade mode (see `docs/technical/routing.md` "Future work")
 
 ## Frontend build (mono-repo)
 - Svelte+Vite app in `src/main/frontend`, built into `target/classes/static` (bundled in the jar).

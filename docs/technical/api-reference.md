@@ -137,10 +137,20 @@ Revokes the client. Returns **`204 No Content`**.
 Returns `RoutingConfigView`:
 
 ```json
-{"strategy": "heuristic", "entry_length_threshold": 100,
+{"strategy": "embedding", "entry_length_threshold": 100,
  "premium_length_threshold": 500,
- "premium_keywords": ["refactor", "architecture", "security"]}
+ "premium_keywords": ["refactor", "architecture", "security"],
+ "route_similarity_threshold": 0.6,
+ "routes": [
+   {"name": "casual-chat", "tier": "local",
+    "examples": ["Hello, how are you today?", "Bonjour, comment ça va ?"]},
+   {"name": "code-and-analysis", "tier": "cloud_premium",
+    "examples": ["Refactor this Java service to use dependency injection"]}
+ ]}
 ```
+
+`strategy` ∈ `embedding` | `heuristic` | `llm`; `tier` ∈ `local` |
+`cloud_entry` | `cloud_premium`.
 
 ### `PUT /v1/admin/routing`
 Body: a `RoutingConfigView`. Applies at runtime (next request); invalid config →

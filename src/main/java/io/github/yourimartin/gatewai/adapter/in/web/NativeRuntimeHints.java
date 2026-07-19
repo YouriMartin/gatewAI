@@ -27,7 +27,8 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       ApiClientView.class,
       CreatedClientView.class,
       CreateClientRequest.class,
-      RoutingConfigView.class);
+      RoutingConfigView.class,
+      RoutingConfigView.RouteView.class);
 
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader) {

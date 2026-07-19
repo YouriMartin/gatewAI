@@ -39,14 +39,20 @@ and carbon savings come from *not* using the expensive model when a cheaper one
 suffices. The default is biased toward savings; when classification is uncertain,
 the configurable fallback decides whether to err toward cost or toward quality.
 
-## Heuristic routing by default, LLM routing opt-in
+## Embedding routes by default, heuristic and LLM as alternatives
 
-**Choice:** the default classifier is **pure heuristics** (length, code blocks,
-keywords); an LLM-based classifier is available but not the default.
+**Choice:** the default classifier is **semantic routes** — the request is
+embedded locally (same Ollama model as the cache) and matched against
+example prompts configured per route/tier. Pure heuristics (length, code
+blocks, keywords) and an LLM-based classifier remain available and serve as
+fallbacks.
 
-**Why:** heuristics are **free and instant** — no extra call, no latency, no cost
-to decide where to route. That fits a gateway on the hot path. Teams that want more
-nuance can switch to the LLM strategy at runtime, accepting its small overhead.
+**Why:** keyword lists are language-bound, awkward to curate, and could only
+force the premium tier. Example prompts are natural to write in the dashboard,
+work in any language the embedding model understands, and route to **any**
+tier. The cost stays negligible — one local embedding call, no cloud call —
+which fits a gateway on the hot path. Teams can still drop to `heuristic`
+(zero cost) or step up to `llm` (more nuance, small overhead) at runtime.
 
 ## 0.92 default similarity threshold
 

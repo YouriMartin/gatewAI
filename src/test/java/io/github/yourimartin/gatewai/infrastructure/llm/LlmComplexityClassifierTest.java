@@ -36,7 +36,6 @@ class LlmComplexityClassifierTest {
     lenient().when(requestSpec.call()).thenReturn(responseSpec);
 
     properties = new ClassifierProperties();
-    properties.setStrategy(ClassifierStrategy.LLM);
 
     classifier = new LlmComplexityClassifier(chatClient, properties, heuristic);
   }
@@ -82,17 +81,6 @@ class LlmComplexityClassifierTest {
 
     verify(requestSpec).system("custom rules");
     verify(requestSpec).user("Hello there");
-  }
-
-  // ---- HEURISTIC strategy delegates ----
-
-  @Test
-  void heuristicStrategyDelegatesWithoutCallingModel() {
-    properties.setStrategy(ClassifierStrategy.HEURISTIC);
-    when(heuristic.classify("Refactor")).thenReturn(ModelTier.CLOUD_PREMIUM);
-
-    assertEquals(ModelTier.CLOUD_PREMIUM, classifier.classify("Refactor"));
-    verify(chatClient, never()).prompt();
   }
 
   // ---- Fallback on failure ----

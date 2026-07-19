@@ -68,7 +68,12 @@ particular:
 
 ## Complexity classifier is fallible
 
-- The default **heuristic** classifier uses length and a finite (bilingual EN/FR)
+- The default **embedding** classifier is only as good as its route examples
+  and its embedding model: `nomic-embed-text` is English-centric, so
+  non-EN/FR languages need their own examples (or a multilingual embedding
+  model) to match reliably. Requests unlike any example fall back to the
+  heuristic.
+- The **heuristic** classifier uses length and a finite (bilingual EN/FR)
   keyword/code-block list. It can misroute: a short but genuinely hard question may
   go `LOCAL`, and a long but trivial one may go `CLOUD_PREMIUM`.
 - The **LLM** strategy is more nuanced but adds a small classification call and can

@@ -11,7 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.in.RoutingConfigUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
@@ -43,7 +45,9 @@ class AdminRoutingControllerTest {
   }
 
   private static RoutingConfig config() {
-    return new RoutingConfig("heuristic", 100, 500, List.of("refactor"));
+    return new RoutingConfig("embedding", 100, 500, List.of("refactor"),
+        0.6, List.of(new SemanticRoute("code", ModelTier.CLOUD_PREMIUM,
+            List.of("refactor this", "debug that"))));
   }
 
   private static final String BODY = """
@@ -51,7 +55,12 @@ class AdminRoutingControllerTest {
         "strategy": "llm",
         "entry_length_threshold": 120,
         "premium_length_threshold": 600,
-        "premium_keywords": ["refactor", "debug"]
+        "premium_keywords": ["refactor", "debug"],
+        "route_similarity_threshold": 0.7,
+        "routes": [
+          {"name": "chat", "tier": "local",
+           "examples": ["hello", "bonjour"]}
+        ]
       }
       """;
 
@@ -62,22 +71,29 @@ class AdminRoutingControllerTest {
     mockMvc.perform(get("/v1/admin/routing")
             .with(authentication(adminAuth())))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.strategy").value("heuristic"))
+        .andExpect(jsonPath("$.strategy").value("embedding"))
         .andExpect(jsonPath("$.entry_length_threshold").value(100))
-        .andExpect(jsonPath("$.premium_keywords[0]").value("refactor"));
+        .andExpect(jsonPath("$.premium_keywords[0]").value("refactor"))
+        .andExpect(jsonPath("$.route_similarity_threshold").value(0.6))
+        .andExpect(jsonPath("$.routes[0].name").value("code"))
+        .andExpect(jsonPath("$.routes[0].tier").value("cloud_premium"))
+        .andExpect(jsonPath("$.routes[0].examples[0]").value("refactor this"));
   }
 
   @Test
   void putAppliesAndReturnsUpdatedConfig() throws Exception {
     when(useCase.current()).thenReturn(
-        new RoutingConfig("llm", 120, 600, List.of("refactor", "debug")));
+        new RoutingConfig("llm", 120, 600, List.of("refactor", "debug"),
+            0.7, List.of(new SemanticRoute("chat", ModelTier.LOCAL,
+                List.of("hello", "bonjour")))));
 
     mockMvc.perform(put("/v1/admin/routing")
             .contentType(MediaType.APPLICATION_JSON).content(BODY)
             .with(authentication(adminAuth())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.strategy").value("llm"))
-        .andExpect(jsonPath("$.premium_length_threshold").value(600));
+        .andExpect(jsonPath("$.premium_length_threshold").value(600))
+        .andExpect(jsonPath("$.routes[0].tier").value("local"));
   }
 
   @Test

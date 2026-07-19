@@ -104,11 +104,19 @@ export async function revokeClient(apiKey: string, id: string): Promise<void> {
   await ensureOk(response);
 }
 
+export interface SemanticRoute {
+  name: string;
+  tier: string;
+  examples: string[];
+}
+
 export interface RoutingConfig {
   strategy: string;
   entry_length_threshold: number;
   premium_length_threshold: number;
   premium_keywords: string[];
+  route_similarity_threshold: number;
+  routes: SemanticRoute[];
 }
 
 export async function getRoutingConfig(apiKey: string): Promise<RoutingConfig> {

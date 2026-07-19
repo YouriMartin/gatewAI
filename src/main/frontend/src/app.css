@@ -297,3 +297,56 @@ button.link {
   align-items: center;
   gap: 0.75rem;
 }
+
+.routing-form .routes {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.routing-form .routes h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.routing-form .routes .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.routing-form .routes .threshold {
+  max-width: 220px;
+}
+
+.route-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid #2d333b;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.route-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.route-head input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.route-card textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2d333b;
+  border-radius: 6px;
+  background: #0d1117;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}

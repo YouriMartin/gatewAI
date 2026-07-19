@@ -50,8 +50,18 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
 
 ## Routing intelligence
 
-- **Trained classifier.** Complement the heuristic/LLM classifiers with a small
-  fine-tuned model for better tier accuracy (cf. vLLM Semantic Router in
+- **Cascade routing (planned next).** Chain the existing classifiers by
+  increasing cost with confidence gates: deterministic signals → embedding
+  routes → LLM classifier only when the best route similarity is ambiguous.
+  `DelegatingComplexityClassifier` is the seam; see the "Future work" section
+  of [`../technical/routing.md`](../technical/routing.md).
+- **Shared request embedding.** Compute the request embedding once and reuse it
+  across the semantic cache and the routing advisor (today the cache embeds
+  internally via `VectorStore.similaritySearch`, so it is computed twice per
+  uncached request).
+- **Trained classifier.** Complement the embedding/heuristic/LLM classifiers
+  with a small fine-tuned model for better tier accuracy (cf. vLLM Semantic
+  Router in
   [`../functional/vllm-semantic-router-comparison.md`](../functional/vllm-semantic-router-comparison.md)).
 - **Feedback loop.** Use observed outcomes (cost, latency, escalations) to tune
   thresholds automatically.

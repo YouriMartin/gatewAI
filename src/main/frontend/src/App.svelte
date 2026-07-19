@@ -28,8 +28,15 @@ let newName = $state('');
 let newAdmin = $state(false);
 let createdKey = $state<string | null>(null);
 
+interface RouteEdit {
+  name: string;
+  tier: string;
+  examplesText: string;
+}
+
 let routing = $state<RoutingConfig | null>(null);
 let keywordsText = $state('');
+let routesEdit = $state<RouteEdit[]>([]);
 let routingError = $state('');
 let routingSaved = $state(false);
 
@@ -102,11 +109,24 @@ async function loadRouting() {
   try {
     routing = await getRoutingConfig(apiKey);
     keywordsText = routing.premium_keywords.join(', ');
+    routesEdit = routing.routes.map((r) => ({
+      name: r.name,
+      tier: r.tier,
+      examplesText: r.examples.join('\n'),
+    }));
     routingError = '';
   } catch (e) {
     routing = null;
     routingError = message(e);
   }
+}
+
+function addRoute() {
+  routesEdit = [...routesEdit, { name: '', tier: 'local', examplesText: '' }];
+}
+
+function removeRoute(index: number) {
+  routesEdit = routesEdit.filter((_, i) => i !== index);
 }
 
 async function saveRouting() {
@@ -118,12 +138,26 @@ async function saveRouting() {
     .split(',')
     .map((k) => k.trim())
     .filter((k) => k.length > 0);
+  const routes = routesEdit.map((r) => ({
+    name: r.name.trim(),
+    tier: r.tier,
+    examples: r.examplesText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0),
+  }));
   try {
     routing = await updateRoutingConfig(apiKey, {
       ...routing,
       premium_keywords: keywords,
+      routes,
     });
     keywordsText = routing.premium_keywords.join(', ');
+    routesEdit = routing.routes.map((r) => ({
+      name: r.name,
+      tier: r.tier,
+      examplesText: r.examples.join('\n'),
+    }));
     routingSaved = true;
     routingError = '';
   } catch (e) {
@@ -321,6 +355,7 @@ async function revoke(id: string) {
           <label>
             Strategy
             <select bind:value={routing.strategy}>
+              <option value="embedding">embedding (semantic routes)</option>
               <option value="heuristic">heuristic</option>
               <option value="llm">llm</option>
             </select>
@@ -342,9 +377,54 @@ async function revoke(id: string) {
             />
           </label>
           <label class="wide">
-            Premium keywords (comma-separated)
+            Premium keywords (comma-separated, heuristic fallback)
             <input type="text" bind:value={keywordsText} />
           </label>
+
+          <div class="routes wide">
+            <h3>Semantic routes</h3>
+            <p class="hint">
+              Each route sends matching requests to its tier. Describe the
+              route with example prompts (one per line, any language) — a
+              request follows the route whose examples are semantically
+              closest. Below the similarity threshold, the heuristic decides.
+            </p>
+            <label class="threshold">
+              Similarity threshold (0–1)
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                bind:value={routing.route_similarity_threshold}
+              />
+            </label>
+            {#each routesEdit as route, i (i)}
+              <div class="route-card">
+                <div class="route-head">
+                  <input
+                    bind:value={route.name}
+                    placeholder="Route name (e.g. code-and-analysis)"
+                  />
+                  <select bind:value={route.tier}>
+                    <option value="local">local</option>
+                    <option value="cloud_entry">cloud_entry</option>
+                    <option value="cloud_premium">cloud_premium</option>
+                  </select>
+                  <button class="link" onclick={() => removeRoute(i)}>
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  rows="4"
+                  bind:value={route.examplesText}
+                  placeholder="Example prompts, one per line"
+                ></textarea>
+              </div>
+            {/each}
+            <button class="link" onclick={addRoute}>+ Add a route</button>
+          </div>
+
           <div class="actions">
             <button onclick={saveRouting}>Save</button>
             {#if routingSaved}<span class="ok">Saved ✓</span>{/if}
