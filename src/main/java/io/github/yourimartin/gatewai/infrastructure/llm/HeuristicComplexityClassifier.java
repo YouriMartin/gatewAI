@@ -3,6 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
@@ -21,30 +24,46 @@ class HeuristicComplexityClassifier implements ComplexityClassifier {
   }
 
   @Override
-  public ModelTier classify(String userText) {
+  public ClassificationOutcome classify(String userText) {
     if (userText == null || userText.isBlank()) {
-      return ModelTier.LOCAL;
+      return outcome(ModelTier.LOCAL,
+          ClassificationJustification.Heuristic.of(HeuristicRule.BLANK_TEXT));
     }
 
     if (CODE_BLOCK_PATTERN.matcher(userText).find()) {
-      return ModelTier.CLOUD_PREMIUM;
+      return outcome(ModelTier.CLOUD_PREMIUM,
+          ClassificationJustification.Heuristic.of(HeuristicRule.CODE_FENCE));
     }
 
     String lower = userText.toLowerCase(Locale.ROOT);
     for (String keyword : properties.getPremiumKeywords()) {
       if (lower.contains(keyword)) {
-        return ModelTier.CLOUD_PREMIUM;
+        return outcome(ModelTier.CLOUD_PREMIUM,
+            ClassificationJustification.Heuristic.keyword(keyword));
       }
     }
 
-    if (userText.length() > properties.getPremiumLengthThreshold()) {
-      return ModelTier.CLOUD_PREMIUM;
+    int premiumThreshold = properties.getPremiumLengthThreshold();
+    if (userText.length() > premiumThreshold) {
+      return outcome(ModelTier.CLOUD_PREMIUM,
+          ClassificationJustification.Heuristic.length(
+              HeuristicRule.PREMIUM_LENGTH, userText.length(),
+              premiumThreshold));
     }
 
-    if (userText.length() > properties.getEntryLengthThreshold()) {
-      return ModelTier.CLOUD_ENTRY;
+    int entryThreshold = properties.getEntryLengthThreshold();
+    if (userText.length() > entryThreshold) {
+      return outcome(ModelTier.CLOUD_ENTRY,
+          ClassificationJustification.Heuristic.length(
+              HeuristicRule.ENTRY_LENGTH, userText.length(), entryThreshold));
     }
 
-    return ModelTier.LOCAL;
+    return outcome(ModelTier.LOCAL,
+        ClassificationJustification.Heuristic.of(HeuristicRule.DEFAULT));
+  }
+
+  private static ClassificationOutcome outcome(
+      ModelTier tier, ClassificationJustification justification) {
+    return new ClassificationOutcome(tier, justification);
   }
 }

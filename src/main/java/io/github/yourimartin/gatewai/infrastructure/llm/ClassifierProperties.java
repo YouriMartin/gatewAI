@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -17,7 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 class ClassifierProperties {
 
   /** Which classification strategy the router uses. */
-  private ClassifierStrategy strategy = ClassifierStrategy.EMBEDDING;
+  private ClassificationStrategy strategy = ClassificationStrategy.EMBEDDING;
 
   /**
    * Model id used by the classifier client. When blank, the cheapest
@@ -76,11 +77,11 @@ class ClassifierProperties {
    */
   private List<Route> routes = defaultRoutes();
 
-  ClassifierStrategy getStrategy() {
+  ClassificationStrategy getStrategy() {
     return strategy;
   }
 
-  void setStrategy(ClassifierStrategy strategy) {
+  void setStrategy(ClassificationStrategy strategy) {
     this.strategy = strategy;
   }
 

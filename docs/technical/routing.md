@@ -32,6 +32,28 @@ by `gatewai.classifier.strategy` through the `@Primary`
 `DelegatingComplexityClassifier` (the seam where a future cascade mode will
 live, see [Future work](#future-work-cascade-routing)):
 
+The port returns a `ClassificationOutcome` — the tier **and** a
+`ClassificationJustification` (v2 batch 1). Every strategy already computed its
+reason and threw it away; capturing it costs nothing on the nominal path and is
+what makes the decision explainable. The justification is a sealed hierarchy, so
+a new strategy cannot be added without every reader saying what it renders:
+
+| Variant | Carries |
+|---|---|
+| `Heuristic` | which rule fired (`CODE_FENCE`, `PREMIUM_KEYWORD`, `PREMIUM_LENGTH`, …), the matched keyword or the observed length vs its threshold |
+| `Embedding` | every route ranked, each with its closest example, plus `topScore`, `margin` (top1 − top2) and the threshold in force |
+| `Llm` | the model's own `reasoning` and the classifier model id |
+| `Fallback` | the strategy that stepped aside, the cause, what actually decided, and the evidence it had gathered first |
+| `FailSafe` | no strategy decided — premium was chosen defensively |
+
+`Fallback` is what makes a **degraded** decision distinguishable from a nominal
+one: the same tier reached by the heuristic means something quite different when
+it was reached because Ollama was unreachable. Causes are
+`NO_ROUTES_CONFIGURED`, `BELOW_THRESHOLD`, `EMBEDDING_ERROR`,
+`NO_TIER_RETURNED` and `LLM_ERROR`. On a below-threshold hand-over the route
+scores ride along as `evidence`, so "the best route only reached 0.41 against a
+0.60 bar" stays visible — the quantity batch 3 will calibrate.
+
 ### Embedding routes (default) — `EmbeddingComplexityClassifier`
 
 Semantic routing in the style of

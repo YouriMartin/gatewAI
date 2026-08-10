@@ -154,7 +154,21 @@ database, on cache hits and misses alike.
 
 ---
 
-## Batch 1 — Uniform explanation contract
+## Batch 1 — Uniform explanation contract — ✅ done
+
+One correction found while implementing:
+
+- **D13 — a fallback needs two justifications, not one.** The plan modelled the
+  fallback as a flat shape (`strategy`, `fallbackFrom`, `cause`). But on a
+  below-threshold hand-over *two* things are worth keeping: what actually decided
+  (the heuristic rule) and what the strategy that stepped aside had computed
+  first (the route scores). Collapsing them makes `strategy()` lie about who
+  decided. `Fallback` therefore carries `effective` **and** `evidence`, the
+  latter null when the failed strategy produced nothing (an error, no routes).
+
+Also delivered: `ClassifierStrategy` moved from `infrastructure.llm` to
+`domain/model` as **`ClassificationStrategy`** — a justification has to name a
+strategy, and the domain cannot import infrastructure. One enum, not two.
 
 The explanation must exist whatever `gatewai.classifier.strategy` is set to,
 otherwise it vanishes on the first config change.
@@ -193,10 +207,15 @@ classifier, `NO_TIER_RETURNED` / `LLM_ERROR`).
   `outcome.tier()` and is otherwise untouched.
 - Blast radius: 1 port, 4 implementations, 1 advisor, ~5 test classes.
 
-### Acceptance
+### Acceptance — all met
 
-All three strategies produce a non-empty justification; the fallback case is
-distinguishable from the nominal one; unit tests per strategy.
+All three strategies produce a non-empty justification (asserted by iterating
+`ClassificationStrategy.values()`, so a future strategy cannot skip it); the
+fallback case is distinguishable from the nominal one; unit tests per strategy.
+
+Verified against real infra that routing behaviour is **unchanged**: the three
+default routes still send a refactoring prompt to `qwen2.5:3b`, a greeting to
+`qwen2.5:0.5b` and a summary request to `qwen2.5:1.5b`.
 
 ---
 
@@ -568,7 +587,7 @@ overpromise.
 
 ```
 Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ✅ done
-Batch 1   Uniform explanation contract
+Batch 1   Uniform explanation contract                            ✅ done
 Batch 2   Routing + cache decision persistence
 Batch 5   Evaluation                     ← before batch 3, which is unvalidatable without it
 Batch 3   Conformal calibration (cache first)
@@ -602,7 +621,7 @@ branch. `./mvnw test` green before every commit.
 
 ## Definition of done
 
-- [ ] All three classifiers produce a usable justification
+- [x] All three classifiers produce a usable justification
 - [ ] Cache and routing decisions persisted, versioned, replayable
 - [ ] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [ ] Cascade routing implemented, its gates calibrated

@@ -46,7 +46,9 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextCall(request);
     }
 
-    ModelTier tier = classifier.classify(userText);
+    // The justification travels with the tier; batch 2 persists it. Routing
+    // itself is unchanged by batch 1.
+    ModelTier tier = classifier.classify(userText).tier();
     List<ModelDefinition> candidates = modelRegistry.findByTier(tier);
 
     if (candidates.isEmpty()) {
@@ -76,7 +78,9 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextStream(request);
     }
 
-    ModelTier tier = classifier.classify(userText);
+    // The justification travels with the tier; batch 2 persists it. Routing
+    // itself is unchanged by batch 1.
+    ModelTier tier = classifier.classify(userText).tier();
     List<ModelDefinition> candidates = modelRegistry.findByTier(tier);
     if (candidates.isEmpty()) {
       return chain.nextStream(request);

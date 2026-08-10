@@ -1,8 +1,13 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
@@ -27,7 +32,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>When no example reaches {@code route-similarity-threshold}, or the
  * embedding call fails, the heuristic classifier decides, so routing never
- * breaks because the embedding model is unreachable.
+ * breaks because the embedding model is unreachable. Those hand-overs are
+ * reported as {@link ClassificationJustification.Fallback}, so a degraded
+ * decision is never mistaken for a nominal one.
  */
 @Component
 class EmbeddingComplexityClassifier implements ComplexityClassifier {
@@ -51,49 +58,113 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
   }
 
   @Override
-  public ModelTier classify(String userText) {
+  public ClassificationOutcome classify(String userText) {
     if (userText == null || userText.isBlank()) {
-      return ModelTier.LOCAL;
+      // Not a fallback: no strategy can classify nothing. The heuristic's
+      // blank-text rule is the shared short-circuit, reported as itself.
+      return heuristic.classify(userText);
     }
 
     List<SemanticRoute> routes = currentRoutes();
     if (routes.isEmpty()) {
       LOG.debug("No semantic route configured, using heuristic");
-      return heuristic.classify(userText);
+      return fallback(userText, FallbackCause.NO_ROUTES_CONFIGURED);
     }
 
+    double threshold = properties.getRouteSimilarityThreshold();
     try {
       RouteIndex idx = indexFor(routes);
       float[] query = embeddingModel.embed(userText);
 
-      RouteMatch best = bestMatch(idx, query);
-      if (best == null
-          || best.similarity() < properties.getRouteSimilarityThreshold()) {
-        LOG.debug("No route above threshold (best={}), using heuristic",
-            best);
-        return heuristic.classify(userText);
+      List<ClassificationJustification.RouteCandidate> candidates =
+          rankRoutes(idx, query);
+      if (candidates.isEmpty()) {
+        return fallback(userText, FallbackCause.NO_ROUTES_CONFIGURED);
       }
 
-      LOG.debug("Route match: {}", best);
-      return best.tier();
+      ClassificationJustification.RouteCandidate best = candidates.getFirst();
+      double margin = candidates.size() > 1
+          ? best.score() - candidates.get(1).score() : 0.0;
+
+      if (best.score() < threshold) {
+        LOG.debug("No route above threshold (best={} at {}), using heuristic",
+            best.route(), best.score());
+        return fallback(userText, FallbackCause.BELOW_THRESHOLD,
+            candidates, margin, threshold);
+      }
+
+      LOG.debug("Route match: {} -> {} ({})",
+          best.route(), best.tier(), best.score());
+      return new ClassificationOutcome(best.tier(),
+          new ClassificationJustification.Embedding(
+              candidates, best.score(), margin, threshold));
     } catch (RuntimeException e) {
       LOG.warn("Embedding classification failed ({}), falling back",
           e.getMessage());
-      return heuristic.classify(userText);
+      return fallback(userText, FallbackCause.EMBEDDING_ERROR);
     }
   }
 
-  private static RouteMatch bestMatch(RouteIndex idx, float[] query) {
-    RouteMatch best = null;
+  /**
+   * One candidate per route, each carrying that route's closest example, sorted
+   * best first and ranked. Same single pass as picking the best route, so the
+   * scores that explain the decision cost nothing extra.
+   */
+  private static List<ClassificationJustification.RouteCandidate> rankRoutes(
+      RouteIndex idx, float[] query) {
+
+    List<ClassificationJustification.RouteCandidate> candidates =
+        new ArrayList<>();
     for (IndexedRoute route : idx.routes()) {
-      for (float[] example : route.vectors()) {
-        double similarity = cosineSimilarity(query, example);
-        if (best == null || similarity > best.similarity()) {
-          best = new RouteMatch(route.name(), route.tier(), similarity);
+      double bestScore = Double.NEGATIVE_INFINITY;
+      String bestUtterance = null;
+      for (int i = 0; i < route.vectors().size(); i++) {
+        double similarity = cosineSimilarity(query, route.vectors().get(i));
+        if (similarity > bestScore) {
+          bestScore = similarity;
+          bestUtterance = route.examples().get(i);
         }
       }
+      if (bestUtterance != null) {
+        candidates.add(new ClassificationJustification.RouteCandidate(
+            route.name(), route.tier(), bestUtterance, bestScore, 0));
+      }
     }
-    return best;
+
+    candidates.sort(Comparator.comparingDouble(
+        ClassificationJustification.RouteCandidate::score).reversed());
+
+    List<ClassificationJustification.RouteCandidate> ranked =
+        new ArrayList<>(candidates.size());
+    for (int i = 0; i < candidates.size(); i++) {
+      ClassificationJustification.RouteCandidate c = candidates.get(i);
+      ranked.add(new ClassificationJustification.RouteCandidate(
+          c.route(), c.tier(), c.bestUtterance(), c.score(), i + 1));
+    }
+    return ranked;
+  }
+
+  private ClassificationOutcome fallback(String userText, FallbackCause cause) {
+    return heuristic.classify(userText)
+        .asFallbackFrom(ClassificationStrategy.EMBEDDING, cause);
+  }
+
+  /**
+   * Below-threshold hand-over: the heuristic decides, and the route scores ride
+   * along as evidence. Knowing the best route only reached 0.41 is exactly what
+   * explains why the heuristic had to decide — and what batch 3 calibrates.
+   */
+  private ClassificationOutcome fallback(
+      String userText, FallbackCause cause,
+      List<ClassificationJustification.RouteCandidate> candidates,
+      double margin, double threshold) {
+
+    ClassificationOutcome decided = heuristic.classify(userText);
+    return new ClassificationOutcome(decided.tier(),
+        new ClassificationJustification.Fallback(
+            ClassificationStrategy.EMBEDDING, cause, decided.justification(),
+            new ClassificationJustification.Embedding(
+                candidates, candidates.getFirst().score(), margin, threshold)));
   }
 
   private List<SemanticRoute> currentRoutes() {
@@ -118,6 +189,7 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
     List<IndexedRoute> indexed = new ArrayList<>();
     for (SemanticRoute route : routes) {
       indexed.add(new IndexedRoute(route.name(), route.tier(),
+          List.copyOf(route.examples()),
           embeddingModel.embed(route.examples())));
     }
     RouteIndex fresh = new RouteIndex(routes, List.copyOf(indexed));
@@ -148,15 +220,8 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
                             List<IndexedRoute> routes) {
   }
 
+  /** A route's examples and their vectors, positionally aligned. */
   private record IndexedRoute(String name, ModelTier tier,
-                              List<float[]> vectors) {
-  }
-
-  private record RouteMatch(String route, ModelTier tier, double similarity) {
-
-    @Override
-    public String toString() {
-      return "%s -> %s (%.3f)".formatted(route, tier, similarity);
-    }
+                              List<String> examples, List<float[]> vectors) {
   }
 }

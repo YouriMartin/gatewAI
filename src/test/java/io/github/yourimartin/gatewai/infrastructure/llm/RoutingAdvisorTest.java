@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOutcomeFixtures.outcome;
 
 import java.util.List;
 import java.util.Map;
@@ -69,7 +70,7 @@ class RoutingAdvisorTest {
     ModelDefinition sonnet = premiumModel();
 
     when(classifier.classify("Refactor this class"))
-        .thenReturn(ModelTier.CLOUD_PREMIUM);
+        .thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
     when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
         .thenReturn(List.of(sonnet));
     when(callChain.nextCall(any())).thenReturn(chainResponse);
@@ -88,7 +89,7 @@ class RoutingAdvisorTest {
         "x".repeat(150));
     ModelDefinition haiku = entryModel();
 
-    when(classifier.classify(any())).thenReturn(ModelTier.CLOUD_ENTRY);
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_ENTRY));
     when(modelRegistry.findByTier(ModelTier.CLOUD_ENTRY))
         .thenReturn(List.of(haiku));
     when(callChain.nextCall(any())).thenReturn(chainResponse);
@@ -115,7 +116,7 @@ class RoutingAdvisorTest {
         .context(Map.of())
         .build();
 
-    when(classifier.classify(any())).thenReturn(ModelTier.CLOUD_PREMIUM);
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
     when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
         .thenReturn(List.of(premiumModel()));
     when(callChain.nextCall(any())).thenReturn(chainResponse);
@@ -136,7 +137,7 @@ class RoutingAdvisorTest {
   void fallsBackToDefaultWhenNoModelForTier() {
     ChatClientRequest request = buildRequest("Hello");
 
-    when(classifier.classify("Hello")).thenReturn(ModelTier.LOCAL);
+    when(classifier.classify("Hello")).thenReturn(outcome(ModelTier.LOCAL));
     when(modelRegistry.findByTier(ModelTier.LOCAL))
         .thenReturn(List.of());
     when(callChain.nextCall(request)).thenReturn(chainResponse);
@@ -185,7 +186,7 @@ class RoutingAdvisorTest {
         .context(context)
         .build();
 
-    when(classifier.classify(any())).thenReturn(ModelTier.CLOUD_PREMIUM);
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
     when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
         .thenReturn(List.of(premiumModel()));
     when(callChain.nextCall(any())).thenReturn(chainResponse);
@@ -202,6 +203,8 @@ class RoutingAdvisorTest {
   void adviseStreamPassesThrough() {
     ChatClientRequest request = buildRequest("stream test");
     Flux<ChatClientResponse> flux = Flux.just(chainResponse);
+    // No model registered for the classified tier: the advisor passes through.
+    when(classifier.classify("stream test")).thenReturn(outcome(ModelTier.LOCAL));
     when(streamChain.nextStream(request)).thenReturn(flux);
 
     Flux<ChatClientResponse> result =
@@ -233,7 +236,7 @@ class RoutingAdvisorTest {
         .context(Map.of())
         .build();
 
-    when(classifier.classify(any())).thenReturn(ModelTier.CLOUD_PREMIUM);
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
     when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
         .thenReturn(List.of(premiumModel()));
     when(callChain.nextCall(any())).thenReturn(chainResponse);

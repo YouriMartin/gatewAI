@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
@@ -55,7 +56,7 @@ class ClassifierRoutingConfigAdapterTest {
     adapter.update(new RoutingConfig("llm", 50, 800, List.of("foo", "bar"),
         0.75, routes));
 
-    assertEquals(ClassifierStrategy.LLM, properties.getStrategy());
+    assertEquals(ClassificationStrategy.LLM, properties.getStrategy());
     assertEquals(50, properties.getEntryLengthThreshold());
     assertEquals(800, properties.getPremiumLengthThreshold());
     assertEquals(List.of("foo", "bar"), properties.getPremiumKeywords());

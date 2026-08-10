@@ -1,9 +1,13 @@
-package io.github.yourimartin.gatewai.infrastructure.llm;
+package io.github.yourimartin.gatewai.domain.model;
 
 /**
- * Selects which complexity-classification strategy the router uses.
+ * Which complexity-classification strategy the router uses.
+ *
+ * <p>Lives in the domain because a classification justification names both the
+ * strategy that was <em>configured</em> and the one that actually
+ * <em>decided</em> — see {@link ClassificationJustification}.
  */
-enum ClassifierStrategy {
+public enum ClassificationStrategy {
 
   /** Pure heuristics: length, code blocks, keywords. Zero cost, zero latency. */
   HEURISTIC,

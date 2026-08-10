@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 import org.springframework.context.annotation.Primary;
@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
  * strategy selected in {@link ClassifierProperties}, read per call so admin
  * API changes apply on the next request. Each concrete classifier keeps its
  * own internal fallback (embedding/LLM degrade to the heuristic).
+ *
+ * <p>The justification is propagated verbatim, never reinterpreted: this class
+ * knows which strategy was <em>configured</em>, and the outcome already says
+ * which one <em>decided</em>.
  *
  * <p>This is also the seam for a future cascade mode (deterministic signals →
  * embedding routes → LLM on ambiguity, see {@code docs/technical/routing.md}).
@@ -35,7 +39,7 @@ class DelegatingComplexityClassifier implements ComplexityClassifier {
   }
 
   @Override
-  public ModelTier classify(String userText) {
+  public ClassificationOutcome classify(String userText) {
     return switch (properties.getStrategy()) {
       case HEURISTIC -> heuristic.classify(userText);
       case EMBEDDING -> embedding.classify(userText);

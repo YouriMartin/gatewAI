@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
@@ -40,7 +41,7 @@ class ClassifierRoutingConfigAdapter implements RoutingConfigPort {
 
   @Override
   public void update(RoutingConfig config) {
-    properties.setStrategy(ClassifierStrategy.valueOf(
+    properties.setStrategy(ClassificationStrategy.valueOf(
         config.strategy().toUpperCase(Locale.ROOT)));
     properties.setEntryLengthThreshold(config.entryLengthThreshold());
     properties.setPremiumLengthThreshold(config.premiumLengthThreshold());
