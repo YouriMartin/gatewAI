@@ -35,6 +35,14 @@ Emitted by `MicrometerMetricsRecorder` on every served request:
 | `gatewai_co2_avoided_grams_total` | counter | — | gCO2 avoided |
 | `gatewai_cache_hits_total` / `gatewai_cache_misses_total` | counter | — | cache |
 | `gatewai_request_latency_seconds` | timer (histogram) | `model` | latency |
+| `gatewai_decisions_write_failures_total` | counter | `kind` (`routing`/`cache`) | decision rows that could not be persisted (v2 batch 2) |
+
+The failure counter is what keeps best-effort tracing honest: decisions are
+written off the request path and never fail a completion, so a store that is
+down would otherwise degrade in complete silence. A non-zero rate means the
+trace has holes, not that requests are failing. The full decision metrics
+(`gatewai.routing.decisions`, `gatewai.cache.decisions`, margins, escalations)
+arrive with batch 6.
 
 Common tag `application=gatewai` on every series.
 

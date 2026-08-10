@@ -152,6 +152,20 @@ So the **requested `model` is a hint**: the router overrides it with the tier's
 configured model id. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
 streamed prompt the same way.
 
+## Traced decisions (v2 batch 2)
+
+Each routing decision is written to `routing_decision`: the chosen tier and
+model, the configured strategy alongside the one that actually decided, the
+justification as JSONB, a one-word `decision_reason`
+(`MATCH` · `BELOW_THRESHOLD_FALLBACK` · `ERROR_FALLBACK` · `NO_MODEL_FOR_TIER`),
+the decision-only latency, and the version of the rules in force. See
+[`data-model.md`](data-model.md).
+
+Two things it deliberately does **not** do. It never blocks or throws — a
+database that is down costs the trace, not the completion. And **a cache hit
+produces no routing decision at all**, because the cache short-circuits upstream
+of the router; that is a fact about the architecture, not a gap in the trace.
+
 ## Hot configuration
 
 The router config is changeable at runtime (no restart):

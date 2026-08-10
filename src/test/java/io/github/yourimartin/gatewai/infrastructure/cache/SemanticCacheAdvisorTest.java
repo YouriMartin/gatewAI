@@ -58,6 +58,9 @@ class SemanticCacheAdvisorTest {
   @Mock
   private ChatClientResponse chainResponse;
 
+  @Mock
+  private CacheDecisionTracer tracer;
+
   @Captor
   private ArgumentCaptor<SearchRequest> searchRequestCaptor;
 
@@ -70,7 +73,7 @@ class SemanticCacheAdvisorTest {
   @BeforeEach
   void setUp() {
     properties = new SemanticCacheProperties();
-    advisor = new SemanticCacheAdvisor(vectorStore, properties);
+    advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer);
   }
 
   // ---- Cache hit tests ----
@@ -78,11 +81,11 @@ class SemanticCacheAdvisorTest {
   @Test
   void cacheHitReturnsStoredResponseWithoutCallingChain() {
     ChatClientRequest request = buildRequest("What is Spring?");
-    Document cachedDoc = new Document("What is Spring?", Map.of(
+    Document cachedDoc = scored(new Document("What is Spring?", Map.of(
         SemanticCacheAdvisor.CACHE_RESPONSE_KEY, "Spring is a framework.",
         SemanticCacheAdvisor.CACHE_MODEL_KEY, "claude-3-sonnet",
         SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY, "end_turn"
-    ));
+    )), 0.97);
 
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
         .thenReturn(List.of(cachedDoc));
@@ -104,9 +107,9 @@ class SemanticCacheAdvisorTest {
   @Test
   void cacheHitUsesDefaultsWhenMetadataIsMissing() {
     ChatClientRequest request = buildRequest("test question");
-    Document cachedDoc = new Document("test question", Map.of(
+    Document cachedDoc = scored(new Document("test question", Map.of(
         SemanticCacheAdvisor.CACHE_RESPONSE_KEY, "cached answer"
-    ));
+    )), 0.97);
 
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
         .thenReturn(List.of(cachedDoc));
@@ -156,12 +159,12 @@ class SemanticCacheAdvisorTest {
   @Test
   void cacheHitReplaysStoredTokensAndFlagsHit() {
     ChatClientRequest request = buildRequest("What is Spring?");
-    Document cachedDoc = new Document("What is Spring?", Map.of(
+    Document cachedDoc = scored(new Document("What is Spring?", Map.of(
         SemanticCacheAdvisor.CACHE_RESPONSE_KEY, "Spring is a framework.",
         SemanticCacheAdvisor.CACHE_MODEL_KEY, "claude-3-sonnet",
         SemanticCacheAdvisor.CACHE_PROMPT_TOKENS_KEY, 10,
         SemanticCacheAdvisor.CACHE_COMPLETION_TOKENS_KEY, 5
-    ));
+    )), 0.97);
 
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
         .thenReturn(List.of(cachedDoc));
@@ -227,7 +230,10 @@ class SemanticCacheAdvisorTest {
     SearchRequest captured = searchRequestCaptor.getValue();
     assertEquals("test", captured.getQuery());
     assertEquals(3, captured.getTopK());
-    assertEquals(0.85, captured.getSimilarityThreshold());
+    // The store ranks without filtering; the advisor decides (v2 batch 2), so
+    // rejected candidates stay visible to the decision trace.
+    assertEquals(SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL,
+        captured.getSimilarityThreshold());
   }
 
   // ---- Filter expression tests ----
@@ -370,7 +376,7 @@ class SemanticCacheAdvisorTest {
     meta.put(SemanticCacheAdvisor.CACHE_MODEL_KEY, "claude-3-sonnet");
     meta.put(SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY, "stop");
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
-        .thenReturn(List.of(new Document("What is Spring?", meta)));
+        .thenReturn(List.of(scored(new Document("What is Spring?", meta), 0.97)));
 
     List<ChatClientResponse> emitted =
         advisor.adviseStream(request, streamChain).collectList().block();
@@ -386,6 +392,16 @@ class SemanticCacheAdvisorTest {
         last.chatResponse().getMetadata().get(LlmResponse.CACHE_HIT_METADATA_KEY)));
     verify(streamChain, never()).nextStream(any());
     verify(vectorStore, never()).add(any());
+  }
+
+  /** A search result as a real store returns it: with its similarity score. */
+  private static Document scored(Document document, double score) {
+    return Document.builder()
+        .id(document.getId())
+        .text(document.getText())
+        .metadata(document.getMetadata())
+        .score(score)
+        .build();
   }
 
   private static ChatResponse streamChunk(String text, String model,

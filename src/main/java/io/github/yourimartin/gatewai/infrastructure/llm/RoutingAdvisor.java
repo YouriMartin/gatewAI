@@ -1,10 +1,21 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.PromptHash;
+import io.github.yourimartin.gatewai.domain.model.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.slf4j.Logger;
@@ -31,11 +42,17 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
 
   private final ComplexityClassifier classifier;
   private final ModelRegistry modelRegistry;
+  private final DecisionRecorder decisionRecorder;
+  private final RoutingConfigVersionTracker configVersion;
 
   RoutingAdvisor(ComplexityClassifier classifier,
-                 ModelRegistry modelRegistry) {
+                 ModelRegistry modelRegistry,
+                 DecisionRecorder decisionRecorder,
+                 RoutingConfigVersionTracker configVersion) {
     this.classifier = classifier;
     this.modelRegistry = modelRegistry;
+    this.decisionRecorder = decisionRecorder;
+    this.configVersion = configVersion;
   }
 
   @Override
@@ -46,19 +63,10 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextCall(request);
     }
 
-    // The justification travels with the tier; batch 2 persists it. Routing
-    // itself is unchanged by batch 1.
-    ModelTier tier = classifier.classify(userText).tier();
-    List<ModelDefinition> candidates = modelRegistry.findByTier(tier);
-
-    if (candidates.isEmpty()) {
-      LOG.info("No model configured for tier {}, using default", tier);
+    ModelDefinition target = route(userText);
+    if (target == null) {
       return chain.nextCall(request);
     }
-
-    ModelDefinition target = candidates.getFirst();
-    LOG.info("Routing to {} (tier={}, model={})",
-        target.provider(), tier, target.modelId());
 
     Prompt routedPrompt = reroutePrompt(request.prompt(),
         target.modelId());
@@ -78,17 +86,10 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextStream(request);
     }
 
-    // The justification travels with the tier; batch 2 persists it. Routing
-    // itself is unchanged by batch 1.
-    ModelTier tier = classifier.classify(userText).tier();
-    List<ModelDefinition> candidates = modelRegistry.findByTier(tier);
-    if (candidates.isEmpty()) {
+    ModelDefinition target = route(userText);
+    if (target == null) {
       return chain.nextStream(request);
     }
-
-    ModelDefinition target = candidates.getFirst();
-    LOG.info("Routing (stream) to {} (tier={}, model={})",
-        target.provider(), tier, target.modelId());
 
     Prompt routedPrompt = reroutePrompt(request.prompt(), target.modelId());
     ChatClientRequest routedRequest = ChatClientRequest.builder()
@@ -97,6 +98,87 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
         .build();
 
     return chain.nextStream(routedRequest);
+  }
+
+  /**
+   * Classifies, picks the target model and records the decision.
+   *
+   * @return the model to rewrite to, or null when the request must pass through
+   *         because no model is registered for the classified tier
+   */
+  private ModelDefinition route(String userText) {
+    long startNanos = System.nanoTime();
+
+    ClassificationOutcome outcome = classifier.classify(userText);
+    List<ModelDefinition> candidates =
+        modelRegistry.findByTier(outcome.tier());
+    ModelDefinition target = candidates.isEmpty() ? null : candidates.getFirst();
+
+    if (target == null) {
+      LOG.info("No model configured for tier {}, using default", outcome.tier());
+    } else {
+      LOG.info("Routing to {} (tier={}, model={})",
+          target.provider(), outcome.tier(), target.modelId());
+    }
+
+    long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    recordDecision(userText, outcome, target, latencyMs);
+    return target;
+  }
+
+  /**
+   * Never throws: the trace exists to explain requests, not to break them. The
+   * recorder itself is non-blocking, but building the row (hashing, reading the
+   * config version) happens here and must be equally harmless.
+   */
+  private void recordDecision(String userText, ClassificationOutcome outcome,
+                              ModelDefinition target, long latencyMs) {
+    try {
+      ClassificationJustification justification = outcome.justification();
+      DecisionReason reason = target == null
+          ? DecisionReason.NO_MODEL_FOR_TIER
+          : DecisionReason.from(justification);
+
+      decisionRecorder.record(new RoutingDecision(
+          UUID.randomUUID(),
+          correlationId(),
+          Instant.now(),
+          PromptHash.of(userText),
+          userText.length(),
+          RequestEmbeddingMemo.current()
+              .flatMap(memo -> memo.embeddingModelId()).orElse(null),
+          configVersion.current(),
+          configuredStrategy(justification),
+          justification.strategy(),
+          justification,
+          reason,
+          outcome.tier(),
+          target == null ? null : target.modelId(),
+          latencyMs));
+    } catch (RuntimeException e) {
+      LOG.warn("Could not build routing decision: {}", e.toString());
+    }
+  }
+
+  /**
+   * The strategy that was configured, which the justification already knows:
+   * on a hand-over it is the one that stepped aside, otherwise the one that
+   * decided.
+   */
+  private static ClassificationStrategy configuredStrategy(
+      ClassificationJustification justification) {
+    return switch (justification) {
+      case ClassificationJustification.Fallback fallback ->
+          fallback.fallbackFrom();
+      case ClassificationJustification.FailSafe failSafe ->
+          failSafe.fallbackFrom();
+      default -> justification.strategy();
+    };
+  }
+
+  private static String correlationId() {
+    return RequestContext.CURRENT.isBound()
+        ? RequestContext.CURRENT.get().traceId() : null;
   }
 
   @Override

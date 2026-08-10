@@ -1,4 +1,4 @@
-package io.github.yourimartin.gatewai.infrastructure.llm;
+package io.github.yourimartin.gatewai.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

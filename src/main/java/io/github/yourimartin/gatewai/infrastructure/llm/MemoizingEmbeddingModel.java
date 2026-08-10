@@ -2,6 +2,8 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.BatchingStrategy;

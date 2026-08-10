@@ -16,19 +16,22 @@ router, so a hit avoids both routing and the model call entirely.
 
 1. Extract the user text from the prompt. If null/blank, pass through
    (`chain.nextCall`).
-2. Build a `SearchRequest` with `query = userText`, `topK` and
-   `similarityThreshold` from properties, plus an optional metadata filter (see
-   below), and run `vectorStore.similaritySearch(...)`.
-3. **Hit** (non-empty results): build a synthetic `ChatClientResponse` from the
-   stored document and return it **without calling `chain.nextCall()`** — the
-   short-circuit.
-4. **Miss**: call `chain.nextCall(request)`, then `cacheStore(...)` the result on
+2. Build a `SearchRequest` with `query = userText` and `topK` from properties,
+   plus an optional metadata filter (see below), and run
+   `vectorStore.similaritySearch(...)`. **No store-side threshold**: the store
+   ranks, the advisor decides (see below).
+3. Compare the best candidate's score to `similarity-threshold`, and record the
+   decision (v2 batch 2).
+4. **Hit**: build a synthetic `ChatClientResponse` from the stored document and
+   return it **without calling `chain.nextCall()`** — the short-circuit.
+5. **Miss**: call `chain.nextCall(request)`, then `cacheStore(...)` the result on
    the way back, and return the real response.
 
 ```java
-List<Document> hits = vectorStore.similaritySearch(searchBuilder.build());
-if (!hits.isEmpty()) {
-    return buildCachedResponse(hits.getFirst(), request.context());  // no LLM call
+List<Document> candidates = lookup(userText);   // ranked, not filtered
+Document hit = accepted(candidates);            // threshold applied here
+if (hit != null) {
+    return buildCachedResponse(hit, request.context());  // no LLM call
 }
 ChatClientResponse response = chain.nextCall(request);
 cacheStore(userText, response);
@@ -80,10 +83,27 @@ The two filters are AND-combined when both apply.
 
 | Property | Default | Meaning |
 |---|---|---|
-| `similarity-threshold` | `0.92` | cosine similarity for a hit; higher = stricter |
-| `top-k` | `1` | nearest neighbours to consider |
+| `similarity-threshold` | `0.92` | cosine similarity for a hit; higher = stricter. Applied by the **advisor**, not the store |
+| `top-k` | `2` | candidates fetched per lookup; values below 2 are lifted to 2 |
 | `ttl-minutes` | `0` | freshness window; `0` = no expiry |
 | `client-namespacing` | `true` | isolate cache per client |
+
+## Traced decisions (v2 batch 2)
+
+Every lookup writes a `cache_decision` row — `HIT`, `MISS`, `BYPASS` or `ERROR`,
+with the winning score, the **runner-up's** score, the threshold in force and,
+on a hit, the served entry's id, age and `origin_correlation_id` (see
+[`data-model.md`](data-model.md)).
+
+This is why the threshold moved out of the store. Filtered server-side, a
+rejected candidate is invisible: neither the runner-up margin nor the
+near-misses could ever be observed, and both are exactly what batch 3 calibrates
+on. A 0.93 hit whose runner-up scored 0.92 is a coin flip; the same hit against
+0.41 is not — and only the advisor-side comparison can tell them apart.
+
+Tracing is best-effort by construction: writes go off the request path and a
+failing store increments `gatewai.decisions.write.failures` instead of failing
+the completion.
 
 ## Design decisions & trade-offs
 

@@ -1,4 +1,4 @@
-package io.github.yourimartin.gatewai.infrastructure.llm;
+package io.github.yourimartin.gatewai.domain.model;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,11 +11,11 @@ import java.util.function.Supplier;
  *
  * <p>An uncached request used to embed the same user text twice: once inside
  * the semantic cache (the {@code VectorStore} embeds the query itself) and once
- * in {@link EmbeddingComplexityClassifier}. Spring AI's {@code SearchRequest}
+ * in the router's embedding classifier. Spring AI's {@code SearchRequest}
  * only accepts a query <em>string</em>, so a precomputed vector cannot be handed
  * to the cache without bypassing the {@code VectorStore} interface — which
  * {@code ADR 0005} forbids. The memo solves it one level lower instead: it is
- * consulted by {@link MemoizingEmbeddingModel}, the {@code EmbeddingModel} bean
+ * consulted by the memoizing {@code EmbeddingModel} decorator, the {@code EmbeddingModel} bean
  * that both the vector store and the classifier are injected with, so the second
  * lookup is a map hit.
  *
@@ -28,11 +28,16 @@ import java.util.function.Supplier;
  * <p>Deliberately tiny and bounded: occlusion attribution (batch 7) embeds many
  * variants of one prompt, and this must not turn into an unbounded per-request
  * heap of 768-float vectors.
+ *
+ * <p>It lives in the domain for the same reason {@link RequestContext} and
+ * {@link CarbonZoneContext} do: several adapters read it — the router and the
+ * cache tracer — and adapters may not depend on one another. Like them, it uses
+ * JDK types only.
  */
 public final class RequestEmbeddingMemo {
 
   /** Vectors kept per request. The hot path needs 1; the cap is slack. */
-  static final int MAX_ENTRIES = 8;
+  public static final int MAX_ENTRIES = 8;
 
   /** Carrier for the current request's memo, bound around the advisor chain. */
   public static final ScopedValue<RequestEmbeddingMemo> CURRENT =
@@ -43,7 +48,7 @@ public final class RequestEmbeddingMemo {
   /** Set on first store: which model produced the vectors in this memo. */
   private String embeddingModelId;
 
-  RequestEmbeddingMemo() {
+  private RequestEmbeddingMemo() {
   }
 
   /**
@@ -84,7 +89,7 @@ public final class RequestEmbeddingMemo {
   }
 
   /** The memoized vector for {@code text}, or null. Never computes anything. */
-  float[] peek(String text) {
+  public float[] peek(String text) {
     synchronized (vectors) {
       return vectors.get(text);
     }
@@ -95,7 +100,7 @@ public final class RequestEmbeddingMemo {
    * {@code loader} on a miss. Beyond {@link #MAX_ENTRIES} the value is computed
    * and returned without being stored, so the memo cannot grow without bound.
    */
-  float[] computeIfAbsent(String text, String modelId,
+  public float[] computeIfAbsent(String text, String modelId,
                           Function<String, float[]> loader) {
     synchronized (vectors) {
       float[] cached = vectors.get(text);

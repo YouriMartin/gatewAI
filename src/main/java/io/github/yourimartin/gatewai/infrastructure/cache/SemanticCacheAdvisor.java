@@ -47,17 +47,29 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   static final String CACHE_COMPLETION_TOKENS_KEY = "cached_completion_tokens";
   static final String CREATED_AT_KEY = "created_at";
   static final String CLIENT_ID_KEY = "client_id";
+  /** Correlation id of the request that produced the cached answer. */
+  static final String CORRELATION_ID_KEY = "correlation_id";
+
+  /**
+   * Candidates fetched per lookup. At least two, so the runner-up's score — the
+   * implicit margin behind a hit — exists to be recorded: 0.93 against 0.92 is
+   * a coin flip, 0.93 against 0.41 is not.
+   */
+  private static final int MIN_TOP_K = 2;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SemanticCacheAdvisor.class);
 
   private final VectorStore vectorStore;
   private final SemanticCacheProperties properties;
+  private final CacheDecisionTracer tracer;
 
   SemanticCacheAdvisor(VectorStore vectorStore,
-                       SemanticCacheProperties properties) {
+                       SemanticCacheProperties properties,
+                       CacheDecisionTracer tracer) {
     this.vectorStore = vectorStore;
     this.properties = properties;
+    this.tracer = tracer;
   }
 
   @Override
@@ -65,25 +77,27 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
                                        CallAdvisorChain chain) {
     String userText = extractUserText(request);
     if (userText == null || userText.isBlank()) {
+      tracer.bypassed(userText);
       return chain.nextCall(request);
     }
 
-    SearchRequest.Builder searchBuilder = SearchRequest.builder()
-        .query(userText)
-        .topK(properties.getTopK())
-        .similarityThreshold(properties.getSimilarityThreshold());
-
-    Filter.Expression filter = buildFilterExpression();
-    if (filter != null) {
-      searchBuilder.filterExpression(filter);
+    List<Document> candidates;
+    try {
+      candidates = lookup(userText);
+    } catch (RuntimeException e) {
+      LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
+      tracer.failed(userText, properties.getSimilarityThreshold());
+      return chain.nextCall(request);
     }
 
-    List<Document> hits = vectorStore.similaritySearch(searchBuilder.build());
+    Document hit = accepted(candidates);
+    tracer.decided(userText, candidates, hit,
+        properties.getSimilarityThreshold());
 
-    if (!hits.isEmpty()) {
+    if (hit != null) {
       LOG.info("Cache HIT for query [{}] (score={})",
-          truncate(userText), hits.getFirst().getScore());
-      return buildCachedResponse(hits.getFirst(), request.context());
+          truncate(userText), hit.getScore());
+      return buildCachedResponse(hit, request.context());
     }
 
     LOG.info("Cache MISS for query [{}]", truncate(userText));
@@ -98,30 +112,34 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
                                                StreamAdvisorChain chain) {
     String userText = extractUserText(request);
     if (userText == null || userText.isBlank()) {
+      tracer.bypassed(userText);
       return chain.nextStream(request);
-    }
-
-    SearchRequest.Builder searchBuilder = SearchRequest.builder()
-        .query(userText)
-        .topK(properties.getTopK())
-        .similarityThreshold(properties.getSimilarityThreshold());
-    Filter.Expression filter = buildFilterExpression();
-    if (filter != null) {
-      searchBuilder.filterExpression(filter);
     }
 
     // similaritySearch runs eagerly here (Scoped Value still bound), so the
     // per-client filter is applied; the deferred store below captures clientId.
-    List<Document> hits = vectorStore.similaritySearch(searchBuilder.build());
+    List<Document> candidates;
+    try {
+      candidates = lookup(userText);
+    } catch (RuntimeException e) {
+      LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
+      tracer.failed(userText, properties.getSimilarityThreshold());
+      return chain.nextStream(request);
+    }
 
-    if (!hits.isEmpty()) {
+    Document hit = accepted(candidates);
+    tracer.decided(userText, candidates, hit,
+        properties.getSimilarityThreshold());
+
+    if (hit != null) {
       LOG.info("Cache HIT (stream) for query [{}] (score={})",
-          truncate(userText), hits.getFirst().getScore());
-      return syntheticStream(hits.getFirst(), request.context());
+          truncate(userText), hit.getScore());
+      return syntheticStream(hit, request.context());
     }
 
     LOG.info("Cache MISS (stream) for query [{}]", truncate(userText));
     String clientId = boundClientId();
+    String correlationId = boundCorrelationId();
     StringBuilder aggregate = new StringBuilder();
     AtomicReference<ChatResponse> lastResponse = new AtomicReference<>();
 
@@ -136,8 +154,8 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
             }
           }
         })
-        .doOnComplete(() ->
-            storeStreamed(userText, aggregate.toString(), lastResponse.get(), clientId));
+        .doOnComplete(() -> storeStreamed(userText, aggregate.toString(),
+            lastResponse.get(), clientId, correlationId));
   }
 
   @Override
@@ -148,6 +166,39 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   @Override
   public int getOrder() {
     return Ordered.HIGHEST_PRECEDENCE;
+  }
+
+  /**
+   * Fetches the nearest candidates <b>without</b> a store-side threshold.
+   *
+   * <p>The accept/reject comparison moved here (v2 batch 2) on purpose: filtered
+   * out in the store, a rejected candidate is invisible, and neither the
+   * runner-up margin nor the near-misses that batch 3 calibrates on would ever
+   * be observable. The store now ranks, the advisor decides.
+   */
+  private List<Document> lookup(String userText) {
+    SearchRequest.Builder searchBuilder = SearchRequest.builder()
+        .query(userText)
+        .topK(Math.max(MIN_TOP_K, properties.getTopK()))
+        .similarityThresholdAll();
+
+    Filter.Expression filter = buildFilterExpression();
+    if (filter != null) {
+      searchBuilder.filterExpression(filter);
+    }
+
+    return vectorStore.similaritySearch(searchBuilder.build());
+  }
+
+  /** The best candidate when it clears the threshold, otherwise null. */
+  private Document accepted(List<Document> candidates) {
+    if (candidates == null || candidates.isEmpty()) {
+      return null;
+    }
+    Document best = candidates.getFirst();
+    Double score = best.getScore();
+    return score != null && score >= properties.getSimilarityThreshold()
+        ? best : null;
   }
 
   static String extractUserText(ChatClientRequest request) {
@@ -226,6 +277,12 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       String clientId = RequestContext.CURRENT.get().clientId();
       if (clientId != null) {
         metadata.put(CLIENT_ID_KEY, clientId);
+      }
+      String correlationId = RequestContext.CURRENT.get().traceId();
+      if (correlationId != null) {
+        // Stamped so a future hit can be traced back to the request whose
+        // routing decision produced this answer (v2 batch 2).
+        metadata.put(CORRELATION_ID_KEY, correlationId);
       }
     }
 
@@ -332,7 +389,8 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
 
   /** Stores a streamed miss once aggregated (clientId captured up the stack). */
   private void storeStreamed(String userText, String responseText,
-                             ChatResponse lastResponse, String clientId) {
+                             ChatResponse lastResponse, String clientId,
+                             String correlationId) {
     if (responseText == null || responseText.isEmpty() || lastResponse == null) {
       return;
     }
@@ -358,6 +416,9 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     if (clientId != null) {
       metadata.put(CLIENT_ID_KEY, clientId);
     }
+    if (correlationId != null) {
+      metadata.put(CORRELATION_ID_KEY, correlationId);
+    }
     vectorStore.add(List.of(new Document(userText, metadata)));
   }
 
@@ -373,6 +434,11 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   private static String boundClientId() {
     return RequestContext.CURRENT.isBound()
         ? RequestContext.CURRENT.get().clientId() : null;
+  }
+
+  private static String boundCorrelationId() {
+    return RequestContext.CURRENT.isBound()
+        ? RequestContext.CURRENT.get().traceId() : null;
   }
 
   private static int intOrZero(Object value) {

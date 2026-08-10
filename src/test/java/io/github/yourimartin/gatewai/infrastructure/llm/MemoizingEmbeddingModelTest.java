@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

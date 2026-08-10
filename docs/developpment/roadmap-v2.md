@@ -219,7 +219,32 @@ default routes still send a refactoring prompt to `qwen2.5:3b`, a greeting to
 
 ---
 
-## Batch 2 — Decision persistence
+## Batch 2 — Decision persistence — ✅ done
+
+Three corrections found while implementing:
+
+- **D14 — `decision_reason` had a value that could never fire and lacked one
+  that always could.** `AMBIGUOUS_ESCALATED` and `CLIENT_PINNED` are not
+  reachable until batch 4 builds the behaviour behind them, so they are not in
+  the enum yet: a reason code that can never fire is worse than no reason code,
+  and adding an enum value later is free (it is stored as a string). Conversely
+  the plan missed a path that fires today — the router classifies a tier for
+  which the registry holds **no model** and passes the request through. That is
+  `NO_MODEL_FOR_TIER`.
+- **D15 — `RequestEmbeddingMemo` had to move to `domain/model`.** The cache
+  tracer needs the embedding-model provenance, the memo lived in
+  `infrastructure.llm`, and ArchUnit forbids one adapter depending on another.
+  It now sits beside `RequestContext` and `CarbonZoneContext`, which are in the
+  domain for exactly this reason — cross-adapter request context, JDK types only.
+- **D16 — a cache hit needs a second correlation id.** The plan asked that a hit
+  lead back to the originating request without naming the field. It is
+  `origin_correlation_id`, stamped into the vector-store metadata when the entry
+  is written; `correlation_id` alone identifies the request being *served*, which
+  is not the one that produced the answer.
+
+The conformal columns (batch 3) and `escalated_to` (batch 4) are deliberately
+absent: they arrive with the code that writes them rather than sitting in the
+schema as columns nothing fills.
 
 ### 2.1 `RoutingDecision`
 
@@ -280,11 +305,24 @@ Asynchronous writes. A persistence failure logs and increments a counter and
 **never** fails the request. Configurable retention (suggested default 90 days)
 and a purge task — reuse the existing `@Scheduled` setup rather than adding one.
 
-### Acceptance
+### Acceptance — all met
 
-Every request produces a `CacheDecision`, and a `RoutingDecision` except on a
-cache hit · a hot route edit changes `routing_config_version` without a restart ·
-DB down → nominal service preserved, tested.
+Verified end to end against a live Postgres, not only in unit tests:
+
+- **Every request produces a `CacheDecision`, and a `RoutingDecision` except on a
+  cache hit.** Three requests → 3 cache decisions, 2 routing decisions; the
+  repeat was a hit and never reached the router.
+- **A hit is auditable back to the answer's own routing.** The `HIT` row carried
+  `origin_correlation_id = b2-refactor`, the request that wrote the entry, plus
+  `runner_up_score = 0.334` against a winning 1.0 — the margin that only exists
+  because the threshold moved into the advisor (D4).
+- **A hot route edit changes `routing_config_version` without a restart.**
+  `PUT /v1/admin/routing` → the next decision was recorded under a new version,
+  with the change logged and timestamped.
+- **A broken decision store preserves nominal service.** With both decision
+  tables renamed out from under the running gateway, a completion still returned
+  **HTTP 200**, the green accounting still recorded the request, and
+  `gatewai_decisions_write_failures_total` incremented for both kinds.
 
 ---
 
@@ -588,7 +626,7 @@ overpromise.
 ```
 Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ✅ done
 Batch 1   Uniform explanation contract                            ✅ done
-Batch 2   Routing + cache decision persistence
+Batch 2   Routing + cache decision persistence           ✅ done
 Batch 5   Evaluation                     ← before batch 3, which is unvalidatable without it
 Batch 3   Conformal calibration (cache first)
 Batch 4   Calibrated cascade routing (+ client pinning)
@@ -622,7 +660,7 @@ branch. `./mvnw test` green before every commit.
 ## Definition of done
 
 - [x] All three classifiers produce a usable justification
-- [ ] Cache and routing decisions persisted, versioned, replayable
+- [x] Cache and routing decisions persisted and versioned (replay API: batch 9)
 - [ ] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [ ] Cascade routing implemented, its gates calibrated
 - [ ] Six quality metrics published and tracked in CI

@@ -47,6 +47,44 @@ call — and equals the job id on the deferred dispatch path.
 > prompt text does live in the vector cache (needed for similarity search), scoped
 > per client.
 
+## `routing_decision` and `cache_decision` (decision tracing)
+
+Written off the request path by `AsyncDecisionRecorder` (v2 batch 2), one row per
+decision. Both join back to `request_log` on `correlation_id`.
+
+`routing_decision`: `prompt_hash` + `prompt_length` · `embedding_model` ·
+`routing_config_version` (see below) · `strategy` vs `effective_strategy` (they
+differ on a hand-over) · `justification` (**JSONB**, the sealed
+`ClassificationJustification` from batch 1) · `decision_reason` ·
+`chosen_tier` / `chosen_model_id` · `routing_latency_ms` (the decision only,
+excluding the LLM call).
+
+`cache_decision`: `outcome` (`HIT` \| `MISS` \| `BYPASS` \| `ERROR`) ·
+`similarity_score` and `runner_up_score` (the implicit margin) · `threshold` ·
+`matched_entry_id` / `matched_entry_age_seconds` · `origin_correlation_id` ·
+`embedding_model`.
+
+Three properties worth knowing:
+
+- **A cache hit has no routing decision.** The cache runs upstream of the
+  router, so a hit short-circuits before any routing happens. That asymmetry is
+  the point: it is where the trace used to be blind.
+- **`origin_correlation_id` closes the loop.** It is the correlation id of the
+  request that *wrote* the served entry, stamped into the vector-store metadata
+  at write time, so a hit leads back to the routing decision behind the answer.
+- **`prompt_hash` is not comparable to `request_log.prompt_hash`.** This one
+  covers the classified user text, that one covers every message. Join on the
+  correlation id, never on the hash.
+
+`routing_config_version` is a short hash of the live `RoutingConfig` (strategy,
+thresholds, keywords, routes and their examples, order included). The rules are
+editable in production, so without it an explanation read later would silently
+describe today's rules rather than the ones that applied. Every change is logged
+with its timestamp by `RoutingConfigVersionTracker`.
+
+Retention is `gatewai.decisions.retention-days` (90 by default); a scheduled
+purge drops older rows. Set `gatewai.decisions.enabled=false` to record nothing.
+
 ## `api_client` (auth/admin)
 
 `ApiClientEntity` ⇄ domain `ApiClient` ⇄ `JpaApiClientAdapter`.
@@ -88,6 +126,7 @@ startup instead of silently altering a table.
 |---|---|
 | `V1__baseline.sql` | `request_log` + `api_client`, byte-for-byte what `ddl-auto=update` used to create |
 | `V2__request_log_correlation_id.sql` | `request_log.correlation_id` + its index |
+| `V3__decision_tables.sql` | `routing_decision` + `cache_decision` and their indexes |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

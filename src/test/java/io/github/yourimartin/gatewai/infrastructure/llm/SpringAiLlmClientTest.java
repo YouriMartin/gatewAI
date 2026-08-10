@@ -14,6 +14,7 @@ import java.util.List;
 import io.github.yourimartin.gatewai.domain.model.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

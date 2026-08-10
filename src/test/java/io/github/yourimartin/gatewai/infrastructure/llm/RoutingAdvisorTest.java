@@ -3,7 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOutcomeFixtures.outcome;
@@ -11,9 +13,16 @@ import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOut
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.PromptHash;
+import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +53,12 @@ class RoutingAdvisorTest {
   private ModelRegistry modelRegistry;
 
   @Mock
+  private DecisionRecorder decisionRecorder;
+
+  @Mock
+  private RoutingConfigVersionTracker configVersion;
+
+  @Mock
   private CallAdvisorChain callChain;
 
   @Mock
@@ -59,7 +74,8 @@ class RoutingAdvisorTest {
 
   @BeforeEach
   void setUp() {
-    advisor = new RoutingAdvisor(classifier, modelRegistry);
+    advisor = new RoutingAdvisor(classifier, modelRegistry,
+        decisionRecorder, configVersion);
   }
 
   // ---- Routing tests ----
@@ -247,6 +263,134 @@ class RoutingAdvisorTest {
     assertNotNull(requestCaptor.getValue().prompt().getInstructions());
     assertEquals(2,
         requestCaptor.getValue().prompt().getInstructions().size());
+  }
+
+  // ---- Decision tracing (v2 batch 2) ----
+
+  @Test
+  void recordsTheDecisionItTook() {
+    ChatClientRequest request = buildRequest("Refactor this class");
+    when(classifier.classify("Refactor this class"))
+        .thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(configVersion.current()).thenReturn("cfg0000000000001");
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    RoutingDecision decision = capturedDecision();
+    assertEquals(ModelTier.CLOUD_PREMIUM, decision.chosenTier());
+    assertEquals("claude-sonnet-4-20250514", decision.chosenModelId());
+    assertEquals(DecisionReason.MATCH, decision.decisionReason());
+    assertEquals("cfg0000000000001", decision.routingConfigVersion());
+    assertEquals(PromptHash.of("Refactor this class"), decision.promptHash());
+    assertEquals("Refactor this class".length(), decision.promptLength());
+    assertNotNull(decision.createdAt());
+  }
+
+  @Test
+  void recordsTheConfiguredStrategyAlongsideTheOneThatDecided() {
+    // A hand-over must stay visible: same tier, very different confidence.
+    ChatClientRequest request = buildRequest("Refactor this class");
+    when(classifier.classify(any())).thenReturn(new ClassificationOutcome(
+        ModelTier.CLOUD_PREMIUM,
+        new ClassificationJustification.Fallback(
+            ClassificationStrategy.EMBEDDING,
+            ClassificationJustification.FallbackCause.EMBEDDING_ERROR,
+            ClassificationJustification.Heuristic.keyword("refactor"))));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    RoutingDecision decision = capturedDecision();
+    assertEquals(ClassificationStrategy.EMBEDDING, decision.strategy());
+    assertEquals(ClassificationStrategy.HEURISTIC, decision.effectiveStrategy());
+    assertEquals(DecisionReason.ERROR_FALLBACK, decision.decisionReason());
+  }
+
+  @Test
+  void recordsABelowThresholdHandOverAsItsOwnReason() {
+    ChatClientRequest request = buildRequest("ambiguous");
+    when(classifier.classify(any())).thenReturn(new ClassificationOutcome(
+        ModelTier.LOCAL,
+        new ClassificationJustification.Fallback(
+            ClassificationStrategy.EMBEDDING,
+            ClassificationJustification.FallbackCause.BELOW_THRESHOLD,
+            ClassificationJustification.Heuristic.of(
+                ClassificationJustification.HeuristicRule.DEFAULT))));
+    when(modelRegistry.findByTier(ModelTier.LOCAL))
+        .thenReturn(List.of(entryModel()));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    assertEquals(DecisionReason.BELOW_THRESHOLD_FALLBACK,
+        capturedDecision().decisionReason());
+  }
+
+  @Test
+  void recordsAPassThroughWhenNoModelIsRegisteredForTheTier() {
+    ChatClientRequest request = buildRequest("Hello");
+    when(classifier.classify("Hello")).thenReturn(outcome(ModelTier.LOCAL));
+    when(modelRegistry.findByTier(ModelTier.LOCAL)).thenReturn(List.of());
+    when(callChain.nextCall(request)).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    RoutingDecision decision = capturedDecision();
+    assertEquals(DecisionReason.NO_MODEL_FOR_TIER, decision.decisionReason());
+    assertNull(decision.chosenModelId());
+    assertEquals(ModelTier.LOCAL, decision.chosenTier());
+  }
+
+  @Test
+  void blankTextIsNotARoutingDecisionAtAll() {
+    ChatClientRequest request = buildRequest("   ");
+    when(callChain.nextCall(request)).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    verify(decisionRecorder, never()).record(any(RoutingDecision.class));
+  }
+
+  @Test
+  void aFailingTracerNeverBreaksRouting() {
+    ChatClientRequest request = buildRequest("Refactor this class");
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(configVersion.current())
+        .thenThrow(new IllegalStateException("config unreadable"));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    ChatClientResponse result = advisor.adviseCall(request, callChain);
+
+    assertSame(chainResponse, result);
+    verify(callChain).nextCall(any());
+  }
+
+  @Test
+  void streamingRecordsItsDecisionToo() {
+    ChatClientRequest request = buildRequest("Refactor this class");
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(streamChain.nextStream(any())).thenReturn(Flux.just(chainResponse));
+
+    advisor.adviseStream(request, streamChain);
+
+    assertEquals("claude-sonnet-4-20250514",
+        capturedDecision().chosenModelId());
+  }
+
+  private RoutingDecision capturedDecision() {
+    ArgumentCaptor<RoutingDecision> captor =
+        ArgumentCaptor.forClass(RoutingDecision.class);
+    verify(decisionRecorder).record(captor.capture());
+    return captor.getValue();
   }
 
   // ---- Helpers ----
