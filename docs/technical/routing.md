@@ -104,10 +104,14 @@ best route similarity lands in an ambiguous band** (e.g. between the threshold
 and threshold + 0.1). This mirrors the vLLM Semantic Router architecture:
 each stage is more expensive but rarely reached.
 `DelegatingComplexityClassifier` is the intended seam — a `cascade` strategy
-would live there, reusing the three existing classifiers unchanged. A further
-optimization is sharing the request embedding between the cache advisor and
-the routing advisor (today the cache embeds via `VectorStore.similaritySearch`
-internally, so the vector is computed twice per uncached request).
+would live there, reusing the three existing classifiers unchanged. See
+[`../developpment/roadmap-v2.md`](../developpment/roadmap-v2.md) for the planned
+implementation with calibrated gates.
+
+The request embedding is **already shared**: `MemoizingEmbeddingModel` memoizes
+it per request, so the cache search, this classifier and the cache store use one
+vector instead of three
+([ADR 0007](adr/0007-memoized-embedding-model.md)).
 
 ## The RoutingAdvisor
 

@@ -34,7 +34,7 @@ class JpaRequestLogAdapterTest {
   @Test
   void saveDelegatesToSpringData() {
     RequestLog log = new RequestLog(
-        UUID.randomUUID(), Instant.now(), "claude-3",
+        UUID.randomUUID(), "corr-1", Instant.now(), "claude-3",
         "a".repeat(64), 10, 5, 15, 200L, "client-1",
         new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5), false
     );
@@ -55,7 +55,7 @@ class JpaRequestLogAdapterTest {
   @Test
   void roundTripDomainToEntityToDomain() {
     RequestLog original = new RequestLog(
-        UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
+        UUID.randomUUID(), "corr-1", Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3-opus", "b".repeat(64),
         100, 50, 150, 1234L, "tenant-42",
         new GreenMetrics(2.25, 0.75, 172.5, 22.5, 60.0), true
@@ -68,9 +68,9 @@ class JpaRequestLogAdapterTest {
   }
 
   @Test
-  void roundTripWithNullClientId() {
+  void roundTripWithNullClientIdAndCorrelationId() {
     RequestLog original = new RequestLog(
-        UUID.randomUUID(), Instant.parse("2026-06-01T12:00:00Z"),
+        UUID.randomUUID(), null, Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3", "c".repeat(64),
         10, 5, 15, 100L, null, GreenMetrics.ZERO, false
     );

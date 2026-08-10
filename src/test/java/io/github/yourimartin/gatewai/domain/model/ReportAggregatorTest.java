@@ -28,7 +28,7 @@ class ReportAggregatorTest {
                                   double costAvoided, double co2,
                                   double co2Avoided, boolean cacheHit) {
     return new RequestLog(
-        UUID.randomUUID(), timestamp, model, "hash", 1, 1, 2, 0L, "client",
+        UUID.randomUUID(), "corr-agg", timestamp, model, "hash", 1, 1, 2, 0L, "client",
         new GreenMetrics(cost, 0.001, co2, costAvoided, co2Avoided), cacheHit);
   }
 

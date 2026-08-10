@@ -39,6 +39,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
+		<!-- Versioned schema migrations (v2 batch 0.1): the gateway owns
+		     request_log + api_client; Spring AI keeps owning vector_store.
+		     spring-boot-flyway carries the auto-configuration (Boot 4 ships it
+		     in its own module, not in flyway-core); the postgresql module is
+		     required by Flyway 10+ for the Postgres dialect. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>

@@ -12,3 +12,4 @@ part that ages well.
 | [0004](0004-scoped-values-no-structured-concurrency.md) | Scoped Values for context; avoid Structured Concurrency | Accepted |
 | [0005](0005-depend-on-vectorstore-interface.md) | Depend on the `VectorStore` interface, not pgvector | Accepted |
 | [0006](0006-avoided-co2-premium-baseline.md) | Measure savings as "avoided" vs a premium baseline | Accepted |
+| [0007](0007-memoized-embedding-model.md) | Share the request embedding by memoizing `EmbeddingModel` | Accepted |

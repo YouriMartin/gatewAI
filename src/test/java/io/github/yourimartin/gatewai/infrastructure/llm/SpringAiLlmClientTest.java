@@ -87,6 +87,28 @@ class SpringAiLlmClientTest {
   }
 
   @Test
+  void callBindsTheEmbeddingMemoAroundTheAdvisorChain() {
+    // The memo must be bound while the advisors run, so the cache advisor and
+    // the router share the user text's vector (v2 batch 0.2).
+    var boundInsideChain = new boolean[]{false};
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.messages(anyList())).thenReturn(requestSpec);
+    when(requestSpec.options(any())).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callResponseSpec);
+    when(callResponseSpec.chatResponse()).thenAnswer(invocation -> {
+      boundInsideChain[0] = RequestEmbeddingMemo.current().isPresent();
+      return buildChatResponse();
+    });
+
+    llmClient.call(new LlmRequest("claude-3",
+        List.of(new LlmMessage("user", "Hello")), null, null));
+
+    assertTrue(boundInsideChain[0]);
+    // ...and unbound again once the request is done.
+    assertFalse(RequestEmbeddingMemo.current().isPresent());
+  }
+
+  @Test
   void callExtractsResponseFieldsCorrectly() {
     stubFluentChain(buildChatResponse());
 

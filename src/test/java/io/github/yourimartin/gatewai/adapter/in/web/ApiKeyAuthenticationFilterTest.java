@@ -84,6 +84,30 @@ class ApiKeyAuthenticationFilterTest {
   }
 
   @Test
+  void correlationIdFromTheIngressFilterReachesTheRequestContext()
+      throws Exception {
+    String rawKey = "sk-test-key-12345";
+    String keyHash = ApiKeyAuthenticationFilter.hashApiKey(rawKey);
+    when(apiClientRepository.findByApiKeyHash(keyHash)).thenReturn(
+        Optional.of(new ApiClient(UUID.randomUUID(), "acme", keyHash, true,
+            Instant.now(), false)));
+
+    request.addHeader("Authorization", "Bearer " + rawKey);
+    request.addHeader(CorrelationIdFilter.HEADER, "req-abc-123");
+    // CorrelationIdFilter runs first in the chain and stores the id.
+    new CorrelationIdFilter().doFilterInternal(request, response,
+        new MockFilterChain());
+
+    var capturedTraceId = new String[]{null};
+    FilterChain capturingChain = (ServletRequest req, ServletResponse res) ->
+        capturedTraceId[0] = RequestContext.CURRENT.get().traceId();
+
+    filter.doFilterInternal(request, response, capturingChain);
+
+    assertEquals("req-abc-123", capturedTraceId[0]);
+  }
+
+  @Test
   void missingAuthorizationHeaderDoesNotAuthenticate() throws Exception {
     filter.doFilterInternal(request, response, filterChain);
 

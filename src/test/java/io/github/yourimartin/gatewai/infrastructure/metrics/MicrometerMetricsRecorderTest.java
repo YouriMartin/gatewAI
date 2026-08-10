@@ -28,8 +28,8 @@ class MicrometerMetricsRecorderTest {
 
   private static RequestLog log(String model, int tokens, boolean cacheHit,
                                 GreenMetrics green) {
-    return new RequestLog(UUID.randomUUID(), Instant.now(), model, "hash",
-        1, 1, tokens, 42L, "client", green, cacheHit);
+    return new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(), model,
+        "hash", 1, 1, tokens, 42L, "client", green, cacheHit);
   }
 
   @Test
@@ -60,8 +60,8 @@ class MicrometerMetricsRecorderTest {
 
   @Test
   void handlesNullModelAndMissingGreenMetrics() {
-    recorder.record(new RequestLog(UUID.randomUUID(), Instant.now(), null,
-        "hash", 0, 0, 0, 0L, "client", null, false));
+    recorder.record(new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(),
+        null, "hash", 0, 0, 0, 0L, "client", null, false));
 
     assertEquals(1.0, registry.get("gatewai.requests")
         .tags("model", "unknown", "cache_hit", "false").counter().count(), DELTA);

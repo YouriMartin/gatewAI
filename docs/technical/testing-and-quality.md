@@ -56,6 +56,11 @@ when no key is set.
 > has no `init.sql` mounted); the `dev` service-container user is a superuser, so
 > this succeeds.
 
+Since v2 batch 0.1 the integration job is also the **migration guard**: booting
+the context runs Flyway and then validates every JPA entity against the migrated
+schema (`ddl-auto=validate`). An entity changed without its migration fails the
+build there — it can no longer be papered over by `ddl-auto=update`.
+
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 
 Activate the `mock` Spring profile (`SPRING_PROFILES_ACTIVE=mock`) to swap the

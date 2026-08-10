@@ -58,7 +58,8 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         client.id().toString(), client.name(), authorities(client));
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-    RequestContext ctx = new RequestContext(client.id().toString(), null);
+    RequestContext ctx = new RequestContext(
+        client.id().toString(), CorrelationIdFilter.from(request));
     ScopedValue.where(RequestContext.CURRENT, ctx).run(() -> {
       try {
         filterChain.doFilter(request, response);

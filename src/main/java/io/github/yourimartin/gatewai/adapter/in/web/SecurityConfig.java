@@ -33,6 +33,9 @@ class SecurityConfig {
         .addFilterBefore(
             new ApiKeyAuthenticationFilter(apiClientRepository),
             UsernamePasswordAuthenticationFilter.class)
+        // Must precede the auth filter: that one reads the id back when it
+        // binds the RequestContext for the advisor chain (v2 batch 0.3).
+        .addFilterBefore(new CorrelationIdFilter(), ApiKeyAuthenticationFilter.class)
         .addFilterAfter(
             new RateLimitFilter(rateLimiter, rateLimitProperties),
             ApiKeyAuthenticationFilter.class)

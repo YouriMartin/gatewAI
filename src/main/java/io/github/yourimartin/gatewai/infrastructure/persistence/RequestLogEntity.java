@@ -19,6 +19,9 @@ class RequestLogEntity {
   @Column(updatable = false)
   private UUID id;
 
+  @Column(name = "correlation_id", updatable = false, length = 64)
+  private String correlationId;
+
   @Column(updatable = false, nullable = false)
   private Instant timestamp;
 
@@ -67,6 +70,7 @@ class RequestLogEntity {
 
   RequestLogEntity(RequestLog log) {
     this.id = log.id();
+    this.correlationId = log.correlationId();
     this.timestamp = log.timestamp();
     this.model = log.model();
     this.promptHash = log.promptHash();
@@ -87,7 +91,7 @@ class RequestLogEntity {
 
   RequestLog toDomain() {
     return new RequestLog(
-        id, timestamp, model, promptHash,
+        id, correlationId, timestamp, model, promptHash,
         promptTokens, completionTokens, totalTokens, latencyMs,
         clientId,
         new GreenMetrics(costEur, energyKwh, gramsCo2,

@@ -47,12 +47,14 @@ class SpringAiLlmClient implements LlmClient {
       optionsBuilder.maxTokens(request.maxTokens());
     }
 
+    // One embedding memo per request, spanning the whole advisor chain: the
+    // cache advisor and the router then share the user text's vector (batch 0.2).
     ChatResponse chatResponse = Objects.requireNonNull(
-        chatClient.prompt()
+        RequestEmbeddingMemo.callWith(() -> chatClient.prompt()
             .messages(springMessages)
             .options(optionsBuilder)
             .call()
-            .chatResponse(),
+            .chatResponse()),
         "ChatResponse must not be null");
 
     return toLlmResponse(chatResponse);
@@ -73,14 +75,15 @@ class SpringAiLlmClient implements LlmClient {
     }
 
     // toStream() drains the reactive pipeline (incl. the cache/routing advisors)
-    // on the calling thread, so Reactor stays confined to this adapter.
-    chatClient.prompt()
+    // on the calling thread, so Reactor stays confined to this adapter — and so
+    // the embedding memo below actually covers the advisors' eager work.
+    RequestEmbeddingMemo.runWith(() -> chatClient.prompt()
         .messages(springMessages)
         .options(optionsBuilder)
         .stream()
         .chatResponse()
         .toStream()
-        .forEach(chatResponse -> onChunk.accept(toChunk(chatResponse)));
+        .forEach(chatResponse -> onChunk.accept(toChunk(chatResponse))));
   }
 
   private static LlmStreamChunk toChunk(ChatResponse chatResponse) {

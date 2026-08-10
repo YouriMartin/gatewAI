@@ -68,6 +68,7 @@ class ChatCompletionService
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
+        resolveCorrelationId(),
         Instant.now(),
         response.model(),
         promptHash,
@@ -94,6 +95,7 @@ class ChatCompletionService
   public void streamComplete(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
     long startNanos = System.nanoTime();
     String clientId = resolveClientId();
+    String correlationId = resolveCorrelationId();
     AtomicReference<LlmStreamChunk> lastChunk = new AtomicReference<>();
 
     llmClient.stream(request, chunk -> {
@@ -112,6 +114,7 @@ class ChatCompletionService
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
+        correlationId,
         Instant.now(),
         last.model(),
         hashPrompt(request),
@@ -148,6 +151,17 @@ class ChatCompletionService
   private static String resolveClientId() {
     if (RequestContext.CURRENT.isBound()) {
       return RequestContext.CURRENT.get().clientId();
+    }
+    return null;
+  }
+
+  /**
+   * The ingress-assigned correlation id (v2 batch 0.3), null outside a bound
+   * request context — an unauthenticated call, or a direct use-case invocation.
+   */
+  private static String resolveCorrelationId() {
+    if (RequestContext.CURRENT.isBound()) {
+      return RequestContext.CURRENT.get().traceId();
     }
     return null;
   }

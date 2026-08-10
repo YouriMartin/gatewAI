@@ -84,7 +84,11 @@ class DeferredChatService implements SubmitDeferredRequestUseCase,
   }
 
   private LlmResponse execute(DeferredJob job, String zone) {
-    RequestContext ctx = new RequestContext(job.clientId(), null);
+    // The job runs long after the submitting HTTP request is gone, so its own
+    // id is the correlation id (v2 batch 0.3) — the client already holds it
+    // from the submit response, and it ties the log back to the job.
+    RequestContext ctx =
+        new RequestContext(job.clientId(), job.id().toString());
     ScopedValue.Carrier carrier = ScopedValue.where(RequestContext.CURRENT, ctx);
     if (zone != null) {
       carrier = carrier.where(CarbonZoneContext.CURRENT, zone);

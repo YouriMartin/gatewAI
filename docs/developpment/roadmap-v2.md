@@ -79,22 +79,41 @@ recalibration in production (calibration stays a triggered operation).
 
 ---
 
-## Batch 0 — Prerequisites (blocking)
+## Batch 0 — Prerequisites (blocking) — ✅ done
 
-### 0.1 Versioned migrations **[post-v1]**
+Two corrections found while implementing, both worth carrying forward:
+
+- **D11 — an uncached request embedded the text three times, not twice.** The
+  plan counted the cache search and the router. It missed the third: on a miss
+  the cache stores its entry as `new Document(userText, …)`, which embeds the
+  same text again. All three now share one vector.
+- **D12 — Flyway needs Boot 4's `spring-boot-flyway` module.** `flyway-core`
+  alone puts Flyway on the classpath with **no auto-configuration**, so the app
+  starts, silently skips every migration, and then fails schema validation. Boot
+  4 ships auto-configurations in per-technology modules.
+
+### 0.1 Versioned migrations **[post-v1]** — ✅
 
 Move from `ddl-auto=update` (`application.properties:61`) to **Flyway**, with a
 baseline migration for the existing schema (`request_log`, `api_client`).
 
-Watch out: **`PgVectorStore` initializes its own `vector_store` table.** Decide
-explicitly whether the baseline owns that table (then
-`spring.ai.vectorstore.pgvector.initialize-schema=false`) or whether Spring AI
-keeps owning it and Flyway ignores it. Do not let both manage it.
+Delivered: `V1__baseline.sql` (`request_log` + `api_client`) and
+`V2__request_log_correlation_id.sql`, `ddl-auto=validate`. Spring AI keeps
+owning `vector_store` and the `vector` extension, so ADR 0005 holds. `V1` is
+idempotent and Flyway runs with `baseline-on-migrate=true` /
+`baseline-version=0`, so an existing `ddl-auto=update` database upgrades with no
+manual step.
+
+Verified against a real Postgres 17 + pgvector, both paths: a fresh database
+(2 migrations applied, validation passes) and a simulated pre-v2 database
+(baselined at 0, `V1` replayed as a no-op, existing rows preserved, `V2` adding
+the new column). The hand-written baseline was checked against the DDL
+`ddl-auto=update` actually produces — identical types and nullability.
 
 Once Flyway exists, the persistent deferred-job store becomes cheap **[post-v1]** —
 noted here, not scheduled.
 
-### 0.2 Shared request embedding **[post-v1]**
+### 0.2 Shared request embedding **[post-v1]** — ✅
 
 Today an uncached request embeds **twice**: once inside the cache's
 `VectorStore.similaritySearch`, once in `EmbeddingComplexityClassifier`.
@@ -109,7 +128,13 @@ The memo entry carries the embedding model id and version; that is what later
 lets an explanation be flagged `STALE`. Cap the memo (a handful of entries) so
 occlusion, which embeds many variants, cannot grow it without bound.
 
-### 0.3 Correlation id (new — see D2)
+Delivered as `MemoizingEmbeddingModel` + `RequestEmbeddingMemo`, bound by
+`SpringAiLlmClient` around the advisor chain; rationale and the assumption it
+rests on are in [ADR 0007](../technical/adr/0007-memoized-embedding-model.md).
+Measured on the local stack: one uncached `/v1/chat/completions` now triggers
+**1** `POST /api/embed` against Ollama, down from 3 (per D11).
+
+### 0.3 Correlation id (new — see D2) — ✅
 
 Generate a correlation id at ingress (honouring an inbound `X-Request-Id` /
 `traceparent` when present), bind it into `RequestContext.traceId`, propagate it
@@ -119,6 +144,13 @@ cache and routing records join on one key (D6). Return it as a response header.
 
 Adding `micrometer-tracing` + OTel is a **separate, optional** decision — the
 correlation id above is enough for everything v2 needs.
+
+Delivered as `CorrelationIdFilter` (honours an inbound `X-Request-Id`, sanitizes
+it, generates a UUID otherwise, always echoes it back), read by
+`ApiKeyAuthenticationFilter` into `RequestContext`, persisted as
+`request_log.correlation_id`. On the deferred path the job id is the correlation
+id. Verified end to end: a client-supplied id and generated ids both reach the
+database, on cache hits and misses alike.
 
 ---
 
@@ -535,7 +567,7 @@ overpromise.
 ## Order of implementation
 
 ```
-Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ← blocking
+Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ✅ done
 Batch 1   Uniform explanation contract
 Batch 2   Routing + cache decision persistence
 Batch 5   Evaluation                     ← before batch 3, which is unvalidatable without it
@@ -575,9 +607,9 @@ branch. `./mvnw test` green before every commit.
 - [ ] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [ ] Cascade routing implemented, its gates calibrated
 - [ ] Six quality metrics published and tracked in CI
-- [ ] The request embedding is computed once per request
+- [x] The request embedding is computed once per request
 - [ ] The dashboard exposes "why this decision"
-- [ ] Versioned migrations in place
+- [x] Versioned migrations in place
 - [ ] `limitations.md` covers the new methodological limits
 - [ ] No latency regression on the nominal path
 - [ ] ArchUnit, Checkstyle, SpotBugs and the native profile still green

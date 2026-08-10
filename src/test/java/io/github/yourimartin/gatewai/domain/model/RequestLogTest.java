@@ -21,10 +21,11 @@ class RequestLogTest {
     UUID id = UUID.randomUUID();
     Instant timestamp = Instant.now();
     RequestLog log = new RequestLog(
-        id, timestamp, "claude-3", "abc123", 10, 5, 15, 42L, "client-1",
-        GREEN, false);
+        id, "corr-1", timestamp, "claude-3", "abc123", 10, 5, 15, 42L,
+        "client-1", GREEN, false);
 
     assertEquals(id, log.id());
+    assertEquals("corr-1", log.correlationId());
     assertEquals(timestamp, log.timestamp());
     assertEquals("claude-3", log.model());
     assertEquals("abc123", log.promptHash());
@@ -41,7 +42,7 @@ class RequestLogTest {
   @Test
   void cacheHitIsCarried() {
     RequestLog log = new RequestLog(
-        UUID.randomUUID(), Instant.now(), "claude-3", "abc123",
+        UUID.randomUUID(), "corr-1", Instant.now(), "claude-3", "abc123",
         10, 5, 15, 42L, "client-1", GREEN, true);
 
     assertTrue(log.cacheHit());
@@ -50,10 +51,21 @@ class RequestLogTest {
   @Test
   void clientIdCanBeNull() {
     RequestLog log = new RequestLog(
-        UUID.randomUUID(), Instant.now(), "claude-3", "abc123",
+        UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
         10, 5, 15, 42L, null, GreenMetrics.ZERO, false);
 
     assertNull(log.clientId());
+  }
+
+  @Test
+  void correlationIdCanBeNull() {
+    // Requests that never went through the ingress filter (direct use-case
+    // calls, tests) have no correlation id; the log must still be valid.
+    RequestLog log = new RequestLog(
+        UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
+        10, 5, 15, 42L, "client-1", GREEN, false);
+
+    assertNull(log.correlationId());
   }
 
   @Test
@@ -61,11 +73,11 @@ class RequestLogTest {
     UUID id = UUID.randomUUID();
     Instant timestamp = Instant.parse("2026-01-01T00:00:00Z");
     RequestLog log1 = new RequestLog(
-        id, timestamp, "claude-3", "hash", 10, 5, 15, 100L, "client-1",
-        GREEN, false);
+        id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
+        "client-1", GREEN, false);
     RequestLog log2 = new RequestLog(
-        id, timestamp, "claude-3", "hash", 10, 5, 15, 100L, "client-1",
-        GREEN, false);
+        id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
+        "client-1", GREEN, false);
 
     assertEquals(log1, log2);
     assertEquals(log1.hashCode(), log2.hashCode());
@@ -76,11 +88,11 @@ class RequestLogTest {
     UUID id = UUID.randomUUID();
     Instant timestamp = Instant.now();
     RequestLog log1 = new RequestLog(
-        id, timestamp, "claude-3", "hash1", 10, 5, 15, 100L, "client-1",
-        GREEN, false);
+        id, "corr-1", timestamp, "claude-3", "hash1", 10, 5, 15, 100L,
+        "client-1", GREEN, false);
     RequestLog log2 = new RequestLog(
-        id, timestamp, "claude-3", "hash2", 10, 5, 15, 100L, "client-1",
-        GREEN, false);
+        id, "corr-1", timestamp, "claude-3", "hash2", 10, 5, 15, 100L,
+        "client-1", GREEN, false);
 
     assertNotEquals(log1, log2);
   }

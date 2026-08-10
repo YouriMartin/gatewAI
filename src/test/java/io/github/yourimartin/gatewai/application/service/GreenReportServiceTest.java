@@ -39,7 +39,7 @@ class GreenReportServiceTest {
   @Test
   void generatesReportFromRepositoryRows() {
     RequestLog log = new RequestLog(
-        UUID.randomUUID(), Instant.now(), "haiku", "hash", 1, 1, 2, 0L,
+        UUID.randomUUID(), "corr-1", Instant.now(), "haiku", "hash", 1, 1, 2, 0L,
         "client", new GreenMetrics(0.002, 0.001, 0.46, 0.013, 0.69), false);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
 

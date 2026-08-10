@@ -31,8 +31,9 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
 
 ## API surface
 
-- **Streaming.** Honor `stream: true` end to end, including a synthetic-`Flux`
-  short-circuit in the cache advisor (today `adviseStream` just delegates).
+- ~~**Streaming.** Honor `stream: true` end to end, including a synthetic-`Flux`
+  short-circuit in the cache advisor~~ — **done** (Phase 7.5): `adviseStream`
+  reroutes and replays a cache hit as a synthetic chunk stream.
 - **Forward more OpenAI fields** that are currently accepted but ignored (`top_p`,
   `n`, `stop`, penalties, `user`).
 - **Tool/function calling** and `response_format` pass-through; additional OpenAI
@@ -43,8 +44,9 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
 - **Cluster-readiness.** Replace the in-memory pieces that assume a single node:
   a distributed rate limiter (Redis/Hazelcast-backed Bucket4j) and a **persistent
   deferred-job store** (today `InMemoryDeferredJobStore` loses jobs on restart).
-- **Schema migrations.** Move from `ddl-auto=update` to versioned migrations
-  (Flyway/Liquibase).
+- ~~**Schema migrations.** Move from `ddl-auto=update` to versioned migrations~~
+  — **done** (v2 batch 0.1): Flyway owns `request_log` + `api_client`,
+  `ddl-auto=validate`, see [`../technical/data-model.md`](../technical/data-model.md).
 - **Native image in CI.** Validate the full GraalVM build on a dedicated runner
   (incl. OpenPDF resource hints) — see [`../technical/native.md`](../technical/native.md).
 
@@ -55,10 +57,10 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
   routes → LLM classifier only when the best route similarity is ambiguous.
   `DelegatingComplexityClassifier` is the seam; see the "Future work" section
   of [`../technical/routing.md`](../technical/routing.md).
-- **Shared request embedding.** Compute the request embedding once and reuse it
-  across the semantic cache and the routing advisor (today the cache embeds
-  internally via `VectorStore.similaritySearch`, so it is computed twice per
-  uncached request).
+- ~~**Shared request embedding.**~~ — **done** (v2 batch 0.2): a memoizing
+  `EmbeddingModel` decorator brings an uncached request from three embedding
+  calls to one, without reaching around `VectorStore`
+  ([ADR 0007](../technical/adr/0007-memoized-embedding-model.md)).
 - **Trained classifier.** Complement the embedding/heuristic/LLM classifiers
   with a small fine-tuned model for better tier accuracy (cf. vLLM Semantic
   Router in
