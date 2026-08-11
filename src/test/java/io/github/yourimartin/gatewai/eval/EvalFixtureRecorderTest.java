@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
@@ -55,8 +56,11 @@ class EvalFixtureRecorderTest {
     String modelId = config.embeddingModelId();
 
     CapturingEmbeddingModel model = new CapturingEmbeddingModel(ollama(modelId));
-    ComplexityClassifier classifier =
-        EvalClassifierFactory.embeddingClassifier(model, routingConfig);
+    // Recorded at the fixed threshold: fixtures hold vectors, and the vectors do
+    // not depend on which threshold reads them.
+    ComplexityClassifier classifier = EvalClassifierFactory.embeddingClassifier(
+        model, routingConfig,
+        CalibrationFixtures.none(routingConfig.routeSimilarityThreshold()));
 
     List<RoutingSample> routingSamples = new ArrayList<>();
     routingSamples.addAll(EvalDatasets.routing(EvalDatasets.ROUTING_CALIBRATION));

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 
@@ -73,7 +74,8 @@ class SemanticCacheAdvisorTest {
   @BeforeEach
   void setUp() {
     properties = new SemanticCacheProperties();
-    advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer);
+    advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
+        CalibrationFixtures.none(properties.getSimilarityThreshold()));
   }
 
   // ---- Cache hit tests ----

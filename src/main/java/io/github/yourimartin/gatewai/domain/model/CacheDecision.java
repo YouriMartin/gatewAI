@@ -29,6 +29,11 @@ import java.util.UUID;
  *                                auditable back to the routing decision that
  *                                produced the answer
  * @param embeddingModel          which model produced the vectors
+ * @param conformalStatus         what the calibrated prediction set looked like
+ *                                (v2 batch 3), or why no calibration applied.
+ *                                A miss caused by an <b>ambiguous</b> set is a
+ *                                deliberate refusal and reads nothing like an
+ *                                empty one; without this both are just "MISS"
  */
 public record CacheDecision(
     UUID id,
@@ -42,6 +47,7 @@ public record CacheDecision(
     String matchedEntryId,
     Long matchedEntryAgeSeconds,
     String originCorrelationId,
-    String embeddingModel
+    String embeddingModel,
+    ConformalStatus conformalStatus
 ) {
 }

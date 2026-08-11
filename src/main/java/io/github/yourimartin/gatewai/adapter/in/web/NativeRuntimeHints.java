@@ -28,7 +28,9 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       CreatedClientView.class,
       CreateClientRequest.class,
       RoutingConfigView.class,
-      RoutingConfigView.RouteView.class);
+      RoutingConfigView.RouteView.class,
+      CalibrationView.class,
+      RecalibrateRequest.class);
 
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader) {

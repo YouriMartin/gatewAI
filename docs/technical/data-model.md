@@ -57,14 +57,14 @@ decision. Both join back to `request_log` on `correlation_id`.
 differ on a hand-over) · `justification` (**JSONB**, the sealed
 `ClassificationJustification` from batch 1) · `decision_reason` ·
 `chosen_tier` / `chosen_model_id` · `routing_latency_ms` (the decision only,
-excluding the LLM call).
+excluding the LLM call) · `conformal_set` / `conformal_alpha` (v2 batch 3).
 
 `cache_decision`: `outcome` (`HIT` \| `MISS` \| `BYPASS` \| `ERROR`) ·
 `similarity_score` and `runner_up_score` (the implicit margin) · `threshold` ·
 `matched_entry_id` / `matched_entry_age_seconds` · `origin_correlation_id` ·
-`embedding_model`.
+`embedding_model` · `conformal_status` (v2 batch 3).
 
-Three properties worth knowing:
+Four properties worth knowing:
 
 - **A cache hit has no routing decision.** The cache runs upstream of the
   router, so a hit short-circuits before any routing happens. That asymmetry is
@@ -75,6 +75,13 @@ Three properties worth knowing:
 - **`prompt_hash` is not comparable to `request_log.prompt_hash`.** This one
   covers the classified user text, that one covers every message. Join on the
   correlation id, never on the hash.
+- **The conformal columns are null when no calibration applied**, which is not
+  the same as an empty set. `conformal_set` null means the decision was taken at
+  a fixed threshold; `conformal_set` empty means a calibration applied and
+  nothing qualified. `cache_decision.conformal_status` carries the same
+  distinction explicitly (`EMPTY_SET` vs `NOT_CALIBRATED` vs
+  `STALE_CALIBRATION`), which is what separates a deliberate refusal
+  (`AMBIGUOUS`) from a plain miss.
 
 `routing_config_version` is a short hash of the live `RoutingConfig` (strategy,
 thresholds, keywords, routes and their examples, order included). The rules are
@@ -84,6 +91,21 @@ with its timestamp by `RoutingConfigVersionTracker`.
 
 Retention is `gatewai.decisions.retention-days` (90 by default); a scheduled
 purge drops older rows. Set `gatewai.decisions.enabled=false` to record nothing.
+
+## `conformal_calibration` (v2 batch 3)
+
+One row per target (`CACHE`, `ROUTING`) — the primary key is the target, because
+exactly one threshold is in force at a time: `guarantee` (what α promises) ·
+`alpha` · `q_hat` · `sample_size` · `embedding_model` ·
+`routing_config_version` (null for the cache, which does not depend on routes) ·
+`calibrated_at`.
+
+No history table. A decision that needs explaining carries its own `alpha` and
+prediction set on its own row, so replaying it never depends on what the store
+happens to hold today — the same reasoning that put `routing_config_version` on
+`routing_decision`. The provenance columns are what make a calibration
+detectably stale; see
+[`conformal-calibration.md`](conformal-calibration.md).
 
 ## `api_client` (auth/admin)
 

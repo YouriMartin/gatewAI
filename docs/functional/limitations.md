@@ -66,11 +66,20 @@ particular:
 - **Measured (v2 batch 5)**: on 300 hand-labelled `(query, cached entry)` pairs,
   the shipped 0.92 threshold wrongly serves **16 %** of the answers it should
   have refused and wrongly refuses **46 %** of those it could have served. No
-  single threshold makes both small — the two distributions overlap — which is
-  what batch 3 calibrates. A residual ~4 % of false positives is irreducible by
-  any threshold: they are questions whose answer changed since it was cached, a
-  freshness problem a TTL fixes and similarity cannot. See
-  [`evaluation.md`](../technical/evaluation.md).
+  single threshold makes both small — the two distributions overlap. A residual
+  ~4 % of false positives is irreducible by **any** threshold: they are questions
+  whose answer changed since it was cached, a freshness problem a TTL fixes and
+  similarity cannot.
+- **Calibrated (v2 batch 3)**, the threshold is fitted rather than guessed and
+  the wrong-answer rate drops to **12.5 %** — but the hit rate drops with it
+  (33 % → 22 %), so fewer wrong answers is bought with more model calls. The
+  guarantee is **marginal, not per-request**: "at most α of non-servable pairs
+  are served" describes the population, never your request. It also assumes the
+  calibration cases are exchangeable with production traffic; the shipped labels
+  are deliberately adversarial, so the measured rates read as a worst case and
+  the promise transfers only as far as that resemblance holds. See
+  [`evaluation.md`](../technical/evaluation.md) and
+  [`conformal-calibration.md`](../technical/conformal-calibration.md).
 - Not suitable as-is for strictly personalized or real-time answers unless you
   raise the threshold / set a TTL / rely on per-client namespacing.
 
@@ -88,14 +97,20 @@ particular:
   still be wrong.
 - The router optimizes for cost tier, not for guaranteed answer quality on every
   request.
-- **Measured (v2 batch 5)**, on 300 hand-labelled prompts: the default embedding
-  strategy picks the labelled tier **62 %** of the time (the heuristic alone:
-  34 %). Its errors are overwhelmingly *under*-routing — a request sent to a
-  cheaper tier than it needed — because prompts that score below the similarity
-  threshold fall back to the heuristic, which sends short text to `LOCAL`. Read
-  the reported carbon saving with that in mind: part of it is answer quality
-  given away rather than efficiency gained. See
-  [`evaluation.md`](../technical/evaluation.md).
+- **Measured (v2 batch 5)**, on 300 hand-labelled prompts: at the guessed 0.60
+  threshold the default embedding strategy picks the labelled tier **62 %** of
+  the time (the heuristic alone: 34 %). Its errors were overwhelmingly
+  *under*-routing, because prompts scoring below the threshold fell back to the
+  heuristic, which sends short text to `LOCAL`.
+- **Calibrated (v2 batch 3)**, the threshold is fitted on labelled data and
+  accuracy reaches **83 %**, with under-routing down from 34 to 8 cases in 100.
+  The reported carbon saving *fell* as a result (55 % → 40 %): the earlier figure
+  was partly answer quality given away rather than efficiency gained, which is
+  why savings and under-routing are printed together. Two caveats remain: the
+  guarantee is marginal rather than per-request, and French accuracy dips
+  slightly (80 % → 76 %) as the lower bar admits more near-misses. See
+  [`evaluation.md`](../technical/evaluation.md) and
+  [`conformal-calibration.md`](../technical/conformal-calibration.md).
 
 ## Single-instance assumptions (not cluster-ready)
 

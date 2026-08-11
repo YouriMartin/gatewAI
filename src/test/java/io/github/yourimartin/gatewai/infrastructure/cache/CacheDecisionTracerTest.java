@@ -15,6 +15,7 @@ import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
@@ -52,7 +53,7 @@ class CacheDecisionTracerTest {
             Instant.now().minusSeconds(120).toEpochMilli()));
     Document second = scored("something else", 0.41, Map.of());
 
-    tracer.decided("q", List.of(best, second), best, 0.92);
+    tracer.decided("q", List.of(best, second), best, 0.92, ConformalStatus.SINGLETON);
 
     CacheDecision decision = captured();
     assertEquals(CacheOutcome.HIT, decision.outcome());
@@ -69,7 +70,7 @@ class CacheDecisionTracerTest {
   void recordsAMissWithTheScoreThatWasNotEnough() {
     Document near = scored("close but no", 0.90, Map.of());
 
-    tracer.decided("q", List.of(near), null, 0.92);
+    tracer.decided("q", List.of(near), null, 0.92, ConformalStatus.NOT_CALIBRATED);
 
     CacheDecision decision = captured();
     assertEquals(CacheOutcome.MISS, decision.outcome());
@@ -80,7 +81,7 @@ class CacheDecisionTracerTest {
 
   @Test
   void anEmptyCacheIsAMissWithNoScores() {
-    tracer.decided("q", List.of(), null, 0.92);
+    tracer.decided("q", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED);
 
     CacheDecision decision = captured();
     assertEquals(CacheOutcome.MISS, decision.outcome());
@@ -91,7 +92,7 @@ class CacheDecisionTracerTest {
   @Test
   void aSingleCandidateHasNoRunnerUp() {
     tracer.decided("q", List.of(scored("only one", 0.99, Map.of())),
-        null, 0.92);
+        null, 0.92, ConformalStatus.NOT_CALIBRATED);
 
     assertNull(captured().runnerUpScore());
   }
@@ -108,7 +109,7 @@ class CacheDecisionTracerTest {
 
   @Test
   void storesAHashNeverThePrompt() {
-    tracer.decided("what is my password", List.of(), null, 0.92);
+    tracer.decided("what is my password", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED);
 
     CacheDecision decision = captured();
     assertEquals(PromptHash.of("what is my password"), decision.promptHash());
@@ -119,7 +120,7 @@ class CacheDecisionTracerTest {
   void carriesTheCorrelationIdOfTheRequestBeingServed() {
     ScopedValue.where(RequestContext.CURRENT,
         new RequestContext("client-1", "corr-42"))
-        .run(() -> tracer.decided("q", List.of(), null, 0.92));
+        .run(() -> tracer.decided("q", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED));
 
     assertEquals("corr-42", captured().correlationId());
   }
@@ -129,7 +130,7 @@ class CacheDecisionTracerTest {
     doThrow(new IllegalStateException("boom"))
         .when(recorder).record(org.mockito.ArgumentMatchers.any(CacheDecision.class));
 
-    assertDoesNotThrow(() -> tracer.decided("q", List.of(), null, 0.92));
+    assertDoesNotThrow(() -> tracer.decided("q", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED));
     assertDoesNotThrow(() -> tracer.bypassed("q"));
     assertDoesNotThrow(() -> tracer.failed("q", 0.92));
   }
@@ -138,7 +139,7 @@ class CacheDecisionTracerTest {
   void aMissingCreatedAtLeavesTheAgeUnknownRatherThanWrong() {
     Document best = scored("no timestamp", 0.99, Map.of());
 
-    tracer.decided("q", List.of(best), best, 0.92);
+    tracer.decided("q", List.of(best), best, 0.92, ConformalStatus.SINGLETON);
 
     assertNull(captured().matchedEntryAgeSeconds());
   }

@@ -418,63 +418,106 @@ Method, labelling conventions and limits:
 
 ---
 
-## Batch 3 — Conformal calibration
+## Batch 3 — Conformal calibration — ✅ done
 
 The differentiating batch. It applies **to the cache first**, then to routing.
 
-Its inputs now exist: the labelled sets of batch 5, the threshold sweep in
-`target/eval/report.json`, and the finding that no single cache threshold makes
-both error types small.
+Its inputs existed thanks to batch 5: the labelled sets, the threshold sweep,
+and the finding that no single cache threshold makes both error types small.
 
-### 3.1 Method: split conformal prediction
+Four corrections found while implementing:
 
-Calibration (offline, replayable): labelled set, n ≥ 200 per target →
-non-conformity score `s_i = 1 − similarity(x_i, expected_target_i)` → quantile
-`q̂ = quantile_⌈(n+1)(1−α)⌉/n({s_i})` → persist `q̂` with `alpha`, `n`,
-`embedding_model_version`, `routing_config_version`, date.
+- **D20 — "choose α asymmetrically" is not a value, it is a side.** Fitting the
+  cache on the positive class (coverage of servable pairs) would have controlled
+  the *cheap* error — a needless model call — and left the expensive one, a wrong
+  answer served to a user, free. The cache is therefore calibrated on the
+  **negative** class, so α bounds the wrong-answer rate directly. The two
+  promises are named in the stored calibration (`ConformalGuarantee`), because
+  one `alpha` field that means two different things is a trap.
+- **D21 — asking the router for its scores creates a bean cycle.** The plan's
+  requirement that the calibration be fitted on exactly the numbers the router
+  decides with was first met by calling the classifier — which then depends on
+  the calibration for its threshold. Spring refused to start, and rightly. The
+  ranking moved into the domain as `RouteScoring`, shared by both, which gives
+  the same guarantee with the dependencies flowing one way. Only a context
+  refresh catches this: `ContextLoadsTest` (integration-tagged) would have, the
+  default unit suite did not.
+- **D22 — the labelled set has an irreducible floor, and it is 4 %.** Any cache
+  α at or below ≈ 0.054 degenerates to a threshold of 1.0. Four labelled pairs
+  ask the same *volatile* question twice, score exactly 1.000, and are labelled
+  non-servable; no similarity threshold can exclude them. The default α is 0.10,
+  above the floor and documented as such.
+- **D23 — the routing prediction set is not yet a decision.** At α = 0.10 the set
+  usually holds all three tiers, so the router still takes the top-ranked route
+  and records the set as evidence. What actually moved routing is the
+  **threshold**. Making the set act is batch 4's cascade; the column is filled
+  now so that batch has data the day it lands.
 
-Inference: `prediction_set = { target c | 1 − similarity(x, c) ≤ q̂ }`.
+### 3.1 Method: split conformal prediction — ✅
 
-### 3.2 Cache first
+`ConformalQuantile` implements `q̂ = the ⌈(n+1)(1−α)⌉-th smallest score` and
+**refuses** rather than approximating when the sample cannot support α, naming
+the number of cases it would need. Calibrations persist with their guarantee,
+`alpha`, `n`, embedding model, routing config version and date, one row per
+target.
 
-Labelling: `(query, cache entry)` pairs judged "the cached answer correctly
-answers this, yes/no".
+### 3.2 Cache first — ✅
 
-- Empty set → miss, call the model
-- Singleton → hit
-- Size > 1 → **do not serve the cache**; ambiguity is a risk signal
+Prediction-set semantics as specified: empty → miss, singleton → hit, more than
+one → **refuse**. Ambiguity rejection applies only under a valid calibration, so
+an uncalibrated install keeps exactly its previous behaviour.
 
-Choose **α asymmetrically** and document why: a false negative costs one LLM
-call, a false positive returns *another question's answer* to the user.
+α = 0.10 on the negative class (D20) gives a threshold of **0.9423**: wrong
+answers served drop from 16.1 % to **12.5 %** on the disjoint test set, at the
+cost of a hit rate falling from 33 % to 22 %. Worth recording: α = 0.20 on this
+data reproduces the guessed 0.92 almost exactly — the old constant was
+implicitly accepting a ~20 % wrong-answer rate, unstated.
 
-### 3.3 Routing
+### 3.3 Routing — ✅
 
-Labelling: `(prompt, expected_tier)`. The conformal set replaces the cascade's
-arbitrary ambiguity band.
+The 0.60 threshold is now calibratable and calibrated: **0.4588** at α = 0.10,
+fitted on 200 labelled prompts. Below-threshold hand-overs to the heuristic fall
+from 47 to 5 per 100 requests and accuracy goes **62 % → 83 %** (English
+45 % → 90 %, French 80 % → 76 %). Empirical coverage on the disjoint test set is
+93.0 % against a promised 90 % (1 s.e. = 3.0 %).
 
-Also fix the observed quantity: the **margin `top1 − top2`** is a better
-confidence signal than raw similarity — 0.82 vs 0.81 is ambiguous, 0.82 vs 0.41
-is not. The default 0.60 threshold itself becomes calibratable.
+The margin `top1 − top2` is recorded per decision (batch 1) and reported by the
+harness; it becomes the cascade's gate in batch 4, where the prediction set
+starts acting (D23).
 
-### 3.4 Limits to document
+### 3.4 Limits to document — ✅
 
-The guarantee is **marginal coverage**, not a per-request guarantee, and it
-assumes exchangeability between calibration and production. Both go into
-[`../functional/limitations.md`](../functional/limitations.md), at the same level
-of honesty as the energy coefficients already flagged as provisional.
+Marginal not conditional, exchangeability, the adversarial skew of the labels
+(which makes the measured rates a worst case), n = 93 negatives, one embedding
+model — in [`../functional/limitations.md`](../functional/limitations.md) and
+[`../technical/conformal-calibration.md`](../technical/conformal-calibration.md).
 
-### 3.5 Invalidation and degradation
+### 3.5 Invalidation and degradation — ✅
 
-If `embedding_model_version` or `routing_config_version` changes, the calibration
-is invalid: warn at startup and on hot change, expose
-`gatewai.conformal.calibration.stale`, and **fall back automatically to today's
-fixed thresholds**. Graceful degradation, never an outage.
+`STALE` on an embedding-model change (both targets) or a route edit (routing
+only — a cache pair's similarity has nothing to do with routes), `DISABLED` on
+the switch, `ABSENT` before the first fit. In every case the fixed threshold
+applies, a warning is logged once per transition, and
+`gatewai_conformal_calibration_stale{target}` goes to 1. A database outage keeps
+the last snapshot rather than silently moving a threshold.
 
-### Acceptance
+### Acceptance — all met
 
-Recalibration triggerable via a protected `/v1/admin/**` endpoint or a command ·
-empirical coverage verified on a disjoint test set within sampling tolerance ·
-degraded mode tested.
+Verified end to end against a live Postgres and Ollama, not only in unit tests:
+
+- **Recalibration through the protected endpoint.** `POST /v1/admin/calibration`
+  fitted both targets in **14 s** and returned thresholds identical, to the
+  digit, to the hermetic harness fit — two independent embedding runs agreeing.
+- **Empirical coverage on a disjoint test set.** Routing 93.0 % against a
+  promised 90 %; cache wrong-answer rate 12.5 % against a promised ≤ 10 %. Both
+  within two standard errors, asserted on every build.
+- **The decisions carry their calibration.** A live request recorded
+  `conformal_set = CLOUD_PREMIUM,LOCAL,CLOUD_ENTRY` with `conformal_alpha = 0.10`;
+  its repeat was served from cache with `conformal_status = SINGLETON` at
+  threshold 0.9423 and the originating correlation id intact.
+- **Degraded mode.** `PUT /v1/admin/routing` on one route example flipped ROUTING
+  to `STALE` within a second: threshold back to 0.60, warning logged, gauge at 1
+  — while CACHE stayed `VALID` at 0.9423, as it should.
 
 ---
 
@@ -630,7 +673,8 @@ than theoretical.
 ## Batch 10 — Documentation (continuous)
 
 **Create**: `docs/technical/decision-tracing.md` (decision model, versioning,
-replay) · `docs/technical/conformal-calibration.md` (method, procedure, limits) ·
+replay) · ~~`docs/technical/conformal-calibration.md`~~ ✅ shipped with batch 3
+(method, the asymmetric guarantees, results, degradation, limits) ·
 ~~`docs/technical/evaluation.md`~~ ✅ shipped with batch 5 (datasets, harness,
 fixtures, metrics, findings).
 
@@ -686,7 +730,7 @@ Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ✅ done
 Batch 1   Uniform explanation contract                            ✅ done
 Batch 2   Routing + cache decision persistence           ✅ done
 Batch 5   Evaluation                                                ✅ done
-Batch 3   Conformal calibration (cache first)
+Batch 3   Conformal calibration (cache first)                       ✅ done
 Batch 4   Calibrated cascade routing (+ client pinning)
 Batch 6   Observability
 Batch 7   Occlusion attribution
@@ -720,7 +764,7 @@ branch. `./mvnw test` green before every commit.
 
 - [x] All three classifiers produce a usable justification
 - [x] Cache and routing decisions persisted and versioned (replay API: batch 9)
-- [ ] Cache and routing thresholds calibrated, with a tested fallback to fixed values
+- [x] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [ ] Cascade routing implemented, its gates calibrated
 - [~] Six quality metrics published and tracked in CI — four measured and
       baselined, escalation rate and conformal coverage emitted as `null` until
@@ -728,6 +772,6 @@ branch. `./mvnw test` green before every commit.
 - [x] The request embedding is computed once per request
 - [ ] The dashboard exposes "why this decision"
 - [x] Versioned migrations in place
-- [ ] `limitations.md` covers the new methodological limits
+- [x] `limitations.md` covers the new methodological limits
 - [ ] No latency regression on the nominal path
 - [ ] ArchUnit, Checkstyle, SpotBugs and the native profile still green

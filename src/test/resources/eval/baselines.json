@@ -4,9 +4,11 @@
   "routingAccuracyTestMin": 0.60,
   "routingAccuracyFrenchMin": 0.77,
   "routingAccuracyEnglishMin": 0.43,
+  "routingAccuracyCalibratedTestMin": 0.80,
   "cacheFalsePositiveRateCalibrationMax": 0.21,
   "cacheFalsePositiveRateTestMax": 0.18,
+  "cacheFalsePositiveRateCalibratedTestMax": 0.15,
   "cacheFalseNegativeRateCalibrationMax": 0.57,
   "cacheFalseNegativeRateTestMax": 0.48,
-  "gramsCo2SavedRatioMin": 0.53
+  "gramsCo2SavedRatioMin": 0.30
 }

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
@@ -37,7 +38,7 @@ class CacheDecisionTracer {
 
   /** Records a hit or a miss, with the scores that separated them. */
   void decided(String userText, List<Document> candidates, Document hit,
-               double threshold) {
+               double threshold, ConformalStatus conformalStatus) {
     try {
       Double best = score(candidates, 0);
       Double runnerUp = score(candidates, 1);
@@ -54,7 +55,8 @@ class CacheDecisionTracer {
           hit == null ? null : hit.getId(),
           hit == null ? null : ageSeconds(hit),
           hit == null ? null : originCorrelationId(hit),
-          embeddingModel()));
+          embeddingModel(),
+          conformalStatus));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }
@@ -80,7 +82,8 @@ class CacheDecisionTracer {
           outcome,
           0, null, threshold,
           null, null, null,
-          embeddingModel()));
+          embeddingModel(),
+          null));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }

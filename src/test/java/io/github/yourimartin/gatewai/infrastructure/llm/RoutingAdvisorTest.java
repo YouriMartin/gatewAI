@@ -13,6 +13,7 @@ import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOut
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
@@ -75,7 +76,7 @@ class RoutingAdvisorTest {
   @BeforeEach
   void setUp() {
     advisor = new RoutingAdvisor(classifier, modelRegistry,
-        decisionRecorder, configVersion);
+        decisionRecorder, configVersion, CalibrationFixtures.none(0.60));
   }
 
   // ---- Routing tests ----

@@ -25,6 +25,7 @@ class ArchitectureTest {
             .adapter("llm", "io.github.yourimartin.gatewai.infrastructure.llm..")
             .adapter("vectorstore", "io.github.yourimartin.gatewai.infrastructure.vectorstore..")
             .adapter("cache", "io.github.yourimartin.gatewai.infrastructure.cache..")
+            .adapter("calibration", "io.github.yourimartin.gatewai.infrastructure.calibration..")
             .adapter("carbon", "io.github.yourimartin.gatewai.infrastructure.carbon..")
             .adapter("dispatch", "io.github.yourimartin.gatewai.infrastructure.dispatch..")
             .adapter("metrics", "io.github.yourimartin.gatewai.infrastructure.metrics..");

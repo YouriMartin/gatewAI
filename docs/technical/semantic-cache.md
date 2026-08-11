@@ -20,8 +20,8 @@ router, so a hit avoids both routing and the model call entirely.
    plus an optional metadata filter (see below), and run
    `vectorStore.similaritySearch(...)`. **No store-side threshold**: the store
    ranks, the advisor decides (see below).
-3. Compare the best candidate's score to `similarity-threshold`, and record the
-   decision (v2 batch 2).
+3. Build the **conformal prediction set** — the candidates at or above the
+   threshold in force — and record the decision (v2 batch 2 and 3).
 4. **Hit**: build a synthetic `ChatClientResponse` from the stored document and
    return it **without calling `chain.nextCall()`** — the short-circuit.
 5. **Miss**: call `chain.nextCall(request)`, then `cacheStore(...)` the result on
@@ -29,9 +29,9 @@ router, so a hit avoids both routing and the model call entirely.
 
 ```java
 List<Document> candidates = lookup(userText);   // ranked, not filtered
-Document hit = accepted(candidates);            // threshold applied here
-if (hit != null) {
-    return buildCachedResponse(hit, request.context());  // no LLM call
+Verdict verdict = decide(candidates);           // threshold + set size decide
+if (verdict.hit() != null) {
+    return buildCachedResponse(verdict.hit(), request.context());  // no LLM call
 }
 ChatClientResponse response = chain.nextCall(request);
 cacheStore(userText, response);
@@ -83,10 +83,33 @@ The two filters are AND-combined when both apply.
 
 | Property | Default | Meaning |
 |---|---|---|
-| `similarity-threshold` | `0.92` | cosine similarity for a hit; higher = stricter. Applied by the **advisor**, not the store |
+| `similarity-threshold` | `0.92` | cosine similarity for a hit; higher = stricter. Applied by the **advisor**, not the store. Since v2 batch 3 this is the **fallback**: a valid calibration supersedes it |
 | `top-k` | `2` | candidates fetched per lookup; values below 2 are lifted to 2 |
 | `ttl-minutes` | `0` | freshness window; `0` = no expiry |
 | `client-namespacing` | `true` | isolate cache per client |
+
+## The calibrated threshold and the prediction set (v2 batch 3)
+
+The `0.92` above was a guess. When a calibration is in force it is replaced by a
+quantile fitted on labelled pairs, and the **size of the prediction set** decides:
+
+| Set | Outcome | `conformal_status` |
+|---|---|---|
+| empty | miss, call the model | `EMPTY_SET` |
+| one candidate | serve it | `SINGLETON` |
+| more than one | **do not serve** | `AMBIGUOUS` |
+
+Refusing an ambiguous set is the point, not an edge case: if two stored answers
+both look right for this query, at most one of them is, and taking the higher
+score is guessing with the user's answer.
+
+With no valid calibration the advisor degrades to exactly the previous behaviour
+— fixed threshold, best candidate wins — and records `NOT_CALIBRATED` or
+`STALE_CALIBRATION` so a degraded decision stays distinguishable. On the shipped
+labels, the calibrated threshold is `0.9423` at α = 0.10, which serves wrong
+answers 12.5 % of the time against the fixed threshold's 16.1 %, at the cost of a
+lower hit rate. Method, numbers and limits:
+[`conformal-calibration.md`](conformal-calibration.md).
 
 ## Traced decisions (v2 batch 2)
 
@@ -116,7 +139,7 @@ the completion.
   per-client store captures `clientId` eagerly (the `doOnComplete` runs on a
   reactive thread where the Scoped Value would be unbound).
 - **False hits**: a high similarity can match a differently-intended prompt. The
-  conservative `0.92` default mitigates this; correctness-critical deployments
+  conservative `0.92` default (or a calibrated threshold) mitigates this; correctness-critical deployments
   should raise it and/or set a TTL. See the functional
   [`limitations.md`](../functional/limitations.md).
 - **Cache quality** is bounded by the embedding model (`nomic-embed-text`).

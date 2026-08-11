@@ -1,7 +1,10 @@
 package io.github.yourimartin.gatewai.infrastructure.persistence;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.DecisionReason;
@@ -71,6 +74,16 @@ class RoutingDecisionEntity {
   @Column(name = "routing_latency_ms", updatable = false)
   private long routingLatencyMs;
 
+  /**
+   * The prediction set, joined by commas. Null when no calibration applied —
+   * distinct from an empty string, which is a calibrated set that stayed empty.
+   */
+  @Column(name = "conformal_set", updatable = false)
+  private String conformalSet;
+
+  @Column(name = "conformal_alpha", updatable = false)
+  private Double conformalAlpha;
+
   protected RoutingDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -90,6 +103,10 @@ class RoutingDecisionEntity {
     this.chosenTier = decision.chosenTier();
     this.chosenModelId = decision.chosenModelId();
     this.routingLatencyMs = decision.routingLatencyMs();
+    this.conformalSet = decision.conformalSet() == null ? null
+        : decision.conformalSet().stream().map(Enum::name)
+            .collect(Collectors.joining(","));
+    this.conformalAlpha = decision.conformalAlpha();
   }
 
   RoutingDecision toDomain() {
@@ -97,6 +114,19 @@ class RoutingDecisionEntity {
         id, correlationId, createdAt, promptHash, promptLength,
         embeddingModel, routingConfigVersion, strategy, effectiveStrategy,
         JustificationJson.fromJson(justification), decisionReason,
-        chosenTier, chosenModelId, routingLatencyMs);
+        chosenTier, chosenModelId, routingLatencyMs,
+        conformalSetToDomain(), conformalAlpha);
+  }
+
+  private List<ModelTier> conformalSetToDomain() {
+    if (conformalSet == null) {
+      return null;
+    }
+    if (conformalSet.isBlank()) {
+      return List.of();
+    }
+    return Arrays.stream(conformalSet.split(","))
+        .map(ModelTier::valueOf)
+        .toList();
   }
 }

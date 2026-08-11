@@ -1,15 +1,17 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.EmbeddedRoute;
+import io.github.yourimartin.gatewai.domain.model.RouteScoring;
 import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 import org.slf4j.Logger;
@@ -45,16 +47,19 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
   private final EmbeddingModel embeddingModel;
   private final ClassifierProperties properties;
   private final HeuristicComplexityClassifier heuristic;
+  private final CalibrationUseCase calibrations;
 
   /** Example-embedding index, rebuilt when the route config changes. */
   private volatile RouteIndex index;
 
   EmbeddingComplexityClassifier(EmbeddingModel embeddingModel,
                                 ClassifierProperties properties,
-                                HeuristicComplexityClassifier heuristic) {
+                                HeuristicComplexityClassifier heuristic,
+                                CalibrationUseCase calibrations) {
     this.embeddingModel = embeddingModel;
     this.properties = properties;
     this.heuristic = heuristic;
+    this.calibrations = calibrations;
   }
 
   @Override
@@ -71,13 +76,17 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
       return fallback(userText, FallbackCause.NO_ROUTES_CONFIGURED);
     }
 
-    double threshold = properties.getRouteSimilarityThreshold();
+    // Calibrated when one is in force (v2 batch 3), otherwise the configured
+    // constant. Batch 5 measured what that constant costs: 82% of English
+    // prompts scored below 0.60 and were handed to the heuristic.
+    double threshold = calibrations.state(CalibrationTarget.ROUTING)
+        .effectiveThreshold();
     try {
       RouteIndex idx = indexFor(routes);
       float[] query = embeddingModel.embed(userText);
 
       List<ClassificationJustification.RouteCandidate> candidates =
-          rankRoutes(idx, query);
+          RouteScoring.rank(query, idx.routes());
       if (candidates.isEmpty()) {
         return fallback(userText, FallbackCause.NO_ROUTES_CONFIGURED);
       }
@@ -103,45 +112,6 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
           e.getMessage());
       return fallback(userText, FallbackCause.EMBEDDING_ERROR);
     }
-  }
-
-  /**
-   * One candidate per route, each carrying that route's closest example, sorted
-   * best first and ranked. Same single pass as picking the best route, so the
-   * scores that explain the decision cost nothing extra.
-   */
-  private static List<ClassificationJustification.RouteCandidate> rankRoutes(
-      RouteIndex idx, float[] query) {
-
-    List<ClassificationJustification.RouteCandidate> candidates =
-        new ArrayList<>();
-    for (IndexedRoute route : idx.routes()) {
-      double bestScore = Double.NEGATIVE_INFINITY;
-      String bestUtterance = null;
-      for (int i = 0; i < route.vectors().size(); i++) {
-        double similarity = cosineSimilarity(query, route.vectors().get(i));
-        if (similarity > bestScore) {
-          bestScore = similarity;
-          bestUtterance = route.examples().get(i);
-        }
-      }
-      if (bestUtterance != null) {
-        candidates.add(new ClassificationJustification.RouteCandidate(
-            route.name(), route.tier(), bestUtterance, bestScore, 0));
-      }
-    }
-
-    candidates.sort(Comparator.comparingDouble(
-        ClassificationJustification.RouteCandidate::score).reversed());
-
-    List<ClassificationJustification.RouteCandidate> ranked =
-        new ArrayList<>(candidates.size());
-    for (int i = 0; i < candidates.size(); i++) {
-      ClassificationJustification.RouteCandidate c = candidates.get(i);
-      ranked.add(new ClassificationJustification.RouteCandidate(
-          c.route(), c.tier(), c.bestUtterance(), c.score(), i + 1));
-    }
-    return ranked;
   }
 
   private ClassificationOutcome fallback(String userText, FallbackCause cause) {
@@ -186,11 +156,9 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
       return current;
     }
 
-    List<IndexedRoute> indexed = new ArrayList<>();
+    List<EmbeddedRoute> indexed = new ArrayList<>();
     for (SemanticRoute route : routes) {
-      indexed.add(new IndexedRoute(route.name(), route.tier(),
-          List.copyOf(route.examples()),
-          embeddingModel.embed(route.examples())));
+      indexed.add(new EmbeddedRoute(route, embeddingModel.embed(route.examples())));
     }
     RouteIndex fresh = new RouteIndex(routes, List.copyOf(indexed));
     index = fresh;
@@ -200,28 +168,7 @@ class EmbeddingComplexityClassifier implements ComplexityClassifier {
     return fresh;
   }
 
-  private static double cosineSimilarity(float[] a, float[] b) {
-    double dot = 0;
-    double normA = 0;
-    double normB = 0;
-    int length = Math.min(a.length, b.length);
-    for (int i = 0; i < length; i++) {
-      dot += (double) a[i] * b[i];
-      normA += (double) a[i] * a[i];
-      normB += (double) b[i] * b[i];
-    }
-    if (normA == 0 || normB == 0) {
-      return 0;
-    }
-    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
   private record RouteIndex(List<SemanticRoute> snapshot,
-                            List<IndexedRoute> routes) {
-  }
-
-  /** A route's examples and their vectors, positionally aligned. */
-  private record IndexedRoute(String name, ModelTier tier,
-                              List<String> examples, List<float[]> vectors) {
+                            List<EmbeddedRoute> routes) {
   }
 }

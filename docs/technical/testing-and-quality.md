@@ -14,8 +14,9 @@ Architecture rules are themselves a test (ArchUnit).
 | `adapter/in/mcp` | unit + Mockito | `GatewayMcpToolsTest` |
 | context / arch | boot + ArchUnit | `GatewaiApplicationTests`, `ArchitectureTest` |
 | `eval` | decision-quality harness on labelled data | `EvaluationHarnessTest`, `VectorFixtureTest` |
+| calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
 
-Roughly 370+ tests run in the default build. Per the project convention, **REST
+Roughly 400+ tests run in the default build. Per the project convention, **REST
 controllers are integration-tested** (MockMvc) and **trivial mappers are not unit
 tested**; everything else has unit coverage.
 
@@ -35,7 +36,12 @@ are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `EmbeddingModelSmokeTe
 bean graph wires — it makes no provider call. It exists because the default suite
 never refreshes the context, so two startup bugs (an MCP `ToolCallbackProvider`
 cycle and a missing `CarbonAwareZoneSelector` bean) once slipped through to the
-first container run. `ChatClientSmokeTest` additionally carries
+first container run. A third joined them in v2 batch 3: the calibration service
+asking the classifier for its route scores, while the classifier asks the
+calibration for its threshold. 407 unit tests were green; the context refused to
+start. That is the entire justification for keeping this job.
+
+`ChatClientSmokeTest` additionally carries
 `@EnabledIfEnvironmentVariable(ANTHROPIC_API_KEY)`, so it is skipped (no paid call)
 when no key is set.
 

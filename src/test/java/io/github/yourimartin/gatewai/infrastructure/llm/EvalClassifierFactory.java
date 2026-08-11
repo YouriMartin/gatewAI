@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -34,12 +35,17 @@ public final class EvalClassifierFactory {
     return new ClassifierRoutingConfigAdapter(new ClassifierProperties()).get();
   }
 
-  /** The production embedding classifier, with its heuristic fallback wired in. */
+  /**
+   * The production embedding classifier, with its heuristic fallback wired in
+   * and the calibration it should consult — which is how the harness scores the
+   * same classifier at the fixed threshold and at a calibrated one (v2 batch 3).
+   */
   public static ComplexityClassifier embeddingClassifier(
-      EmbeddingModel embeddingModel, RoutingConfig config) {
+      EmbeddingModel embeddingModel, RoutingConfig config,
+      CalibrationUseCase calibrations) {
     ClassifierProperties properties = propertiesOf(config);
-    return new EmbeddingComplexityClassifier(
-        embeddingModel, properties, new HeuristicComplexityClassifier(properties));
+    return new EmbeddingComplexityClassifier(embeddingModel, properties,
+        new HeuristicComplexityClassifier(properties), calibrations);
   }
 
   /** The production heuristic classifier, for the zero-cost baseline. */

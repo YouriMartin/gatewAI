@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,6 +56,10 @@ class CacheDecisionEntity {
   @Column(name = "embedding_model", updatable = false)
   private String embeddingModel;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "conformal_status", updatable = false, length = 32)
+  private ConformalStatus conformalStatus;
+
   protected CacheDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -72,6 +77,7 @@ class CacheDecisionEntity {
     this.matchedEntryAgeSeconds = decision.matchedEntryAgeSeconds();
     this.originCorrelationId = decision.originCorrelationId();
     this.embeddingModel = decision.embeddingModel();
+    this.conformalStatus = decision.conformalStatus();
   }
 
   CacheDecision toDomain() {
@@ -79,6 +85,6 @@ class CacheDecisionEntity {
         id, correlationId, createdAt, promptHash, outcome,
         similarityScore, runnerUpScore, threshold,
         matchedEntryId, matchedEntryAgeSeconds, originCorrelationId,
-        embeddingModel);
+        embeddingModel, conformalStatus);
   }
 }

@@ -2,14 +2,18 @@ package io.github.yourimartin.gatewai.infrastructure.cache;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.github.yourimartin.gatewai.domain.model.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.CalibrationStatus;
+import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
+import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,13 +67,16 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   private final VectorStore vectorStore;
   private final SemanticCacheProperties properties;
   private final CacheDecisionTracer tracer;
+  private final CalibrationUseCase calibrations;
 
   SemanticCacheAdvisor(VectorStore vectorStore,
                        SemanticCacheProperties properties,
-                       CacheDecisionTracer tracer) {
+                       CacheDecisionTracer tracer,
+                       CalibrationUseCase calibrations) {
     this.vectorStore = vectorStore;
     this.properties = properties;
     this.tracer = tracer;
+    this.calibrations = calibrations;
   }
 
   @Override
@@ -86,21 +93,22 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       candidates = lookup(userText);
     } catch (RuntimeException e) {
       LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
-      tracer.failed(userText, properties.getSimilarityThreshold());
+      tracer.failed(userText, activeThreshold());
       return chain.nextCall(request);
     }
 
-    Document hit = accepted(candidates);
-    tracer.decided(userText, candidates, hit,
-        properties.getSimilarityThreshold());
+    Verdict verdict = decide(candidates);
+    tracer.decided(userText, candidates, verdict.hit(), verdict.threshold(),
+        verdict.status());
 
-    if (hit != null) {
+    if (verdict.hit() != null) {
       LOG.info("Cache HIT for query [{}] (score={})",
-          truncate(userText), hit.getScore());
-      return buildCachedResponse(hit, request.context());
+          truncate(userText), verdict.hit().getScore());
+      return buildCachedResponse(verdict.hit(), request.context());
     }
 
-    LOG.info("Cache MISS for query [{}]", truncate(userText));
+    LOG.info("Cache MISS for query [{}] ({})",
+        truncate(userText), verdict.status());
 
     ChatClientResponse response = chain.nextCall(request);
     cacheStore(userText, response);
@@ -123,21 +131,22 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       candidates = lookup(userText);
     } catch (RuntimeException e) {
       LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
-      tracer.failed(userText, properties.getSimilarityThreshold());
+      tracer.failed(userText, activeThreshold());
       return chain.nextStream(request);
     }
 
-    Document hit = accepted(candidates);
-    tracer.decided(userText, candidates, hit,
-        properties.getSimilarityThreshold());
+    Verdict verdict = decide(candidates);
+    tracer.decided(userText, candidates, verdict.hit(), verdict.threshold(),
+        verdict.status());
 
-    if (hit != null) {
+    if (verdict.hit() != null) {
       LOG.info("Cache HIT (stream) for query [{}] (score={})",
-          truncate(userText), hit.getScore());
-      return syntheticStream(hit, request.context());
+          truncate(userText), verdict.hit().getScore());
+      return CachedResponseStream.of(verdict.hit(), request.context());
     }
 
-    LOG.info("Cache MISS (stream) for query [{}]", truncate(userText));
+    LOG.info("Cache MISS (stream) for query [{}] ({})",
+        truncate(userText), verdict.status());
     String clientId = boundClientId();
     String correlationId = boundCorrelationId();
     StringBuilder aggregate = new StringBuilder();
@@ -190,15 +199,68 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     return vectorStore.similaritySearch(searchBuilder.build());
   }
 
-  /** The best candidate when it clears the threshold, otherwise null. */
-  private Document accepted(List<Document> candidates) {
-    if (candidates == null || candidates.isEmpty()) {
-      return null;
+  /** The threshold in force, for a lookup that failed before deciding. */
+  private double activeThreshold() {
+    return calibrations.state(CalibrationTarget.CACHE).effectiveThreshold();
+  }
+
+  /**
+   * Applies the conformal prediction set to the candidates (v2 batch 3).
+   *
+   * <p>Under a valid calibration the threshold is {@code q̂}, fitted so that at
+   * most α of the pairs a human judged wrong are served, and the <b>size</b> of
+   * the set decides:
+   *
+   * <ul>
+   *   <li>empty — nothing is close enough: a miss;</li>
+   *   <li>one — serve it;</li>
+   *   <li>more than one — <b>do not serve</b>. If two stored answers both look
+   *       right for this query, at most one of them is, and taking the higher
+   *       score is guessing with the user's answer. Ambiguity is a risk signal,
+   *       not a tie to break.</li>
+   * </ul>
+   *
+   * <p>With no calibration in force this degrades to exactly the previous
+   * behaviour — fixed threshold, best candidate wins — because a gateway that
+   * has never been calibrated must keep working, and because changing the
+   * serving rule for uncalibrated installs would be a behaviour change smuggled
+   * in under a feature.
+   */
+  private Verdict decide(List<Document> candidates) {
+    CalibrationState calibration = calibrations.state(CalibrationTarget.CACHE);
+    double threshold = calibration.effectiveThreshold();
+
+    List<Document> set = candidates == null ? List.of() : candidates.stream()
+        .filter(candidate -> admits(candidate, threshold))
+        .toList();
+
+    if (!calibration.isApplied()) {
+      ConformalStatus status = calibration.status() == CalibrationStatus.STALE
+          ? ConformalStatus.STALE_CALIBRATION : ConformalStatus.NOT_CALIBRATED;
+      return new Verdict(set.isEmpty() ? null : set.getFirst(), threshold, status);
     }
-    Document best = candidates.getFirst();
-    Double score = best.getScore();
-    return score != null && score >= properties.getSimilarityThreshold()
-        ? best : null;
+
+    return switch (set.size()) {
+      case 0 -> new Verdict(null, threshold, ConformalStatus.EMPTY_SET);
+      case 1 -> new Verdict(set.getFirst(), threshold, ConformalStatus.SINGLETON);
+      default -> new Verdict(null, threshold, ConformalStatus.AMBIGUOUS);
+    };
+  }
+
+  /** An unscored candidate is not admitted: absence of a score is not a match. */
+  private static boolean admits(Document candidate, double threshold) {
+    Double score = candidate.getScore();
+    return score != null && score >= threshold;
+  }
+
+  /**
+   * What the cache decided, and under which threshold.
+   *
+   * @param hit       the entry to serve, or null
+   * @param threshold the acceptance threshold in force, calibrated or fixed
+   * @param status    the shape of the prediction set, for the trace
+   */
+  private record Verdict(Document hit, double threshold, ConformalStatus status) {
   }
 
   static String extractUserText(ChatClientRequest request) {
@@ -325,67 +387,6 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   }
 
   // --- streaming helpers (Phase 7.5) ---
-
-  /** Replays a cached answer as a synthetic chunk stream (no model call). */
-  private static Flux<ChatClientResponse> syntheticStream(
-      Document hit, Map<String, Object> context) {
-    Map<String, Object> metadata = hit.getMetadata();
-    String responseText = (String) metadata.getOrDefault(CACHE_RESPONSE_KEY, "");
-    String model = (String) metadata.getOrDefault(CACHE_MODEL_KEY, "cache");
-    String finishReason =
-        (String) metadata.getOrDefault(CACHE_FINISH_REASON_KEY, "stop");
-    int promptTokens = intOrZero(metadata.get(CACHE_PROMPT_TOKENS_KEY));
-    int completionTokens = intOrZero(metadata.get(CACHE_COMPLETION_TOKENS_KEY));
-
-    List<String> pieces = splitForStreaming(responseText);
-    List<ChatClientResponse> chunks = new ArrayList<>();
-    for (int i = 0; i < pieces.size(); i++) {
-      boolean last = i == pieces.size() - 1;
-      chunks.add(chunkResponse(pieces.get(i), model, last ? finishReason : "",
-          last, promptTokens, completionTokens, context));
-    }
-    if (chunks.isEmpty()) {
-      chunks.add(chunkResponse("", model, finishReason, true,
-          promptTokens, completionTokens, context));
-    }
-    return Flux.fromIterable(chunks);
-  }
-
-  private static ChatClientResponse chunkResponse(String text, String model,
-      String finishReason, boolean last, int promptTokens, int completionTokens,
-      Map<String, Object> context) {
-    Generation generation = new Generation(
-        new AssistantMessage(text),
-        ChatGenerationMetadata.builder()
-            .finishReason(finishReason == null ? "" : finishReason)
-            .build());
-
-    var metaBuilder = ChatResponseMetadata.builder().model(model);
-    if (last) {
-      metaBuilder.usage(new DefaultUsage(promptTokens, completionTokens))
-          .keyValue(LlmResponse.CACHE_HIT_METADATA_KEY, Boolean.TRUE);
-    }
-
-    ChatResponse chatResponse =
-        new ChatResponse(List.of(generation), metaBuilder.build());
-    return ChatClientResponse.builder()
-        .chatResponse(chatResponse)
-        .context(context)
-        .build();
-  }
-
-  /** Fixed-size pieces so the deltas concatenate back to the exact answer. */
-  private static List<String> splitForStreaming(String text) {
-    if (text == null || text.isEmpty()) {
-      return List.of();
-    }
-    int size = 24;
-    List<String> pieces = new ArrayList<>();
-    for (int i = 0; i < text.length(); i += size) {
-      pieces.add(text.substring(i, Math.min(text.length(), i + size)));
-    }
-    return pieces;
-  }
 
   /** Stores a streamed miss once aggregated (clientId captured up the stack). */
   private void storeStreamed(String userText, String responseText,

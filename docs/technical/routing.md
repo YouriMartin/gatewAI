@@ -52,7 +52,7 @@ it was reached because Ollama was unreachable. Causes are
 `NO_ROUTES_CONFIGURED`, `BELOW_THRESHOLD`, `EMBEDDING_ERROR`,
 `NO_TIER_RETURNED` and `LLM_ERROR`. On a below-threshold hand-over the route
 scores ride along as `evidence`, so "the best route only reached 0.41 against a
-0.60 bar" stays visible — the quantity batch 3 will calibrate.
+0.60 bar" stays visible — the quantity batch 3 calibrates.
 
 ### Embedding routes (default) — `EmbeddingComplexityClassifier`
 
@@ -71,7 +71,8 @@ The request is embedded with the **same local Ollama embedding model as the
 semantic cache** (`nomic-embed-text`) and compared to every example with cosine
 similarity; the route holding the closest example wins
 (**max-over-utterances**, more robust than centroids when a route's examples
-are diverse). Below `route-similarity-threshold` (default **0.60**) the
+are diverse — the ranking itself lives in the domain as `RouteScoring`, shared
+with the calibration so the two cannot drift). Below the threshold in force the
 heuristic decides; on embedding failure it also falls back to the heuristic,
 so routing never breaks because Ollama is unreachable.
 
@@ -87,8 +88,11 @@ Properties of this approach:
   against 0.647 for French, so **82 % of English prompts fall below the 0.60
   threshold** (French: 14 %) and are decided by the heuristic instead. Routing
   accuracy follows: 45 % English against 80 % French. The limiting factor is the
-  fixed threshold, not language coverage — see
-  [`evaluation.md`](evaluation.md), and batch 3 for calibrating it on data.
+  fixed threshold, not language coverage — see [`evaluation.md`](evaluation.md).
+  **Fixed in v2 batch 3**: a threshold calibrated on labelled prompts (0.4588 at
+  α = 0.10) cuts hand-overs from 47 to 5 per 100 requests and lifts overall
+  accuracy from 62 % to 83 %, English from 45 % to 90 %. See
+  [`conformal-calibration.md`](conformal-calibration.md).
 - **N routes, any tier**: unlike premium keywords (which could only force
   premium), routes target any tier and any number of routes is allowed.
 - **Cheap**: one local embedding call per uncached request, no LLM call. The

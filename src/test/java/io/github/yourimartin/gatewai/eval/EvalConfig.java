@@ -86,6 +86,16 @@ final class EvalConfig {
     return number("gatewai.cache.similarity-threshold", 0.92);
   }
 
+  /** Risk level the routing calibration is fitted at (v2 batch 3). */
+  double routingAlpha() {
+    return number("gatewai.conformal.routing-alpha", 0.10);
+  }
+
+  /** Risk level the cache calibration is fitted at — the tighter of the two. */
+  double cacheAlpha() {
+    return number("gatewai.conformal.cache-alpha", 0.10);
+  }
+
   /** Static grid carbon intensity, gCO2 per kWh. */
   double gridIntensityGramsPerKwh() {
     return number("gatewai.carbon.grid-intensity-grams-per-kwh", 230.0);

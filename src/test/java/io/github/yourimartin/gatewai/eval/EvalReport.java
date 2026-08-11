@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
 import tools.jackson.databind.ObjectMapper;
@@ -225,6 +226,57 @@ final class EvalReport {
         .append(round(latency.p50())).append(" ms | ")
         .append(round(latency.p95())).append(" ms | ")
         .append(latency.samples()).append(" |\n\n");
+  }
+
+  /**
+   * The conformal metrics (v2 batch 3): what each calibration promised, and what
+   * it delivered on a test set it was not fitted on.
+   */
+  void conformal(ConformalCalibration routing, HarnessCalibrator.Coverage coverage,
+                 ConformalCalibration cache, HarnessCalibrator.Coverage wrongAnswers) {
+
+    ObjectNode node = metrics().putObject("conformalCoverage");
+    putCalibration(node.putObject("routing"), routing, coverage,
+        "share of test prompts whose correct route is inside the prediction set");
+    putCalibration(node.putObject("cache"), cache, wrongAnswers,
+        "share of non-servable test pairs the threshold would serve anyway");
+
+    markdown.append("## Conformal calibration\n\n")
+        .append("Fitted on the calibration halves, measured on the disjoint test ")
+        .append("halves. A guarantee stated at α is worth nothing until the ")
+        .append("empirical rate on unseen data lands near it.\n\n")
+        .append("| Target | Guarantee | α | Threshold | Fitted on | Promised | Measured | 1 s.e. |\n")
+        .append("|---|---|---|---|---|---|---|---|\n");
+    appendCalibration("routing", routing, coverage);
+    appendCalibration("cache", cache, wrongAnswers);
+    markdown.append('\n');
+  }
+
+  private void putCalibration(ObjectNode node, ConformalCalibration calibration,
+                              HarnessCalibrator.Coverage coverage, String meaning) {
+    node.put("guarantee", calibration.guarantee().name());
+    node.put("alpha", round(calibration.alpha()));
+    node.put("qHat", round(calibration.qhat()));
+    node.put("threshold", round(calibration.similarityThreshold()));
+    node.put("calibrationSampleSize", calibration.sampleSize());
+    node.put("testSampleSize", coverage.sampleSize());
+    node.put("target", round(coverage.target()));
+    node.put("measured", round(coverage.rate()));
+    node.put("standardError", round(coverage.standardError()));
+    node.put("meaning", meaning);
+  }
+
+  private void appendCalibration(String target, ConformalCalibration calibration,
+                                 HarnessCalibrator.Coverage coverage) {
+    markdown.append("| ").append(target)
+        .append(" | ").append(calibration.guarantee())
+        .append(" | ").append(round(calibration.alpha()))
+        .append(" | ").append(round(calibration.similarityThreshold()))
+        .append(" | ").append(calibration.sampleSize())
+        .append(" | ").append(percent(coverage.target()))
+        .append(" | ").append(percent(coverage.rate()))
+        .append(" | ").append(percent(coverage.standardError()))
+        .append(" |\n");
   }
 
   /** Records a metric the plan asks for that no shipped code can produce yet. */

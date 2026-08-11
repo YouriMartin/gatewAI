@@ -5,15 +5,19 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import io.github.yourimartin.gatewai.domain.model.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
 import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
@@ -44,15 +48,18 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   private final ModelRegistry modelRegistry;
   private final DecisionRecorder decisionRecorder;
   private final RoutingConfigVersionTracker configVersion;
+  private final CalibrationUseCase calibrations;
 
   RoutingAdvisor(ComplexityClassifier classifier,
                  ModelRegistry modelRegistry,
                  DecisionRecorder decisionRecorder,
-                 RoutingConfigVersionTracker configVersion) {
+                 RoutingConfigVersionTracker configVersion,
+                 CalibrationUseCase calibrations) {
     this.classifier = classifier;
     this.modelRegistry = modelRegistry;
     this.decisionRecorder = decisionRecorder;
     this.configVersion = configVersion;
+    this.calibrations = calibrations;
   }
 
   @Override
@@ -139,6 +146,9 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           ? DecisionReason.NO_MODEL_FOR_TIER
           : DecisionReason.from(justification);
 
+      CalibrationState calibration =
+          calibrations.state(CalibrationTarget.ROUTING);
+
       decisionRecorder.record(new RoutingDecision(
           UUID.randomUUID(),
           correlationId(),
@@ -154,10 +164,47 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           reason,
           outcome.tier(),
           target == null ? null : target.modelId(),
-          latencyMs));
+          latencyMs,
+          conformalSet(justification, calibration),
+          calibration.isApplied() ? calibration.calibration().alpha() : null));
     } catch (RuntimeException e) {
       LOG.warn("Could not build routing decision: {}", e.toString());
     }
+  }
+
+  /**
+   * The tiers whose route cleared the calibrated threshold, best first
+   * (v2 batch 3).
+   *
+   * <p>Derived from the scores the classifier already reported rather than
+   * recomputed, so the recorded set is by construction the one the decision was
+   * taken from. Null when no calibration applied — a decision taken without one
+   * has no prediction set, which is not the same as having an empty one.
+   */
+  private static List<ModelTier> conformalSet(
+      ClassificationJustification justification, CalibrationState calibration) {
+
+    if (!calibration.isApplied()) {
+      return null;
+    }
+    double threshold = calibration.effectiveThreshold();
+    return candidates(justification).stream()
+        .filter(candidate -> candidate.score() >= threshold)
+        .map(ClassificationJustification.RouteCandidate::tier)
+        .distinct()
+        .toList();
+  }
+
+  /** Per-route scores, whether the strategy decided or handed over below them. */
+  private static List<ClassificationJustification.RouteCandidate> candidates(
+      ClassificationJustification justification) {
+    return switch (justification) {
+      case ClassificationJustification.Embedding embedding -> embedding.candidates();
+      case ClassificationJustification.Fallback fallback ->
+          fallback.evidence() instanceof ClassificationJustification.Embedding evidence
+              ? evidence.candidates() : List.of();
+      default -> List.of();
+    };
   }
 
   /**

@@ -16,12 +16,15 @@ import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOut
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -61,7 +64,8 @@ class EmbeddingComplexityClassifierTest {
                 ClassificationJustification.HeuristicRule.BLANK_TEXT)));
 
     classifier = new EmbeddingComplexityClassifier(
-        embeddingModel, properties, heuristic);
+        embeddingModel, properties, heuristic,
+        CalibrationFixtures.none(properties::getRouteSimilarityThreshold));
   }
 
   @Test
@@ -94,6 +98,41 @@ class EmbeddingComplexityClassifierTest {
     when(heuristic.classify("ambiguous")).thenReturn(outcome(ModelTier.CLOUD_ENTRY));
 
     assertEquals(ModelTier.CLOUD_ENTRY, classifier.classify("ambiguous").tier());
+  }
+
+  @Test
+  @DisplayName("a calibration replaces the configured threshold (v2 batch 3)")
+  void appliesTheCalibratedThresholdInsteadOfTheConfiguredOne() {
+    // 0.707 against the code axis: below the configured 0.9, above a calibrated
+    // 0.45. Batch 5 measured this exact case as the dominant misrouting path.
+    properties.setRouteSimilarityThreshold(0.9);
+    EmbeddingComplexityClassifier calibrated = new EmbeddingComplexityClassifier(
+        embeddingModel, properties, heuristic,
+        CalibrationFixtures.applied(
+            CalibrationFixtures.calibration(CalibrationTarget.ROUTING, 0.45), 0.9));
+    when(embeddingModel.embed("ambiguous")).thenReturn(new float[] {0.5f, 0.7f});
+
+    ClassificationOutcome outcome = calibrated.classify("ambiguous");
+
+    assertEquals(ModelTier.CLOUD_PREMIUM, outcome.tier());
+    verify(heuristic, never()).classify("ambiguous");
+    assertEquals(0.45,
+        ((ClassificationJustification.Embedding) outcome.justification()).threshold(),
+        1e-9);
+  }
+
+  @Test
+  @DisplayName("a stale calibration is not applied: the configured threshold decides")
+  void staleCalibrationLeavesTheConfiguredThresholdInForce() {
+    properties.setRouteSimilarityThreshold(0.9);
+    EmbeddingComplexityClassifier degraded = new EmbeddingComplexityClassifier(
+        embeddingModel, properties, heuristic,
+        CalibrationFixtures.stale(
+            CalibrationFixtures.calibration(CalibrationTarget.ROUTING, 0.45), 0.9));
+    when(embeddingModel.embed("ambiguous")).thenReturn(new float[] {0.5f, 0.7f});
+    when(heuristic.classify("ambiguous")).thenReturn(outcome(ModelTier.CLOUD_ENTRY));
+
+    assertEquals(ModelTier.CLOUD_ENTRY, degraded.classify("ambiguous").tier());
   }
 
   @Test

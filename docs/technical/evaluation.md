@@ -55,7 +55,7 @@ Two fixture shapes, for two different reasons:
   is `bestScore >= threshold`, a single comparison; the score itself comes from
   pgvector, not from gateway code. Recording similarities pins down the model's
   opinion and leaves the *policy* free to vary, which is exactly what batch 3
-  will calibrate.
+  calibrates.
 
 An unknown text is a hard failure with a re-record instruction, never a zero
 vector — a fabricated embedding would score as a confident wrong answer and blame
@@ -79,16 +79,21 @@ point.
 
 ## The datasets
 
-`src/test/resources/eval/`, JSON Lines, one labelled case per line so a
-relabelling is a one-line diff. Calibration and test sets are **disjoint** and
-asserted to be.
+JSON Lines, one labelled case per line so a relabelling is a one-line diff.
+Calibration and test sets are **disjoint** and asserted to be.
 
-| File | n | Content |
-|---|---|---|
-| `routing-calibration.jsonl` | 200 | `(prompt, expectedTier, language, tags)` |
-| `routing-test.jsonl` | 100 | idem, disjoint |
-| `cache-calibration.jsonl` | 200 | `(query, entry, judgment, language, tags)` |
-| `cache-test.jsonl` | 100 | idem, disjoint |
+| File | Where | n | Content |
+|---|---|---|---|
+| `routing-calibration.jsonl` | `src/main/resources/eval/` | 200 | `(prompt, expectedTier, language, tags)` |
+| `routing-test.jsonl` | `src/test/resources/eval/` | 100 | idem, disjoint |
+| `cache-calibration.jsonl` | `src/main/resources/eval/` | 200 | `(query, entry, judgment, language, tags)` |
+| `cache-test.jsonl` | `src/test/resources/eval/` | 100 | idem, disjoint |
+
+The **calibration** halves ship in the jar (v2 batch 3): the gateway calibrates
+itself from them on a fresh install, rather than shipping thresholds someone
+guessed and waiting for the operator's own labels. The **test** halves stay
+test-scope on purpose — a calibration fitted on its own test set measures
+nothing.
 
 Both calibration sets meet the n ≥ 200 the split-conformal method of batch 3
 needs. Labels are hand-made; they are the real cost of v2 and are meant to be
@@ -155,7 +160,7 @@ changing and the gaps stay visible.
 | Estimated savings | measured (€ and gCO2 vs an all-premium baseline) |
 | Decision latency p50/p95 | recorded live at fixture time |
 | Escalation rate | `null` — no cascade to escalate through until batch 4 |
-| Conformal coverage | `null` — no calibrated prediction set until batch 3 |
+| Conformal coverage | measured since v2 batch 3 (see below) |
 
 Three deliberate choices:
 
@@ -236,6 +241,34 @@ same set, and the heuristic scores 0 % on `keyword-trap`, `length-trap` and
 `ambiguous` — the traps it was designed to fall into.
 
 ---
+
+## Conformal calibration (v2 batch 3)
+
+The harness fits both calibrations on the **calibration** halves and scores them
+on the **test** halves, which is the acceptance criterion of batch 3 verified
+hermetically on every commit:
+
+| Target | Guarantee | α | Threshold | Promised | Measured | 1 s.e. |
+|---|---|---|---|---|---|---|
+| routing | `CORRECT_TARGET_COVERAGE` | 0.10 | 0.4588 | 90 % coverage | **93.0 %** | 3.0 % |
+| cache | `WRONG_ANSWER_RATE` | 0.10 | 0.9423 | ≤ 10 % wrong answers | **12.5 %** | 4.0 % |
+
+Both land within two standard errors of their promise, which is the tolerance
+the assertions use — a finite test set cannot land exactly on a marginal
+guarantee, and asserting equality would be asserting that a coin lands on its
+expectation.
+
+The report also scores the calibrated classifier end to end
+(`routingTestCalibrated`, `cacheTestCalibrated`), so the improvement is visible
+next to the fixed-threshold run rather than claimed: routing 62 % → 83 %, cache
+false positives 16.1 % → 12.5 %.
+
+The quantile and the route scoring are the production domain classes; what the
+harness does not replay is the calibration service's plumbing — reading labelled
+files, embedding pairs, storing the fit — which has its own unit test. Replaying
+that here would mean recording a vector for every cache text, tripling the
+fixtures to re-verify a cosine. The live service was checked against the
+hermetic fit and produces the same thresholds to the digit.
 
 ## Baselines and regressions
 

@@ -36,6 +36,17 @@ Emitted by `MicrometerMetricsRecorder` on every served request:
 | `gatewai_cache_hits_total` / `gatewai_cache_misses_total` | counter | — | cache |
 | `gatewai_request_latency_seconds` | timer (histogram) | `model` | latency |
 | `gatewai_decisions_write_failures_total` | counter | `kind` (`routing`/`cache`) | decision rows that could not be persisted (v2 batch 2) |
+| `gatewai_conformal_calibration_stale` | gauge | `target` (`cache`/`routing`) | 1 when the fixed threshold is in force instead of a calibration (v2 batch 3) |
+| `gatewai_conformal_threshold` | gauge | `target` | the similarity threshold actually applied |
+
+`gatewai_conformal_calibration_stale` is the same idea applied to calibration:
+falling back to a fixed threshold is invisible in the responses by construction,
+so one alert rule (`== 1`) covers never-calibrated, gone-stale and switched-off
+alike. The *reason* is deliberately not a tag — it changes over the life of a
+process, and a gauge whose tags move creates a new series every time. Read it
+from `GET /v1/admin/calibration` or the startup log, which states both
+thresholds and where they came from. `gatewai_conformal_threshold` beside it
+makes a threshold change visible on the same graph as the tier mix it moved.
 
 The failure counter is what keeps best-effort tracing honest: decisions are
 written off the request path and never fail a completion, so a store that is

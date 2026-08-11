@@ -156,6 +156,33 @@ Returns `RoutingConfigView`:
 Body: a `RoutingConfigView`. Applies at runtime (next request); invalid config →
 `400`. Returns the updated config.
 
+## Admin — calibration (`ROLE_ADMIN`)
+
+### `GET /v1/admin/calibration`
+What governs each decision right now. One entry per target (`CACHE`, `ROUTING`):
+
+```json
+[{"target": "CACHE", "status": "VALID", "applied": true,
+  "effectiveThreshold": 0.9423, "fixedFallback": 0.92,
+  "guarantee": "WRONG_ANSWER_RATE", "alpha": 0.10, "qhat": 0.9423,
+  "sampleSize": 93, "embeddingModel": "nomic-embed-text",
+  "routingConfigVersion": null, "calibratedAt": "2026-08-11T18:34:50Z"}]
+```
+
+`status` ∈ `VALID` | `STALE` | `ABSENT` | `DISABLED`. `effectiveThreshold` is
+what is actually applied — `fixedFallback` whenever `applied` is false.
+
+### `POST /v1/admin/calibration`
+Fits both calibrations from the labelled set and stores them. Body optional:
+`{"routingAlpha": 0.10, "cacheAlpha": 0.10}`; omitted values use the configured
+defaults. Returns the same shape as `GET`.
+
+Takes ~15 s on a local stack — it embeds every labelled pair and scores every
+labelled prompt. `409 calibration_failed` when the labelled set cannot support
+the α asked for (the message says how many cases it would need); `400
+invalid_alpha` when α is outside `(0,1)`. See
+[`conformal-calibration.md`](conformal-calibration.md).
+
 ## MCP
 
 `POST /mcp` — Model Context Protocol server (streamable HTTP), same Bearer auth.
@@ -173,5 +200,6 @@ Tools: `routed_chat`, `green_report`, `carbon_intensity`. See [`mcp.md`](mcp.md)
 
 `200` ok · `201` client created · `202` async accepted · `204` revoked · `400`
 bad input · `401` missing/invalid key · `403` non-admin on admin route · `404`
-unknown async id · `429` rate limited (`Retry-After`) · `500` internal error ·
+unknown async id · `409` calibration impossible on the labelled set · `429` rate
+limited (`Retry-After`) · `500` internal error ·
 `502`/`503` upstream provider error (chat ingress, see [Errors](#errors)).

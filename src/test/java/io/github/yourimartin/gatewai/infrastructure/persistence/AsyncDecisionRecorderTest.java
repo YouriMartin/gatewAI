@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
@@ -127,13 +128,13 @@ class AsyncDecisionRecorderTest {
         "nomic-embed-text", "cfgversion0000001",
         ClassificationStrategy.EMBEDDING, ClassificationStrategy.EMBEDDING,
         ClassificationJustification.Heuristic.of(HeuristicRule.DEFAULT),
-        DecisionReason.MATCH, ModelTier.LOCAL, "qwen2.5:0.5b", 4L);
+        DecisionReason.MATCH, ModelTier.LOCAL, "qwen2.5:0.5b", 4L, null, null);
   }
 
   private static CacheDecision cacheDecision() {
     return new CacheDecision(
         UUID.randomUUID(), "corr-1", Instant.now(), "b".repeat(64),
         CacheOutcome.MISS, 0.4, 0.2, 0.92, null, null, null,
-        "nomic-embed-text");
+        "nomic-embed-text", ConformalStatus.NOT_CALIBRATED);
   }
 }

@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.domain.model;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -31,6 +32,13 @@ import java.util.UUID;
  * @param chosenModelId         the model it was rewritten to, null when the
  *                              router passed the request through
  * @param routingLatencyMs      time spent deciding, excluding the LLM call
+ * @param conformalSet          the tiers whose route cleared the calibrated
+ *                              threshold (v2 batch 3), best first.
+ *                              <b>Null</b> when no calibration was in force —
+ *                              which is not the same as an empty set, where a
+ *                              calibration applied and nothing qualified
+ * @param conformalAlpha        the risk level that set was built at, null with
+ *                              {@code conformalSet}
  */
 public record RoutingDecision(
     UUID id,
@@ -46,6 +54,12 @@ public record RoutingDecision(
     DecisionReason decisionReason,
     ModelTier chosenTier,
     String chosenModelId,
-    long routingLatencyMs
+    long routingLatencyMs,
+    List<ModelTier> conformalSet,
+    Double conformalAlpha
 ) {
+
+  public RoutingDecision {
+    conformalSet = conformalSet == null ? null : List.copyOf(conformalSet);
+  }
 }
