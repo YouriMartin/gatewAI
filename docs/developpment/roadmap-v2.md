@@ -326,49 +326,105 @@ Verified end to end against a live Postgres, not only in unit tests:
 
 ---
 
-## Batch 5 — Evaluation (before batch 3, deliberately)
+## Batch 5 — Evaluation (before batch 3, deliberately) — ✅ done
 
 Calibrating without an evaluation set replaces a guessed threshold with a
 quantile computed on nothing.
 
-### 5.1 Datasets
+Three corrections found while implementing:
 
-Versioned in the repo, **calibration and test kept disjoint**:
+- **D17 — recording similarities would have measured a copy of the router.** The
+  plan left the fixture shape open. Recording *similarities* for routing would
+  have forced the harness to re-implement route ranking, the threshold and the
+  hand-over to the heuristic — and to keep reporting good numbers after the real
+  classifier regressed. Routing therefore records **vectors** (exact `float32`,
+  not quantised) and replays the production classifier through them; only the
+  cache, whose rule is a single comparison against a score the vector store
+  produces, records similarities.
+- **D18 — the harness has to reach into `infrastructure.llm`.** The classifiers
+  and `ClassifierProperties` are package-private, correctly. One test-scope
+  class, `EvalClassifierFactory`, lives in that package and builds them exactly
+  as Spring does. It is the only such exception and says so in its Javadoc.
+- **D19 — a savings figure without an under-routing figure is propaganda.** A
+  gateway reaches 100 % carbon saving by sending everything to the smallest
+  model. The report prints the two together, always.
 
-- **Routing**: `(prompt, expected_tier)`
-- **Cache**: `(query, entry, judgment)`
+### 5.1 Datasets — ✅
 
-Include adversarial cases: ambiguous prompts, out-of-distribution prompts, and
-**bilingual FR/EN** — `routing.md` already flags `nomic-embed-text` as
-English-centric, which makes this a known risk to *measure* rather than assume.
+600 hand-labelled cases in `src/test/resources/eval/`, JSON Lines, one case per
+line: routing `(prompt, expected_tier, language, tags)` 200 + 100, cache
+`(query, entry, judgment, language, tags)` 200 + 100. Calibration and test are
+disjoint and asserted to be; both calibration sets meet n ≥ 200.
 
-Target n ≥ 200 per calibration target (batch 3). Labelling is manual and is the
-real cost of v2; budget it as such.
+Adversarial cases are tagged so they can be scored separately: `keyword-trap`
+(premium keyword, trivial request), `length-trap` (long and trivial),
+`short-premium` (four words, genuinely hard), `ambiguous`, `ood`, plus
+`cross-lingual` and `volatile` on the cache side. A test asserts no evaluation
+prompt is a copy of a route example — it caught five while the set was written.
 
-### 5.2 Metrics
+### 5.2 Metrics — ✅ (four of six; two are gated on later batches)
 
-| Metric | Definition |
-|---|---|
-| Routing accuracy | % of tiers matching the label |
-| Cache accuracy | false-positive / false-negative rate |
-| Estimated savings | € and gCO2 vs an all-premium baseline, via the existing accounting |
-| Escalation rate | % reaching cascade level 3 |
-| Conformal coverage | empirical vs target 1−α |
-| Decision latency | p50 / p95, excluding the LLM call |
+Routing accuracy, cache false-positive/false-negative rates, estimated savings
+and decision latency are measured. Escalation rate and conformal coverage are
+emitted as `null` with their reason attached — batch 4 and batch 3 respectively —
+so the report's shape stops changing and the gaps stay visible.
 
-### 5.3 Automation
+Routing accuracy is split by **direction**: over-routing wastes money and carbon,
+under-routing returns an answer the chosen tier could not give. Same point of
+accuracy, different mistake.
 
-A task runnable in the existing CI producing a report comparable across commits;
-an accuracy regression must be detectable automatically. Note (D7) that the
-harness needs a real embedding model: either a CI Ollama service or a recorded
-fixture set of vectors. Prefer **fixtures** so `./mvnw test` stays hermetic, and
-keep the live run as an opt-in profile.
+### 5.3 Automation — ✅
+
+`EvaluationHarnessTest` runs in the ordinary `./mvnw test` in ~0.15 s, with no
+Ollama and no database, and fails the build below the floors in
+`baselines.json`. Fixtures carry their provenance (embedding model, dataset
+digest, `RoutingConfigVersion`) and the harness refuses stale ones with the
+re-record command. CI uploads `target/eval/report.{json,md}` and pastes the
+Markdown into the job summary.
+
+### What it found
+
+| | Calibration | Test |
+|---|---|---|
+| Routing accuracy (embedding) | 66.0 % | 62.0 % |
+| Routing accuracy (heuristic baseline) | — | 34.0 % |
+| Over- / under-routed | 12 / 56 | 4 / 34 |
+| Cache false positives / negatives | 19.4 % / 54.2 % | 16.1 % / 45.5 % |
+| CO2 saved vs all-premium | — | 55.4 % |
+| Decision latency p50 / p95 | — | 34 ms / 44 ms |
+
+Four findings, all of which change what batches 3 and 4 should do:
+
+1. **English routes far worse than French — the opposite of the documented
+   risk.** 45 % against 80 %. Not a classifier problem but a threshold one: mean
+   best-route similarity is 0.538 for English against 0.647 for French, so 82 %
+   of English prompts fall below 0.60 (French: 14 %), hand over to the heuristic,
+   and get sent to `LOCAL`. `routing.md` warned that `nomic-embed-text` being
+   English-centric made *French* the risk; on this data it is the other way
+   round. **This is the strongest argument yet for batch 3 calibrating
+   `route-similarity-threshold` instead of shipping a guess.**
+2. **Much of the 55 % carbon saving is under-routing**, not efficiency: 34 of 100
+   test requests went below their labelled tier.
+3. **No cache threshold makes both errors small** — the servable and
+   non-servable distributions overlap (medians 0.910 and 0.850). At 0.92 the
+   cache refuses 46 % of what it could serve. Batch 3's asymmetric α is the right
+   instrument, and the sweep in the report is its input.
+4. **~4 % of cache false positives are irreducible by any threshold**: the
+   `volatile` pairs, where the same question has a different answer today. A TTL
+   fixes those; similarity cannot.
+
+Method, labelling conventions and limits:
+[`../technical/evaluation.md`](../technical/evaluation.md).
 
 ---
 
 ## Batch 3 — Conformal calibration
 
 The differentiating batch. It applies **to the cache first**, then to routing.
+
+Its inputs now exist: the labelled sets of batch 5, the threshold sweep in
+`target/eval/report.json`, and the finding that no single cache threshold makes
+both error types small.
 
 ### 3.1 Method: split conformal prediction
 
@@ -574,7 +630,9 @@ than theoretical.
 ## Batch 10 — Documentation (continuous)
 
 **Create**: `docs/technical/decision-tracing.md` (decision model, versioning,
-replay) · `docs/technical/conformal-calibration.md` (method, procedure, limits).
+replay) · `docs/technical/conformal-calibration.md` (method, procedure, limits) ·
+~~`docs/technical/evaluation.md`~~ ✅ shipped with batch 5 (datasets, harness,
+fixtures, metrics, findings).
 
 **Update**: `routing.md` — "Future work: cascade routing" becomes implemented ·
 `semantic-cache.md` — calibrated threshold, traced decision, top-k change ·
@@ -627,7 +685,7 @@ overpromise.
 Batch 0   Prerequisites (Flyway, shared embedding, correlation id)   ✅ done
 Batch 1   Uniform explanation contract                            ✅ done
 Batch 2   Routing + cache decision persistence           ✅ done
-Batch 5   Evaluation                     ← before batch 3, which is unvalidatable without it
+Batch 5   Evaluation                                                ✅ done
 Batch 3   Conformal calibration (cache first)
 Batch 4   Calibrated cascade routing (+ client pinning)
 Batch 6   Observability
@@ -652,8 +710,9 @@ branch. `./mvnw test` green before every commit.
    Recommendation: include the flag, default off.
 3. **Tracing dependency (D2)** — plain correlation id only (recommended), or add
    `micrometer-tracing` + OTel and get real spans?
-4. **Evaluation in CI (5.3)** — recorded vector fixtures (recommended, keeps
-   `./mvnw test` hermetic) or a live Ollama service in CI?
+4. **Evaluation in CI (5.3)** — ✅ **settled in batch 5**: recorded vector
+   fixtures, committed with their provenance. `./mvnw test` stays hermetic and
+   the live run is a manual, explicitly flagged recording step.
 
 ---
 
@@ -663,7 +722,9 @@ branch. `./mvnw test` green before every commit.
 - [x] Cache and routing decisions persisted and versioned (replay API: batch 9)
 - [ ] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [ ] Cascade routing implemented, its gates calibrated
-- [ ] Six quality metrics published and tracked in CI
+- [~] Six quality metrics published and tracked in CI — four measured and
+      baselined, escalation rate and conformal coverage emitted as `null` until
+      batches 4 and 3 land
 - [x] The request embedding is computed once per request
 - [ ] The dashboard exposes "why this decision"
 - [x] Versioned migrations in place

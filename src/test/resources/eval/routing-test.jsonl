@@ -1,0 +1,100 @@
+{"id":"r-tst-001","prompt":"Hey, what's up?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-002","prompt":"What is the capital of Canada?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-003","prompt":"Convert 80 degrees Fahrenheit to Celsius.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-004","prompt":"How do you spell \"rhythm\"?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-005","prompt":"Translate \"see you tomorrow\" into Portuguese.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-006","prompt":"Who painted Guernica?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-007","prompt":"What is 144 divided by 12?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-008","prompt":"Give me an antonym for \"scarce\".","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-009","prompt":"Tell me a one-line joke.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-010","prompt":"What does \"FYI\" mean?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-011","prompt":"Name the four seasons.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-012","prompt":"Is Sydney the capital of Australia?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-013","prompt":"Bonjour ! Tu peux m'aider ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-014","prompt":"Quelle est la capitale de la Grèce ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-015","prompt":"Convertis 3 litres en centilitres.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-016","prompt":"Comment écrit-on « développement » ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-017","prompt":"Traduis « bon appétit » en anglais.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-018","prompt":"Qui a écrit Les Misérables ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-019","prompt":"Combien font 12 fois 12 ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-020","prompt":"Donne-moi le contraire de « lent ».","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-021","prompt":"Quel est le symbole chimique de l'argent ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-022","prompt":"Bonne journée !","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-023","prompt":"Cite deux fleuves français.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-024","prompt":"Quelle est la durée d'un match de rugby ?","expectedTier":"LOCAL","language":"fr","tags":["ood"]}
+{"id":"r-tst-025","prompt":"What is the tallest tree species in the world?","expectedTier":"LOCAL","language":"en","tags":["ood"]}
+{"id":"r-tst-026","prompt":"How long should I boil an egg for it to be soft?","expectedTier":"LOCAL","language":"en","tags":["ood"]}
+{"id":"r-tst-027","prompt":"Que veut dire le mot « refactoring » ?","expectedTier":"LOCAL","language":"fr","tags":["keyword-trap"]}
+{"id":"r-tst-028","prompt":"How is the word \"optimize\" spelled in British English?","expectedTier":"LOCAL","language":"en","tags":["keyword-trap"]}
+{"id":"r-tst-029","prompt":"Hello again, my friend! I hope this message finds you in good health and good spirits on this fine morning. I have absolutely nothing technical to ask you today, nothing to fix and nothing to review, I simply wanted to send a short and warm note to say that I appreciate the conversations we have had recently and that they have brightened up several otherwise fairly dull afternoons at the office. Please enjoy the rest of your week, take a proper break at the weekend, and I will no doubt be back with real questions soon enough.","expectedTier":"LOCAL","language":"en","tags":["length-trap"]}
+{"id":"r-tst-030","prompt":"Salut ! J'espère que tout va bien de ton côté en ce début de matinée. Je n'ai rien de technique à te demander aujourd'hui, rien à corriger et rien à relire, je voulais juste t'envoyer un petit mot chaleureux pour te dire que j'apprécie beaucoup nos échanges de ces dernières semaines et qu'ils ont égayé plusieurs après-midis plutôt ternes au bureau. Profite bien de ta fin de semaine, repose-toi vraiment ce week-end, et je reviendrai sans aucun doute très vite avec de vraies questions.","expectedTier":"LOCAL","language":"fr","tags":["length-trap"]}
+{"id":"r-tst-031","prompt":"What is the currency of Switzerland?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-tst-032","prompt":"Donne-moi un mot qui rime avec « nuage ».","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-tst-033","prompt":"Summarize this blog post in two sentences.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-034","prompt":"Résume ce rapport en dix points clés.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-035","prompt":"Write an email asking a supplier for an updated quote.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-036","prompt":"Rédige un e-mail de remerciement après un entretien d'embauche.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-037","prompt":"Explain what a container is to someone who has never used Docker.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-tst-038","prompt":"Explique simplement ce qu'est un cookie de navigateur.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-039","prompt":"Make this paragraph shorter and friendlier.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-040","prompt":"Reformule ce message pour qu'il soit plus diplomate.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-041","prompt":"Draft an announcement post for our open-source release.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-042","prompt":"Écris une description produit pour un sac à dos en toile recyclée.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-043","prompt":"Turn this transcript into a set of action items with owners.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-044","prompt":"Propose un ordre du jour pour une réunion d'équipe d'une heure.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-045","prompt":"Write a 150-word summary of our quarterly results for the intranet.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-046","prompt":"Suggère quatre titres pour une newsletter interne sur la mobilité douce.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-047","prompt":"Explain the difference between a library and a framework.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-tst-048","prompt":"Résume les points forts et les points faibles de cette offre commerciale.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-049","prompt":"Write onboarding instructions for a new team member's first day.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-050","prompt":"Rédige une réponse à un avis client négatif sur notre application mobile.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-051","prompt":"Explain to a manager why we need a staging environment.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-tst-052","prompt":"Traduis cette page d'aide en anglais, en gardant les titres courts.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-053","prompt":"Write a short press release about a partnership announcement.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-054","prompt":"Fais un résumé de cet article de presse en trois phrases.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-055","prompt":"Explain what an environment variable is to a junior colleague.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-tst-056","prompt":"Rédige un message Slack pour annoncer une maintenance de deux heures.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-057","prompt":"Write a job ad for a part-time customer support role.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-058","prompt":"Explique la différence entre le chiffrement et le hachage, sans détail technique.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ambiguous"]}
+{"id":"r-tst-059","prompt":"Summarize the differences between these two insurance policies.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ood"]}
+{"id":"r-tst-060","prompt":"Rédige un compte rendu de visite de chantier à partir de ces notes.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ood"]}
+{"id":"r-tst-061","prompt":"Write a friendly reminder about the expense-report deadline.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-062","prompt":"Propose trois accroches pour une campagne de recrutement.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-063","prompt":"Explain what a pull request is to a non-developer stakeholder.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-tst-064","prompt":"Écris une courte introduction pour la documentation de notre API publique.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ambiguous"]}
+{"id":"r-tst-065","prompt":"Rewrite these release notes for a customer-facing audience.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-tst-066","prompt":"Résume ce fil de discussion en gardant les décisions prises.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-tst-067","prompt":"Refactor this repository class so the SQL is no longer duplicated in six methods.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-068","prompt":"Analyse ce code et explique pourquoi il consomme autant de mémoire.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-069","prompt":"Design an event schema for an order lifecycle that supports replay.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-070","prompt":"Débogue cette exception de connexion qui n'arrive que sous forte charge.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-071","prompt":"Write a parser for a nested configuration format and handle malformed input.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-072","prompt":"Audite ce formulaire de connexion et liste les failles de sécurité possibles.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-073","prompt":"Compare optimistic and pessimistic locking for our inventory service.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-074","prompt":"Démontre que cette fonction de hachage répartit uniformément les clés.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-075","prompt":"Explain why our p99 latency triples when the connection pool reaches 20.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-076","prompt":"Conçois une stratégie de bascule progressive vers un nouveau moteur de recherche.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-077","prompt":"Implement a bounded work queue with backpressure and explain the failure modes.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-078","prompt":"Pourquoi ce verrou distribué peut-il être détenu deux fois simultanément ?","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-079","prompt":"Design a retry policy for a webhook delivery system with ordering guarantees.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-080","prompt":"Optimise cette jointure qui produit un produit cartésien involontaire.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-081","prompt":"Prove that this concurrent counter never loses an increment.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-082","prompt":"Propose un découpage en contextes bornés pour ce domaine métier.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-083","prompt":"Explain the isolation anomalies we would accept by moving to READ COMMITTED.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-084","prompt":"Analyse cette trace d'exécution et identifie le goulot d'étranglement.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-085","prompt":"Design a permission model with role inheritance and resource-level overrides.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-086","prompt":"Réécris cette classe de 600 lignes en respectant l'inversion de dépendances.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-087","prompt":"Explain how to detect and break a circular dependency between these modules.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-088","prompt":"Conçois un plan de test de charge pour valider 5 000 connexions simultanées.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-089","prompt":"Review this token-refresh flow for replay attacks.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-090","prompt":"Explique comment garantir l'exactitude d'un compteur distribué sans verrou global.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-tst-091","prompt":"Why is this index unused?","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["short-premium"]}
+{"id":"r-tst-092","prompt":"Corrige cette fuite de descripteurs.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["short-premium"]}
+{"id":"r-tst-093","prompt":"Is this cast safe?","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["short-premium"]}
+{"id":"r-tst-094","prompt":"Ce code est-il thread-safe ?","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["short-premium"]}
+{"id":"r-tst-095","prompt":"Our nightly job used to finish in twenty minutes and now takes four hours, and nothing obvious changed in the code. It reads about six million rows from one table, enriches each row with two lookups against a second table, and writes the result into a third one inside a single transaction. The database was upgraded a month ago and the table has grown by roughly forty percent since the summer. I would like you to work through the likely causes in order of probability, tell me what to measure to confirm each one, and then propose a rewrite that keeps the job restartable.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["long"]}
+{"id":"r-tst-096","prompt":"Notre traitement nocturne se terminait en vingt minutes et prend désormais quatre heures, sans changement évident dans le code. Il lit environ six millions de lignes dans une table, enrichit chaque ligne avec deux recherches dans une deuxième table, puis écrit le résultat dans une troisième, le tout dans une seule transaction. La base a été mise à jour il y a un mois et la table a grossi d'environ quarante pour cent depuis l'été. J'aimerais que tu déroules les causes probables par ordre de vraisemblance, que tu indiques quoi mesurer pour confirmer chacune, puis que tu proposes une réécriture qui reste reprenable après incident.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["long"]}
+{"id":"r-tst-097","prompt":"What is wrong here?\n\n```java\nif (name == \"admin\") {\n  grantAll();\n}\n```","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["code"]}
+{"id":"r-tst-098","prompt":"Peux-tu expliquer ce comportement ?\n\n```sql\nSELECT * FROM orders WHERE status <> 'PAID';\n```","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["code"]}
+{"id":"r-tst-099","prompt":"Design an anti-corruption layer between our domain and this third-party billing API.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-tst-100","prompt":"Analyse les compromis entre un cache local par instance et un cache partagé Redis.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}

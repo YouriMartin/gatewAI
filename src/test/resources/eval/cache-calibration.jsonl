@@ -1,0 +1,200 @@
+{"id":"c-cal-001","query":"What is the capital of France?","entry":"What's the capital city of France?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-002","query":"How do I reset my password?","entry":"What is the procedure to reset my password?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-003","query":"Explain what a REST API is.","entry":"Can you explain what a REST API is?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-004","query":"What are the opening hours of the support desk?","entry":"When is the support desk open?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-005","query":"How can I export my invoices as PDF?","entry":"Is there a way to export invoices to PDF?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-006","query":"What does the acronym SLA stand for?","entry":"What is the meaning of the acronym SLA?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-007","query":"Summarize the benefits of unit testing.","entry":"What are the benefits of unit testing? Summarize them.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-008","query":"How do I add a user to my organisation?","entry":"How can I invite a new user into my organisation?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-009","query":"Whats the differnce between TCP and UDP?","entry":"What is the difference between TCP and UDP?","judgment":"YES","language":"en","tags":["typo"]}
+{"id":"c-cal-010","query":"Explain dependency injection in Spring.","entry":"Explain dependency injection in the Spring framework.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-011","query":"Give me the steps to install the CLI on macOS.","entry":"How do I install the CLI on macOS?","judgment":"YES","language":"en","tags":["imperative-vs-question"]}
+{"id":"c-cal-012","query":"Why should we use connection pooling?","entry":"What is the point of connection pooling?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-013","query":"What is idempotency in HTTP?","entry":"Explain HTTP idempotency.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-014","query":"How much does the Pro plan cost per month?","entry":"What is the monthly price of the Pro plan?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-015","query":"Could you tell me what a container image is?","entry":"What is a container image?","judgment":"YES","language":"en","tags":["politeness"]}
+{"id":"c-cal-016","query":"Define technical debt.","entry":"What is technical debt?","judgment":"YES","language":"en","tags":["imperative-vs-question"]}
+{"id":"c-cal-017","query":"What is the recommended Java version for this project?","entry":"Which Java version should I use for this project?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-018","query":"How do I cancel my subscription?","entry":"What is the process for cancelling my subscription?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-019","query":"Explain the difference between authentication and authorization.","entry":"What is the difference between authentication and authorisation?","judgment":"YES","language":"en","tags":["spelling-variant"]}
+{"id":"c-cal-020","query":"What is a semantic cache?","entry":"Can you explain what a semantic cache is?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-021","query":"How do I enable two-factor authentication?","entry":"How can I turn on 2FA on my account?","judgment":"YES","language":"en","tags":["paraphrase","abbreviation"]}
+{"id":"c-cal-022","query":"What are the advantages of PostgreSQL over MySQL?","entry":"Why would I choose PostgreSQL rather than MySQL?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-023","query":"Write a definition of continuous integration.","entry":"What does continuous integration mean?","judgment":"YES","language":"en","tags":["imperative-vs-question"]}
+{"id":"c-cal-024","query":"How long does the free trial last?","entry":"What is the duration of the free trial?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-025","query":"What is the purpose of a load balancer?","entry":"What does a load balancer do?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-026","query":"Explain what garbage collection is in the JVM.","entry":"How does garbage collection work in the JVM?","judgment":"YES","language":"en","tags":["paraphrase","ambiguous"]}
+{"id":"c-cal-027","query":"Where can I find the API documentation?","entry":"What is the URL of the API documentation?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-028","query":"What is the maximum upload size?","entry":"How large can an uploaded file be?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-029","query":"Tell me what a message queue is used for.","entry":"What is a message queue used for?","judgment":"YES","language":"en","tags":["imperative-vs-question"]}
+{"id":"c-cal-030","query":"How do I rotate my API key?","entry":"What are the steps to rotate an API key?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-031","query":"Quelle est la capitale de l'Espagne ?","entry":"Quelle est la capitale espagnole ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-032","query":"Comment réinitialiser mon mot de passe ?","entry":"Quelle est la procédure pour réinitialiser mon mot de passe ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-033","query":"Explique ce qu'est une API REST.","entry":"Peux-tu m'expliquer ce qu'est une API REST ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-034","query":"Quels sont les horaires du support ?","entry":"À quelle heure le support est-il joignable ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-035","query":"Comment exporter mes factures en PDF ?","entry":"Est-il possible d'exporter les factures au format PDF ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-036","query":"Que signifie l'acronyme RGPD ?","entry":"Que veut dire RGPD ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-037","query":"Résume les avantages des tests unitaires.","entry":"Quels sont les avantages des tests unitaires ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-cal-038","query":"Comment ajouter un utilisateur à mon organisation ?","entry":"Comment inviter un nouvel utilisateur dans mon organisation ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-039","query":"Quelle est la diférence entre TCP et UDP ?","entry":"Quelle est la différence entre TCP et UDP ?","judgment":"YES","language":"fr","tags":["typo"]}
+{"id":"c-cal-040","query":"Explique l'injection de dépendances dans Spring.","entry":"Explique l'injection de dépendances avec le framework Spring.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-041","query":"Donne-moi les étapes d'installation du CLI sur Linux.","entry":"Comment installer le CLI sur Linux ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-cal-042","query":"Pourquoi utiliser un pool de connexions ?","entry":"À quoi sert un pool de connexions ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-043","query":"Qu'est-ce que l'idempotence en HTTP ?","entry":"Explique l'idempotence des requêtes HTTP.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-044","query":"Combien coûte l'offre Pro par mois ?","entry":"Quel est le tarif mensuel de l'offre Pro ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-045","query":"Pourriez-vous m'expliquer ce qu'est une image de conteneur ?","entry":"Qu'est-ce qu'une image de conteneur ?","judgment":"YES","language":"fr","tags":["politeness"]}
+{"id":"c-cal-046","query":"Définis la dette technique.","entry":"Qu'est-ce que la dette technique ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-cal-047","query":"Quelle version de Java est recommandée pour ce projet ?","entry":"Quelle version de Java dois-je utiliser sur ce projet ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-048","query":"Comment résilier mon abonnement ?","entry":"Quelle est la procédure de résiliation de mon abonnement ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-049","query":"Explique la différence entre authentification et autorisation.","entry":"Quelle est la différence entre l'authentification et l'autorisation ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-050","query":"Qu'est-ce qu'un cache sémantique ?","entry":"Peux-tu expliquer ce qu'est un cache sémantique ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-051","query":"Comment activer la double authentification ?","entry":"Comment activer l'authentification à deux facteurs sur mon compte ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-052","query":"Quels sont les avantages de PostgreSQL par rapport à MySQL ?","entry":"Pourquoi choisir PostgreSQL plutôt que MySQL ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-053","query":"Écris une définition de l'intégration continue.","entry":"Que signifie l'intégration continue ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-cal-054","query":"Combien de temps dure l'essai gratuit ?","entry":"Quelle est la durée de la période d'essai gratuite ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-055","query":"À quoi sert un répartiteur de charge ?","entry":"Quel est le rôle d'un répartiteur de charge ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-056","query":"Où trouver la documentation de l'API ?","entry":"Quelle est l'adresse de la documentation de l'API ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-057","query":"Quelle est la taille maximale d'un fichier envoyé ?","entry":"Quel est le poids maximal autorisé pour un fichier envoyé ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-058","query":"Dis-moi à quoi sert une file de messages.","entry":"À quoi sert une file de messages ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-cal-059","query":"Comment renouveler ma clé d'API ?","entry":"Quelles sont les étapes pour renouveler une clé d'API ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-060","query":"Qu'est-ce qu'un webhook ?","entry":"Peux-tu m'expliquer ce qu'est un webhook ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-061","query":"How do I configure a proxy for outbound requests?","entry":"How can I set up an HTTP proxy for outgoing requests?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-062","query":"What is the retention period for logs?","entry":"How long are logs kept?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-063","query":"Explain what a virtual thread is in Java.","entry":"What are virtual threads in Java?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-064","query":"How do I run the test suite?","entry":"What command runs the test suite?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-065","query":"What is pgvector used for?","entry":"What is the purpose of the pgvector extension?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-066","query":"Comment lancer la suite de tests ?","entry":"Quelle commande exécute la suite de tests ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-067","query":"Quelle est la durée de conservation des journaux ?","entry":"Combien de temps les journaux sont-ils conservés ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-068","query":"Explique ce qu'est un fil virtuel en Java.","entry":"Que sont les fils virtuels en Java ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-069","query":"À quoi sert pgvector ?","entry":"Quel est l'objectif de l'extension pgvector ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-070","query":"Comment configurer un proxy pour les appels sortants ?","entry":"Comment paramétrer un proxy HTTP pour les requêtes sortantes ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-071","query":"What is the difference between a mock and a stub?","entry":"Can you explain how a mock differs from a stub?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-072","query":"How do I increase the JVM heap size?","entry":"Which flag increases the JVM heap size?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-073","query":"What is a database index?","entry":"Explain what an index is in a database.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-074","query":"Quelle est la différence entre un mock et un stub ?","entry":"Peux-tu expliquer en quoi un mock diffère d'un stub ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-075","query":"Comment augmenter la taille du tas de la JVM ?","entry":"Quel paramètre augmente la taille du tas de la JVM ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-076","query":"Qu'est-ce qu'un index de base de données ?","entry":"Explique ce qu'est un index dans une base de données.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-077","query":"What does the 429 status code mean?","entry":"What is HTTP status 429?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-078","query":"Que signifie le code de statut 429 ?","entry":"Qu'est-ce que le statut HTTP 429 ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-079","query":"How do I check the health of the service?","entry":"Which endpoint reports the service health?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-080","query":"Comment vérifier l'état de santé du service ?","entry":"Quel endpoint indique l'état de santé du service ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-081","query":"Explain what a carbon intensity value represents.","entry":"What does a carbon intensity figure mean?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-082","query":"Explique ce que représente une intensité carbone.","entry":"Que signifie une valeur d'intensité carbone ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-083","query":"What is the difference between a cache hit and a cache miss?","entry":"Explain cache hits versus cache misses.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-084","query":"Quelle est la différence entre un succès et un échec de cache ?","entry":"Explique la différence entre un hit et un miss de cache.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-085","query":"How can I see my monthly usage?","entry":"Where do I find my usage for the month?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-086","query":"Où consulter ma consommation mensuelle ?","entry":"Comment voir ma consommation du mois ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-087","query":"What is a rate limit?","entry":"Explain what rate limiting means.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-088","query":"Qu'est-ce qu'une limite de débit ?","entry":"Explique ce que signifie la limitation de débit.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-089","query":"How do I contact technical support?","entry":"What is the best way to reach technical support?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-090","query":"Comment contacter le support technique ?","entry":"Quel est le meilleur moyen de joindre le support technique ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-091","query":"What is an embedding vector?","entry":"Explain what an embedding vector is.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-092","query":"Qu'est-ce qu'un vecteur d'embedding ?","entry":"Explique ce qu'est un vecteur d'embedding.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-093","query":"How do I disable telemetry?","entry":"What is the setting to turn telemetry off?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-094","query":"Comment désactiver la télémétrie ?","entry":"Quel paramètre permet de couper la télémétrie ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-095","query":"What is the default port of the gateway?","entry":"On which port does the gateway listen by default?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-096","query":"Quel est le port par défaut de la passerelle ?","entry":"Sur quel port la passerelle écoute-t-elle par défaut ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-097","query":"Explain what a stack trace is.","entry":"What is a stack trace?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-098","query":"Explique ce qu'est une trace d'exécution.","entry":"Qu'est-ce qu'une trace d'exécution ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-099","query":"How do I upgrade to the latest version?","entry":"What are the steps to upgrade to the newest version?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-cal-100","query":"Comment passer à la dernière version ?","entry":"Quelles sont les étapes pour installer la version la plus récente ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-cal-101","query":"What is the capital of Italy?","entry":"What is the capital of France?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-102","query":"How do I enable two-factor authentication?","entry":"How do I disable two-factor authentication?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-cal-103","query":"Which Java version introduced virtual threads?","entry":"Which Java version introduced records?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-104","query":"Convert 10 kilometres into miles.","entry":"Convert 10 miles into kilometres.","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-cal-105","query":"Translate this paragraph into German.","entry":"Summarize this paragraph.","judgment":"NO","language":"en","tags":["task-swap"]}
+{"id":"c-cal-106","query":"What is a webhook?","entry":"What is a WebSocket?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-107","query":"How do I upgrade from version 2 to version 3?","entry":"How do I upgrade from version 1 to version 2?","judgment":"NO","language":"en","tags":["version-swap"]}
+{"id":"c-cal-108","query":"What is the price of the Enterprise plan?","entry":"What is the price of the Pro plan?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-109","query":"How do I revoke an API key?","entry":"How do I create an API key?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-cal-110","query":"Why is my request returning 403?","entry":"Why is my request returning 404?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-111","query":"Explain the difference between authentication and authorization.","entry":"Explain what authentication is.","judgment":"NO","language":"en","tags":["scope-change"]}
+{"id":"c-cal-112","query":"How do I debug a Java stream that returns nothing?","entry":"What is a Java stream?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-cal-113","query":"What is the maximum download size?","entry":"What is the maximum upload size?","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-cal-114","query":"How do I install the CLI on Windows?","entry":"How do I install the CLI on macOS?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-115","query":"What are the drawbacks of microservices?","entry":"What are the benefits of microservices?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-cal-116","query":"Show me how to write an integration test.","entry":"Show me how to write a unit test.","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-117","query":"How do I roll back a migration?","entry":"How do I apply a migration?","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-cal-118","query":"What is the carbon intensity in Germany right now?","entry":"What is the carbon intensity in France right now?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-119","query":"Explain optimistic locking.","entry":"Explain pessimistic locking.","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-120","query":"How do I export my data?","entry":"How do I import my data?","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-cal-121","query":"What is the retention period for backups?","entry":"What is the retention period for logs?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-122","query":"Write a Python function to parse a CSV file.","entry":"Write a Java function to parse a CSV file.","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-123","query":"How do I scale the service horizontally?","entry":"How do I scale the service vertically?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-124","query":"What does a 500 error mean?","entry":"What does a 503 error mean?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-125","query":"Which tests run in the integration profile?","entry":"Which tests run in the default profile?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-126","query":"How do I decrease the JVM heap size?","entry":"How do I increase the JVM heap size?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-cal-127","query":"Explain what a cache miss is.","entry":"Explain what a cache hit is.","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-128","query":"What is the read replica lag?","entry":"What is the write throughput?","judgment":"NO","language":"en","tags":["unrelated"]}
+{"id":"c-cal-129","query":"How do I add a column without downtime?","entry":"How do I drop a column without downtime?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-cal-130","query":"What is the difference between gCO2 and kWh?","entry":"What is the difference between kWh and MWh?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-131","query":"Quelle est la capitale de l'Italie ?","entry":"Quelle est la capitale de la France ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-132","query":"Comment activer la double authentification ?","entry":"Comment désactiver la double authentification ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-cal-133","query":"Quelle version de Java a introduit les fils virtuels ?","entry":"Quelle version de Java a introduit les records ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-134","query":"Convertis 10 kilomètres en miles.","entry":"Convertis 10 miles en kilomètres.","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-cal-135","query":"Traduis ce paragraphe en allemand.","entry":"Résume ce paragraphe.","judgment":"NO","language":"fr","tags":["task-swap"]}
+{"id":"c-cal-136","query":"Qu'est-ce qu'un webhook ?","entry":"Qu'est-ce qu'un WebSocket ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-137","query":"Comment migrer de la version 2 vers la version 3 ?","entry":"Comment migrer de la version 1 vers la version 2 ?","judgment":"NO","language":"fr","tags":["version-swap"]}
+{"id":"c-cal-138","query":"Quel est le tarif de l'offre Entreprise ?","entry":"Quel est le tarif de l'offre Pro ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-139","query":"Comment révoquer une clé d'API ?","entry":"Comment créer une clé d'API ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-cal-140","query":"Pourquoi ma requête renvoie-t-elle un 403 ?","entry":"Pourquoi ma requête renvoie-t-elle un 404 ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-141","query":"Explique la différence entre authentification et autorisation.","entry":"Explique ce qu'est l'authentification.","judgment":"NO","language":"fr","tags":["scope-change"]}
+{"id":"c-cal-142","query":"Comment déboguer un flux Java qui ne renvoie rien ?","entry":"Qu'est-ce qu'un flux en Java ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-cal-143","query":"Quelle est la taille maximale d'un téléchargement ?","entry":"Quelle est la taille maximale d'un envoi ?","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-cal-144","query":"Comment installer le CLI sur Windows ?","entry":"Comment installer le CLI sur macOS ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-145","query":"Quels sont les inconvénients des microservices ?","entry":"Quels sont les avantages des microservices ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-cal-146","query":"Montre-moi comment écrire un test d'intégration.","entry":"Montre-moi comment écrire un test unitaire.","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-147","query":"Comment annuler une migration ?","entry":"Comment appliquer une migration ?","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-cal-148","query":"Quelle est l'intensité carbone en Allemagne en ce moment ?","entry":"Quelle est l'intensité carbone en France en ce moment ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-149","query":"Explique le verrouillage optimiste.","entry":"Explique le verrouillage pessimiste.","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-150","query":"Comment exporter mes données ?","entry":"Comment importer mes données ?","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-cal-151","query":"Quelle est la durée de conservation des sauvegardes ?","entry":"Quelle est la durée de conservation des journaux ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-152","query":"Écris une fonction Python qui parse un fichier CSV.","entry":"Écris une fonction Java qui parse un fichier CSV.","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-153","query":"Comment mettre à l'échelle horizontalement le service ?","entry":"Comment mettre à l'échelle verticalement le service ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-154","query":"Que signifie une erreur 500 ?","entry":"Que signifie une erreur 503 ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-155","query":"Comment réduire la taille du tas de la JVM ?","entry":"Comment augmenter la taille du tas de la JVM ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-cal-156","query":"Explique ce qu'est un échec de cache.","entry":"Explique ce qu'est un succès de cache.","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-157","query":"Comment ajouter une colonne sans interruption de service ?","entry":"Comment supprimer une colonne sans interruption de service ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-cal-158","query":"Quelle est la différence entre gCO2 et kWh ?","entry":"Quelle est la différence entre kWh et MWh ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-159","query":"Quels tests s'exécutent dans le profil d'intégration ?","entry":"Quels tests s'exécutent dans le profil par défaut ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-160","query":"Comment contacter le service commercial ?","entry":"Comment contacter le support technique ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-161","query":"What is the capital of France?","entry":"Quelle est la capitale de la France ?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-162","query":"How do I reset my password?","entry":"Comment réinitialiser mon mot de passe ?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-163","query":"Explique ce qu'est une API REST.","entry":"Explain what a REST API is.","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-164","query":"Quels sont les avantages des tests unitaires ?","entry":"What are the benefits of unit testing?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-165","query":"What is a semantic cache?","entry":"Qu'est-ce qu'un cache sémantique ?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-166","query":"Comment exporter mes factures en PDF ?","entry":"How can I export my invoices as PDF?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-cal-167","query":"What is the weather in Paris today?","entry":"What is the weather in Paris today?","judgment":"NO","language":"en","tags":["volatile"]}
+{"id":"c-cal-168","query":"Quelle est la date d'aujourd'hui ?","entry":"Quelle est la date d'aujourd'hui ?","judgment":"NO","language":"fr","tags":["volatile"]}
+{"id":"c-cal-169","query":"What is our current queue depth?","entry":"What is our current queue depth?","judgment":"NO","language":"en","tags":["volatile"]}
+{"id":"c-cal-170","query":"Quelle est l'intensité carbone actuelle du réseau ?","entry":"Quelle est l'intensité carbone actuelle du réseau ?","judgment":"NO","language":"fr","tags":["volatile"]}
+{"id":"c-cal-171","query":"How do I write a recursive descent parser?","entry":"What is the capital of Portugal?","judgment":"NO","language":"en","tags":["unrelated"]}
+{"id":"c-cal-172","query":"Comment préparer une pâte à pizza ?","entry":"Comment configurer un pool de connexions ?","judgment":"NO","language":"fr","tags":["unrelated"]}
+{"id":"c-cal-173","query":"Tell me a joke about databases.","entry":"Explain database normalisation.","judgment":"NO","language":"en","tags":["unrelated"]}
+{"id":"c-cal-174","query":"Donne-moi une blague sur les bases de données.","entry":"Explique la normalisation des bases de données.","judgment":"NO","language":"fr","tags":["unrelated"]}
+{"id":"c-cal-175","query":"What is the fastest sorting algorithm for nearly sorted data?","entry":"What is the fastest sorting algorithm in the general case?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-cal-176","query":"Quel est l'algorithme de tri le plus rapide sur des données presque triées ?","entry":"Quel est l'algorithme de tri le plus rapide dans le cas général ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-cal-177","query":"How do I mock a final class in Java?","entry":"How do I mock an interface in Java?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-cal-178","query":"Comment simuler une classe finale en Java ?","entry":"Comment simuler une interface en Java ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-cal-179","query":"Why does my Docker build fail on ARM?","entry":"Why does my Docker build fail on x86?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-180","query":"Pourquoi ma construction Docker échoue-t-elle sur ARM ?","entry":"Pourquoi ma construction Docker échoue-t-elle sur x86 ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-181","query":"Summarize this article in one sentence.","entry":"Summarize this article in three bullet points.","judgment":"YES","language":"en","tags":["format-change","ambiguous"]}
+{"id":"c-cal-182","query":"Résume cet article en une phrase.","entry":"Résume cet article en trois points.","judgment":"YES","language":"fr","tags":["format-change","ambiguous"]}
+{"id":"c-cal-183","query":"What is dependency inversion?","entry":"What is dependency injection?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-184","query":"Qu'est-ce que l'inversion de dépendances ?","entry":"Qu'est-ce que l'injection de dépendances ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-185","query":"How do I configure TLS for the gateway?","entry":"How do I configure TLS for the database?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-186","query":"Comment configurer TLS pour la passerelle ?","entry":"Comment configurer TLS pour la base de données ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-187","query":"What is the p99 latency of the cache lookup?","entry":"What is the average latency of the cache lookup?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-188","query":"Quelle est la latence p99 de la recherche en cache ?","entry":"Quelle est la latence moyenne de la recherche en cache ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-189","query":"Give me a regex that matches an email address.","entry":"Give me a regex that matches a URL.","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-cal-190","query":"Donne-moi une expression régulière qui reconnaît une adresse e-mail.","entry":"Donne-moi une expression régulière qui reconnaît une URL.","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-cal-191","query":"How do I list all users in the admin API?","entry":"How do I create a user with the admin API?","judgment":"NO","language":"en","tags":["task-swap"]}
+{"id":"c-cal-192","query":"Comment lister tous les utilisateurs via l'API d'administration ?","entry":"Comment créer un utilisateur via l'API d'administration ?","judgment":"NO","language":"fr","tags":["task-swap"]}
+{"id":"c-cal-193","query":"What is the difference between a hit rate and a miss rate?","entry":"What is the difference between a hit rate and a hit ratio?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-194","query":"Explain the difference between latency and throughput.","entry":"Explain the difference between bandwidth and throughput.","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-cal-195","query":"Explique la différence entre latence et débit.","entry":"Explique la différence entre bande passante et débit.","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-cal-196","query":"Please explain, in simple terms, what a REST API is.","entry":"Explain what a REST API is.","judgment":"YES","language":"en","tags":["politeness"]}
+{"id":"c-cal-197","query":"Peux-tu m'expliquer simplement ce qu'est une API REST ?","entry":"Explique ce qu'est une API REST.","judgment":"YES","language":"fr","tags":["politeness"]}
+{"id":"c-cal-198","query":"whats the max upload size","entry":"What is the maximum upload size?","judgment":"YES","language":"en","tags":["casing","typo"]}
+{"id":"c-cal-199","query":"comment reinitialiser mon mot de passe","entry":"Comment réinitialiser mon mot de passe ?","judgment":"YES","language":"fr","tags":["casing","accents"]}
+{"id":"c-cal-200","query":"What is the purpose of the /v1/chat/completions endpoint?","entry":"What does the /v1/chat/completions endpoint do?","judgment":"YES","language":"en","tags":["paraphrase"]}

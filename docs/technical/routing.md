@@ -82,6 +82,13 @@ Properties of this approach:
   are English (within the embedding model's multilingual ability;
   `nomic-embed-text` is English-centric, so keep bilingual examples per route
   or swap in a multilingual embedding model for more languages).
+  **Measured since v2 batch 5, and not in the expected direction**: with the
+  default routes, English prompts reach a mean best-route similarity of 0.538
+  against 0.647 for French, so **82 % of English prompts fall below the 0.60
+  threshold** (French: 14 %) and are decided by the heuristic instead. Routing
+  accuracy follows: 45 % English against 80 % French. The limiting factor is the
+  fixed threshold, not language coverage — see
+  [`evaluation.md`](evaluation.md), and batch 3 for calibrating it on data.
 - **N routes, any tier**: unlike premium keywords (which could only force
   premium), routes target any tier and any number of routes is allowed.
 - **Cheap**: one local embedding call per uncached request, no LLM call. The

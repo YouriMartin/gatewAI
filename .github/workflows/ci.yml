@@ -19,6 +19,22 @@ jobs:
       - name: Verify (tests + Checkstyle + SpotBugs)
         run: ./mvnw -B -DskipFrontend verify
 
+      # The evaluation harness (v2 batch 5) runs inside the suite above, on
+      # committed embedding fixtures — no Ollama, no database. It fails the build
+      # by itself when a metric drops below src/test/resources/eval/baselines.json;
+      # these two steps only make the numbers readable and comparable across
+      # commits without opening the logs.
+      - name: Publish the evaluation report to the job summary
+        if: always()
+        run: cat target/eval/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload the evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-report
+          path: target/eval/
+          if-no-files-found: warn
+
   # Full-context boot: catches bean-wiring regressions (Phase 7.3). Runs the
   # @Tag("integration") suite against real Postgres + Ollama service containers.
   integration:

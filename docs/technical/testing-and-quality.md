@@ -13,8 +13,9 @@ Architecture rules are themselves a test (ArchUnit).
 | `adapter/in/web` | MockMvc integration | `ChatCompletionControllerTest`, `GreenReportControllerTest` |
 | `adapter/in/mcp` | unit + Mockito | `GatewayMcpToolsTest` |
 | context / arch | boot + ArchUnit | `GatewaiApplicationTests`, `ArchitectureTest` |
+| `eval` | decision-quality harness on labelled data | `EvaluationHarnessTest`, `VectorFixtureTest` |
 
-Roughly 220+ tests run in the default build. Per the project convention, **REST
+Roughly 370+ tests run in the default build. Per the project convention, **REST
 controllers are integration-tested** (MockMvc) and **trivial mappers are not unit
 tested**; everything else has unit coverage.
 
@@ -78,6 +79,32 @@ Use it for demos, dashboard/UI work, and plumbing tests. It still needs the loca
 embedding model (for the cache) and Postgres; it just never calls Anthropic or a
 real Ollama chat model. (`DelegatingChatModel` is `@Profile("!mock")`, so exactly
 one `@Primary` egress is active.)
+
+## Decision quality is a test too (v2 batch 5)
+
+`EvaluationHarnessTest` scores the **real** routing and cache decision code
+against 600 hand-labelled cases and fails the build when a metric falls below
+`src/test/resources/eval/baselines.json`. It is an ordinary unit test — it runs in
+the default suite, in ~0.15 s, with no Ollama and no database — because the
+embedding model is replaced by vectors recorded once and committed under
+`src/test/resources/eval/fixtures/`.
+
+Each run writes `target/eval/report.json` and `report.md`; CI uploads both and
+pastes the Markdown into the job summary, which is what makes two commits
+comparable.
+
+Editing a dataset or a route example invalidates the fixtures — the harness then
+fails, naming the command that re-records them:
+
+```bash
+docker compose up -d ollama
+./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true
+```
+
+`EvalFixtureRecorderTest` is the only part that needs infrastructure. It is tagged
+`integration` **and** gated on `-Deval.record=true`, so no automated run can
+rewrite committed fixtures. Full method, labelling conventions, current numbers
+and limits: [`evaluation.md`](evaluation.md).
 
 ## Architecture tests (ArchUnit)
 

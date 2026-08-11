@@ -1,0 +1,200 @@
+{"id":"r-cal-001","prompt":"Hello! How are you doing today?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-002","prompt":"Thanks, that was really helpful.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-003","prompt":"What is the capital of Portugal?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-004","prompt":"Convert 12 miles to kilometres.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-005","prompt":"How do you spell \"necessary\"?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-006","prompt":"What time is it in Tokyo right now?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-007","prompt":"Translate \"good evening\" into Italian.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-008","prompt":"Who wrote Pride and Prejudice?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-009","prompt":"What is 17 times 23?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-010","prompt":"Give me a synonym for \"happy\".","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-011","prompt":"Tell me a short joke about cats.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-012","prompt":"What is the plural of \"cactus\"?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-013","prompt":"What does ASAP stand for?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-014","prompt":"Round 3.14159 to two decimal places.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-015","prompt":"Name three primary colours.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-016","prompt":"What is the chemical symbol for gold?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-017","prompt":"Good morning!","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-018","prompt":"Is Lisbon in Europe?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-019","prompt":"What is the largest ocean on Earth?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-020","prompt":"List the days of the week.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-021","prompt":"Bonjour, comment vas-tu aujourd'hui ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-022","prompt":"Merci pour ton retour, c'est très clair.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-023","prompt":"Quelle est la capitale de la Norvège ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-024","prompt":"Convertis 5 kilomètres en miles.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-025","prompt":"Comment écrit-on « accueil » ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-026","prompt":"Quelle heure est-il à New York ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-027","prompt":"Traduis « bonne nuit » en allemand.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-028","prompt":"Qui a peint la Joconde ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-029","prompt":"Combien font 45 plus 78 ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-030","prompt":"Donne-moi un synonyme de « rapide ».","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-031","prompt":"Raconte-moi une blague courte.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-032","prompt":"Quel est le pluriel de « cheval » ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-033","prompt":"Que veut dire « SVP » ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-034","prompt":"Cite trois pays d'Amérique du Sud.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-035","prompt":"Quel est le symbole chimique du fer ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-036","prompt":"À bientôt !","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-037","prompt":"Est-ce que Tokyo est au Japon ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-038","prompt":"Comment dit-on « merci » en japonais ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-039","prompt":"Quelle est la monnaie du Japon ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-040","prompt":"Quel est le plus haut sommet d'Europe ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-041","prompt":"What is a good name for a golden retriever puppy?","expectedTier":"LOCAL","language":"en","tags":["ood"]}
+{"id":"r-cal-042","prompt":"Comment s'appelle le petit du cheval ?","expectedTier":"LOCAL","language":"fr","tags":["ood"]}
+{"id":"r-cal-043","prompt":"Combien de joueurs y a-t-il dans une équipe de football ?","expectedTier":"LOCAL","language":"fr","tags":["ood"]}
+{"id":"r-cal-044","prompt":"What is the boiling point of water in Fahrenheit?","expectedTier":"LOCAL","language":"en","tags":["ood"]}
+{"id":"r-cal-045","prompt":"What does the word \"algorithm\" mean?","expectedTier":"LOCAL","language":"en","tags":["keyword-trap"]}
+{"id":"r-cal-046","prompt":"Que signifie le mot « architecture » ?","expectedTier":"LOCAL","language":"fr","tags":["keyword-trap"]}
+{"id":"r-cal-047","prompt":"Is \"debug\" written with one g or two?","expectedTier":"LOCAL","language":"en","tags":["keyword-trap"]}
+{"id":"r-cal-048","prompt":"Comment prononce-t-on « vulnérabilité » ?","expectedTier":"LOCAL","language":"fr","tags":["keyword-trap"]}
+{"id":"r-cal-049","prompt":"Hi there! I hope you are having a lovely week so far. I just wanted to drop by and say thank you for all the help you have given me over the past few weeks, it has genuinely been appreciated, and I hope the rest of your day goes really well too. There is no question in this message at all, and nothing that needs an answer from you, I simply wanted to send a friendly note to say hello and to wish you a very pleasant weekend ahead with plenty of rest and sunshine. Take care of yourself, and talk soon, my friend!","expectedTier":"LOCAL","language":"en","tags":["length-trap"]}
+{"id":"r-cal-050","prompt":"Coucou ! J'espère que tu passes une très bonne semaine. Je voulais simplement t'écrire un petit message sympathique pour te remercier de ton aide ces derniers temps, ça m'a vraiment été utile et je t'en suis reconnaissant. Il n'y a aucune question dans ce message, rien qui demande une réponse de ta part, je voulais juste prendre un instant pour te dire bonjour et te souhaiter une excellente fin de semaine, avec beaucoup de repos et un peu de soleil si possible. Prends bien soin de toi et à très bientôt !","expectedTier":"LOCAL","language":"fr","tags":["length-trap"]}
+{"id":"r-cal-051","prompt":"Say hello in five different languages.","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-052","prompt":"Compte de 1 à 10 en espagnol.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-053","prompt":"What is the opposite of \"generous\"?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-054","prompt":"Donne-moi un mot qui rime avec « soleil ».","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-055","prompt":"How many days are there in February 2028?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-056","prompt":"Quelle est la vitesse de la lumière en km/s ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-057","prompt":"Give me one fun fact about penguins.","expectedTier":"LOCAL","language":"en","tags":["ood"]}
+{"id":"r-cal-058","prompt":"Quels sont les ingrédients de base d'une pâte à crêpes ?","expectedTier":"LOCAL","language":"fr","tags":["ood"]}
+{"id":"r-cal-059","prompt":"Yes or no: is the Earth flat?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-060","prompt":"Ça va ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-061","prompt":"Traduis « I love you » en espagnol.","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-062","prompt":"What is 100 divided by 4?","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-063","prompt":"Abbreviate the word \"kilogram\".","expectedTier":"LOCAL","language":"en","tags":["nominal"]}
+{"id":"r-cal-064","prompt":"Quel jour de la semaine sera le 1er janvier 2027 ?","expectedTier":"LOCAL","language":"fr","tags":["nominal"]}
+{"id":"r-cal-065","prompt":"Condense this article into five key takeaways.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-066","prompt":"Résume ce texte en cinq phrases claires.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-067","prompt":"Write a polite email declining a job offer.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-068","prompt":"Rédige un e-mail pour reporter la réunion de lundi à jeudi.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-069","prompt":"Explain what an API is to a non-technical manager.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-070","prompt":"Explique le fonctionnement du DNS en termes simples.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-071","prompt":"Rewrite this paragraph in a more formal tone.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-072","prompt":"Corrige l'orthographe et améliore le style de ce paragraphe.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-073","prompt":"Draft a LinkedIn post celebrating our first thousand users.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-074","prompt":"Écris une description produit pour une tasse en céramique.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-075","prompt":"Turn these rough notes into a structured meeting agenda.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-076","prompt":"Fais une liste de courses pour un dîner végétarien pour six personnes.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ood"]}
+{"id":"r-cal-077","prompt":"Write a 100-word product description for noise-cancelling headphones.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-078","prompt":"Propose cinq titres pour un article de blog sur le télétravail.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-079","prompt":"Explain the difference between HTTP and HTTPS in simple terms.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-080","prompt":"Résume les avantages et les inconvénients du travail hybride.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-081","prompt":"Write a short bio for a conference speaker.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-082","prompt":"Rédige une réponse polie à un client mécontent de son délai de livraison.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-083","prompt":"Summarize the key points of this meeting transcript.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-084","prompt":"Traduis et adapte ce paragraphe marketing en français.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-085","prompt":"Explain what machine learning is to a high-school student.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-086","prompt":"Écris un tweet pour annoncer une mise à jour de notre application.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-087","prompt":"Give me an outline for a 10-minute presentation on cybersecurity awareness.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["keyword-trap"]}
+{"id":"r-cal-088","prompt":"Rédige une note interne annonçant un changement d'horaires d'ouverture.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-089","prompt":"Compare two project management tools at a high level.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-090","prompt":"Explique en quelques phrases la différence entre le RGPD et le CCPA.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ambiguous"]}
+{"id":"r-cal-091","prompt":"Write release notes for a minor version bump.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-092","prompt":"Rédige une lettre de motivation courte pour un stage en marketing.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-093","prompt":"Turn this bullet list into a coherent paragraph.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-094","prompt":"Fais un résumé exécutif d'une page de ce rapport annuel.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-095","prompt":"Explain what a REST endpoint does.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-096","prompt":"Écris une FAQ de cinq questions sur notre politique de retour.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-097","prompt":"Draft a customer satisfaction survey with eight questions.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-098","prompt":"Propose un plan détaillé pour un article de blog sur l'IA générative.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-099","prompt":"Rewrite this error message so an end user can understand it.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-100","prompt":"Résume cette documentation technique pour un public non technique.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-101","prompt":"Write a thank-you note to send after a job interview.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-102","prompt":"Génère cinq idées de publications pour le compte Instagram d'une librairie.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-103","prompt":"Explain the pros and cons of remote onboarding.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-104","prompt":"Rédige un script de 60 secondes pour une vidéo de présentation produit.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-105","prompt":"Summarize the plot of The Odyssey in one paragraph.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ood"]}
+{"id":"r-cal-106","prompt":"Explique ce qu'est une blockchain à un enfant de dix ans.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-107","prompt":"Write meeting minutes from these rough notes.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-108","prompt":"Traduis ce mode d'emploi en anglais simple et direct.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-109","prompt":"Suggest a subject line for a newsletter about sustainability.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-110","prompt":"Rédige une bio Twitter pour un développeur freelance.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-111","prompt":"Explain what CI/CD means for a product manager.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-112","prompt":"Fais un comparatif rapide entre le train et l'avion pour un Paris-Marseille.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ood"]}
+{"id":"r-cal-113","prompt":"Write an apology email for a delayed shipment.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-114","prompt":"Résume les nouveautés de cette note de version pour l'équipe support.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-115","prompt":"Explain the difference between a bug and a feature request.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-116","prompt":"Rédige un message d'absence pour ma boîte mail pendant les congés.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-117","prompt":"Draft a short user guide for resetting a password.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-118","prompt":"Écris une description de poste pour un développeur Java junior.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-119","prompt":"Explain what a webhook is, with one concrete example.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-120","prompt":"Résume cet article scientifique en langage courant.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ood"]}
+{"id":"r-cal-121","prompt":"Write three variations of this headline for A/B testing.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-122","prompt":"Rédige un e-mail de relance commerciale courtois et bref.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-123","prompt":"Explain how a VPN protects a remote worker.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-124","prompt":"Fais un plan de formation d'une journée pour les nouveaux arrivants.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-125","prompt":"Write a changelog entry for a small bug fix.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-126","prompt":"Rédige une invitation pour un webinaire sur l'écoconception logicielle.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-127","prompt":"Explain the basics of unit testing to a new developer.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["ambiguous"]}
+{"id":"r-cal-128","prompt":"Traduis ces libellés d'interface en français, en gardant un ton neutre.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["nominal"]}
+{"id":"r-cal-129","prompt":"Write an introduction paragraph for our annual sustainability report.","expectedTier":"CLOUD_ENTRY","language":"en","tags":["nominal"]}
+{"id":"r-cal-130","prompt":"Explique la différence entre une API REST et GraphQL, sans entrer dans le détail.","expectedTier":"CLOUD_ENTRY","language":"fr","tags":["ambiguous"]}
+{"id":"r-cal-131","prompt":"Refactor this Java service to use constructor injection and explain the trade-offs.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-132","prompt":"Évalue la complexité en temps et en mémoire de cette boucle imbriquée.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-133","prompt":"Design a database schema for a multi-tenant SaaS with row-level isolation.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-134","prompt":"Debug this stack trace and explain the root cause, not just the symptom.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-135","prompt":"Écris une fonction qui parse un CSV avec guillemets échappés et gère les erreurs.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-136","prompt":"Review this code for security vulnerabilities and rank them by severity.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-137","prompt":"Compare CQRS with a single shared write model for our reporting needs.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-138","prompt":"Démontre pourquoi le tri fusion est en O(n log n).","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-139","prompt":"Explain why this SQL query does a sequential scan and how to fix it.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-140","prompt":"Conçois une stratégie de migration d'un monolithe vers des microservices.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-141","prompt":"Implement a thread-safe LRU cache in Java, designed for virtual threads.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-142","prompt":"Pourquoi cette situation de compétition n'apparaît-elle qu'en production ?","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-143","prompt":"Design an idempotency strategy for a payment API with retries.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-144","prompt":"Optimise cette requête PostgreSQL qui met 40 secondes sur 10 millions de lignes.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-145","prompt":"Write a proof that this recursive function always terminates.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-146","prompt":"Propose une architecture hexagonale pour ce module legacy fortement couplé.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-147","prompt":"Explain the CAP theorem trade-offs for our multi-region deployment.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-148","prompt":"Analyse ce dump de mémoire et identifie l'origine de la fuite.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-149","prompt":"Design a rate limiter that stays correct across twelve stateless instances.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-150","prompt":"Réécris ce code impératif en style fonctionnel sans perdre en lisibilité.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-151","prompt":"Explain how to prevent SQL injection in this dynamic query builder.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-152","prompt":"Conçois un plan de reprise après sinistre pour une base PostgreSQL de 2 To.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-153","prompt":"Why does this Kubernetes pod get OOMKilled only under sustained load?","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-154","prompt":"Implémente l'algorithme de Dijkstra avec une file de priorité et justifie la complexité.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-155","prompt":"Design a backwards-compatible API versioning scheme for a public gateway.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-156","prompt":"Analyse les risques de sécurité de ce flux d'authentification OAuth2.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-157","prompt":"Refactor this 800-line controller into testable units.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-158","prompt":"Explique les garanties de cohérence de ce cache distribué en cas de partition réseau.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-159","prompt":"Write a property-based testing strategy for this expression parser.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-160","prompt":"Conçois un schéma de partitionnement pour une table de 5 milliards d'événements.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-161","prompt":"Find out why our virtual threads pin the carrier thread in this code path.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-162","prompt":"Propose une stratégie de tests pour un système de facturation critique.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-163","prompt":"Explain the trade-offs between JWT and opaque tokens for our gateway.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-164","prompt":"Optimise le temps de démarrage de cette application Spring Boot.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-165","prompt":"Design a schema migration that runs with zero downtime on a live table.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-166","prompt":"Analyse ce plan d'exécution et explique pourquoi l'index n'est pas utilisé.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-167","prompt":"Implement exponential backoff with jitter and explain which failure modes it fixes.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-168","prompt":"Écris un algorithme de déduplication sémantique et discute des faux positifs.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-169","prompt":"Explain how to make this batch job idempotent and safely restartable.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-170","prompt":"Conçois une politique de rétention RGPD pour des journaux contenant des données personnelles.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-171","prompt":"Why does this regular expression backtrack catastrophically, and how do I rewrite it?","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-172","prompt":"Analyse la capacité de cette architecture à tenir 100 000 requêtes par seconde.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-173","prompt":"Design an audit trail that application code cannot tamper with.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-174","prompt":"Explique comment implémenter un disjoncteur logiciel et décris ses trois états.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-175","prompt":"Review this Dockerfile for security issues and image-size problems.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-176","prompt":"Conçois un modèle de données pour de la comptabilité en partie double.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-177","prompt":"Explain the memory-model implications of this double-checked locking idiom.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-178","prompt":"Optimise cet algorithme de plus court chemin pour un graphe qui change en continu.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-179","prompt":"Design a multi-tenant quota system with fair sharing under contention.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-180","prompt":"Analyse ce code concurrent et identifie les invariants qui ne sont pas protégés.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-181","prompt":"Explain how to migrate from synchronous REST calls to event-driven messaging.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-182","prompt":"Propose une stratégie d'observabilité pour tracer une requête à travers six services.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-183","prompt":"Work out a deadlock-free lock ordering for these four mutexes.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-184","prompt":"Débogue cette erreur de sérialisation qui n'apparaît qu'après un redéploiement.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-185","prompt":"Design a feature-flag system that keeps working when the config service is down.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-186","prompt":"Analyse les implications de performance d'un passage de JPA à jOOQ sur ce module.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-187","prompt":"Explain why this floating-point comparison fails intermittently in production.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-188","prompt":"Conçois une architecture de cache multi-niveaux avec invalidation cohérente.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-189","prompt":"Review this authentication middleware for privilege-escalation paths.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-190","prompt":"Écris une stratégie de sharding pour une base multi-locataires en forte croissance.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}
+{"id":"r-cal-191","prompt":"Fix this deadlock.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["short-premium"]}
+{"id":"r-cal-192","prompt":"Pourquoi ce code est-il en O(n²) ?","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["short-premium"]}
+{"id":"r-cal-193","prompt":"Thread-safe singleton in Java?","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["short-premium"]}
+{"id":"r-cal-194","prompt":"Cette transaction est-elle sérialisable ?","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["short-premium"]}
+{"id":"r-cal-195","prompt":"Here is the failing test and the class under test. The assertion passes locally on my machine and fails on CI about one run in five, always on the same line, and always with a slightly different expected value. The class keeps a shared HashMap that is populated during startup by three different beans, and reads from it inside a stream that we recently parallelised. I need you to work out whether the intermittent failure comes from the map, from the parallel stream, or from the test itself, and then propose a fix that does not slow the happy path down.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["long"]}
+{"id":"r-cal-196","prompt":"Voici le service et son test qui échoue. Le test passe systématiquement sur mon poste et échoue environ une fois sur cinq sur l'intégration continue, toujours à la même ligne, avec une valeur attendue légèrement différente à chaque fois. Le service conserve une HashMap partagée, remplie au démarrage par trois beans distincts, et la relit dans un flux que nous avons récemment parallélisé. J'aimerais que tu détermines si le problème vient de la map, du flux parallèle ou du test lui-même, puis que tu proposes un correctif qui ne dégrade pas le chemin nominal.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["long"]}
+{"id":"r-cal-197","prompt":"Why does this always return zero?\n\n```java\ndouble ratio = hits / total;\n```","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["code"]}
+{"id":"r-cal-198","prompt":"Peux-tu corriger ce bloc ?\n\n```java\nfor (int i = 0; i <= list.size(); i++) {\n  process(list.get(i));\n}\n```","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["code"]}
+{"id":"r-cal-199","prompt":"Design a blue-green deployment for a stateful service with zero downtime.","expectedTier":"CLOUD_PREMIUM","language":"en","tags":["nominal"]}
+{"id":"r-cal-200","prompt":"Explique quelles garanties de cohérence nous perdons en ajoutant un réplica en lecture.","expectedTier":"CLOUD_PREMIUM","language":"fr","tags":["nominal"]}

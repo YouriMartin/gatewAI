@@ -1,0 +1,12 @@
+{
+  "_comment": "Floors measured on the committed fixtures, set just below the observed run so a real regression fails the build and a rounding difference does not. Raise them after a genuine improvement; changing the embedding model means re-recording and re-setting them deliberately.",
+  "routingAccuracyCalibrationMin": 0.64,
+  "routingAccuracyTestMin": 0.60,
+  "routingAccuracyFrenchMin": 0.77,
+  "routingAccuracyEnglishMin": 0.43,
+  "cacheFalsePositiveRateCalibrationMax": 0.21,
+  "cacheFalsePositiveRateTestMax": 0.18,
+  "cacheFalseNegativeRateCalibrationMax": 0.57,
+  "cacheFalseNegativeRateTestMax": 0.48,
+  "gramsCo2SavedRatioMin": 0.53
+}

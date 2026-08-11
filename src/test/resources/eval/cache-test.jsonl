@@ -1,0 +1,100 @@
+{"id":"c-tst-001","query":"What is the capital of Belgium?","entry":"Which city is the capital of Belgium?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-002","query":"How do I change my email address?","entry":"What is the procedure to update my email address?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-003","query":"Explain what a message broker does.","entry":"What is the role of a message broker?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-004","query":"How can I download an invoice?","entry":"Where do I download my invoice from?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-005","query":"What does the acronym TTL mean?","entry":"What is the meaning of TTL?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-006","query":"Give me a definition of idempotence.","entry":"What is idempotence?","judgment":"YES","language":"en","tags":["imperative-vs-question"]}
+{"id":"c-tst-007","query":"How do I enable debug logging?","entry":"Which setting turns on debug logging?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-008","query":"What is the difference between a thread and a process?","entry":"How does a thread differ from a process?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-009","query":"whats the default timeout","entry":"What is the default timeout?","judgment":"YES","language":"en","tags":["casing","typo"]}
+{"id":"c-tst-010","query":"Could you explain what caching is?","entry":"Explain what caching is.","judgment":"YES","language":"en","tags":["politeness"]}
+{"id":"c-tst-011","query":"How do I check which version is installed?","entry":"Which command shows the installed version?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-012","query":"What is a foreign key?","entry":"Explain what a foreign key is in a relational database.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-013","query":"How long is data kept after account deletion?","entry":"What is the data retention period after an account is deleted?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-014","query":"Explain what an SLA is.","entry":"What is a service level agreement?","judgment":"YES","language":"en","tags":["abbreviation"]}
+{"id":"c-tst-015","query":"How do I filter the report by month?","entry":"Is there a way to filter the report per month?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-016","query":"Quelle est la capitale de la Belgique ?","entry":"Quelle ville est la capitale de la Belgique ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-017","query":"Comment changer mon adresse e-mail ?","entry":"Quelle est la procédure pour modifier mon adresse e-mail ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-018","query":"Explique le rôle d'un courtier de messages.","entry":"Quel est le rôle d'un courtier de messages ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-019","query":"Comment télécharger une facture ?","entry":"Où puis-je télécharger ma facture ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-020","query":"Que signifie l'acronyme TTL ?","entry":"Que veut dire TTL ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-021","query":"Donne-moi une définition de l'idempotence.","entry":"Qu'est-ce que l'idempotence ?","judgment":"YES","language":"fr","tags":["imperative-vs-question"]}
+{"id":"c-tst-022","query":"Comment activer les journaux de débogage ?","entry":"Quel paramètre active les journaux de débogage ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-023","query":"Quelle est la différence entre un fil d'exécution et un processus ?","entry":"En quoi un fil d'exécution diffère-t-il d'un processus ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-024","query":"quel est le delai d expiration par defaut","entry":"Quel est le délai d'expiration par défaut ?","judgment":"YES","language":"fr","tags":["casing","accents"]}
+{"id":"c-tst-025","query":"Pourrais-tu expliquer ce qu'est la mise en cache ?","entry":"Explique ce qu'est la mise en cache.","judgment":"YES","language":"fr","tags":["politeness"]}
+{"id":"c-tst-026","query":"Comment savoir quelle version est installée ?","entry":"Quelle commande affiche la version installée ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-027","query":"Qu'est-ce qu'une clé étrangère ?","entry":"Explique ce qu'est une clé étrangère dans une base relationnelle.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-028","query":"Combien de temps les données sont-elles conservées après suppression du compte ?","entry":"Quelle est la durée de conservation des données après suppression d'un compte ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-029","query":"Explique ce qu'est un SLA.","entry":"Qu'est-ce qu'un accord de niveau de service ?","judgment":"YES","language":"fr","tags":["abbreviation"]}
+{"id":"c-tst-030","query":"Comment filtrer le rapport par mois ?","entry":"Est-il possible de filtrer le rapport mois par mois ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-031","query":"What is the purpose of a reverse proxy?","entry":"What does a reverse proxy do?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-032","query":"À quoi sert un proxy inverse ?","entry":"Quel est le rôle d'un proxy inverse ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-033","query":"How do I set an environment variable in Docker Compose?","entry":"What is the syntax for environment variables in Docker Compose?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-034","query":"Comment définir une variable d'environnement dans Docker Compose ?","entry":"Quelle est la syntaxe des variables d'environnement dans Docker Compose ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-035","query":"What is a prepared statement?","entry":"Explain what a prepared statement is.","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-036","query":"Qu'est-ce qu'une requête préparée ?","entry":"Explique ce qu'est une requête préparée.","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-037","query":"How do I see the routing decision for a request?","entry":"Where can I find the routing decision taken for a given request?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-038","query":"Comment consulter la décision de routage d'une requête ?","entry":"Où trouver la décision de routage prise pour une requête donnée ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-039","query":"What is the difference between a tier and a model?","entry":"How does a tier differ from a model in the registry?","judgment":"YES","language":"en","tags":["paraphrase"]}
+{"id":"c-tst-040","query":"Quelle est la différence entre un palier et un modèle ?","entry":"En quoi un palier diffère-t-il d'un modèle dans le registre ?","judgment":"YES","language":"fr","tags":["paraphrase"]}
+{"id":"c-tst-041","query":"Summarize the release in one paragraph.","entry":"Summarize the release in a few sentences.","judgment":"YES","language":"en","tags":["format-change","ambiguous"]}
+{"id":"c-tst-042","query":"Résume cette version en un paragraphe.","entry":"Résume cette version en quelques phrases.","judgment":"YES","language":"fr","tags":["format-change","ambiguous"]}
+{"id":"c-tst-043","query":"What is the capital of Austria?","entry":"What is the capital of Australia?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-044","query":"How do I unsubscribe from the newsletter?","entry":"How do I subscribe to the newsletter?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-tst-045","query":"Which Java version removed the security manager?","entry":"Which Java version introduced the security manager?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-tst-046","query":"Convert 100 euros into dollars.","entry":"Convert 100 dollars into euros.","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-tst-047","query":"Proofread this paragraph.","entry":"Translate this paragraph.","judgment":"NO","language":"en","tags":["task-swap"]}
+{"id":"c-tst-048","query":"What is a service mesh?","entry":"What is a message queue?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-tst-049","query":"How do I migrate from Flyway 9 to Flyway 10?","entry":"How do I migrate from Flyway 8 to Flyway 9?","judgment":"NO","language":"en","tags":["version-swap"]}
+{"id":"c-tst-050","query":"What is the price of the Starter plan?","entry":"What is the price of the Enterprise plan?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-051","query":"How do I delete a client?","entry":"How do I create a client?","judgment":"NO","language":"en","tags":["task-swap"]}
+{"id":"c-tst-052","query":"Why does my request return 401?","entry":"Why does my request return 403?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-053","query":"Explain the difference between a hit and a bypass.","entry":"Explain what a cache hit is.","judgment":"NO","language":"en","tags":["scope-change"]}
+{"id":"c-tst-054","query":"How do I profile a slow Spring Boot startup?","entry":"What is Spring Boot?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-tst-055","query":"What is the minimum supported Postgres version?","entry":"What is the maximum supported Postgres version?","judgment":"NO","language":"en","tags":["direction-swap"]}
+{"id":"c-tst-056","query":"How do I deploy on Kubernetes?","entry":"How do I deploy with Docker Compose?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-057","query":"What are the risks of a shared cache across clients?","entry":"What are the benefits of a shared cache across clients?","judgment":"NO","language":"en","tags":["negation"]}
+{"id":"c-tst-058","query":"Show me how to write an ArchUnit rule.","entry":"Show me how to write a JUnit test.","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-tst-059","query":"Quelle est la capitale de l'Autriche ?","entry":"Quelle est la capitale de l'Australie ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-060","query":"Comment me désinscrire de la newsletter ?","entry":"Comment m'inscrire à la newsletter ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-tst-061","query":"Quelle version de Java a supprimé le gestionnaire de sécurité ?","entry":"Quelle version de Java a introduit le gestionnaire de sécurité ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-tst-062","query":"Convertis 100 euros en dollars.","entry":"Convertis 100 dollars en euros.","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-tst-063","query":"Relis et corrige ce paragraphe.","entry":"Traduis ce paragraphe.","judgment":"NO","language":"fr","tags":["task-swap"]}
+{"id":"c-tst-064","query":"Qu'est-ce qu'un maillage de services ?","entry":"Qu'est-ce qu'une file de messages ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-tst-065","query":"Comment migrer de Flyway 9 vers Flyway 10 ?","entry":"Comment migrer de Flyway 8 vers Flyway 9 ?","judgment":"NO","language":"fr","tags":["version-swap"]}
+{"id":"c-tst-066","query":"Quel est le tarif de l'offre Découverte ?","entry":"Quel est le tarif de l'offre Entreprise ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-067","query":"Comment supprimer un client ?","entry":"Comment créer un client ?","judgment":"NO","language":"fr","tags":["task-swap"]}
+{"id":"c-tst-068","query":"Pourquoi ma requête renvoie-t-elle un 401 ?","entry":"Pourquoi ma requête renvoie-t-elle un 403 ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-069","query":"Explique la différence entre un hit et un contournement de cache.","entry":"Explique ce qu'est un hit de cache.","judgment":"NO","language":"fr","tags":["scope-change"]}
+{"id":"c-tst-070","query":"Comment analyser un démarrage lent de Spring Boot ?","entry":"Qu'est-ce que Spring Boot ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-tst-071","query":"Quelle est la version minimale de Postgres supportée ?","entry":"Quelle est la version maximale de Postgres supportée ?","judgment":"NO","language":"fr","tags":["direction-swap"]}
+{"id":"c-tst-072","query":"Comment déployer sur Kubernetes ?","entry":"Comment déployer avec Docker Compose ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-073","query":"Quels sont les risques d'un cache partagé entre clients ?","entry":"Quels sont les avantages d'un cache partagé entre clients ?","judgment":"NO","language":"fr","tags":["negation"]}
+{"id":"c-tst-074","query":"Montre-moi comment écrire une règle ArchUnit.","entry":"Montre-moi comment écrire un test JUnit.","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-tst-075","query":"What is a semantic route?","entry":"Qu'est-ce qu'une route sémantique ?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-tst-076","query":"Comment fonctionne le routage sémantique ?","entry":"How does semantic routing work?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-tst-077","query":"What is the maximum upload size?","entry":"Quelle est la taille maximale d'un envoi ?","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-tst-078","query":"Explique ce qu'est un webhook.","entry":"Explain what a webhook is.","judgment":"NO","language":"mixed","tags":["cross-lingual"]}
+{"id":"c-tst-079","query":"How many requests are queued right now?","entry":"How many requests are queued right now?","judgment":"NO","language":"en","tags":["volatile"]}
+{"id":"c-tst-080","query":"Quelle est la charge actuelle du serveur ?","entry":"Quelle est la charge actuelle du serveur ?","judgment":"NO","language":"fr","tags":["volatile"]}
+{"id":"c-tst-081","query":"How do I bake sourdough bread?","entry":"How do I configure a Postgres connection pool?","judgment":"NO","language":"en","tags":["unrelated"]}
+{"id":"c-tst-082","query":"Quelle est la meilleure période pour visiter le Japon ?","entry":"Quelle est la meilleure stratégie d'indexation pour cette table ?","judgment":"NO","language":"fr","tags":["unrelated"]}
+{"id":"c-tst-083","query":"What is the best index for a range query?","entry":"What is the best index for an equality query?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-tst-084","query":"Quel index choisir pour une requête par intervalle ?","entry":"Quel index choisir pour une requête d'égalité ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-tst-085","query":"How do I test a streaming endpoint?","entry":"How do I test a synchronous endpoint?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-tst-086","query":"Comment tester un endpoint en flux continu ?","entry":"Comment tester un endpoint synchrone ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-tst-087","query":"What is the gCO2 per request for the premium tier?","entry":"What is the gCO2 per request for the local tier?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-088","query":"Quel est le gCO2 par requête pour le palier premium ?","entry":"Quel est le gCO2 par requête pour le palier local ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-089","query":"How do I read the Prometheus metrics?","entry":"How do I read the Grafana dashboard?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-tst-090","query":"Comment lire les métriques Prometheus ?","entry":"Comment lire le tableau de bord Grafana ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-tst-091","query":"What happens when the embedding model is unreachable?","entry":"What happens when the database is unreachable?","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-092","query":"Que se passe-t-il si le modèle d'embedding est injoignable ?","entry":"Que se passe-t-il si la base de données est injoignable ?","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-093","query":"Give me a regex for a French phone number.","entry":"Give me a regex for a UK phone number.","judgment":"NO","language":"en","tags":["entity-swap"]}
+{"id":"c-tst-094","query":"Donne-moi une expression régulière pour un numéro français.","entry":"Donne-moi une expression régulière pour un numéro britannique.","judgment":"NO","language":"fr","tags":["entity-swap"]}
+{"id":"c-tst-095","query":"How do I revoke an admin key?","entry":"How do I revoke a client key?","judgment":"NO","language":"en","tags":["specificity"]}
+{"id":"c-tst-096","query":"Comment révoquer une clé d'administration ?","entry":"Comment révoquer une clé client ?","judgment":"NO","language":"fr","tags":["specificity"]}
+{"id":"c-tst-097","query":"What is the difference between an advisor and a filter?","entry":"What is the difference between an advisor and an interceptor?","judgment":"NO","language":"en","tags":["near-miss"]}
+{"id":"c-tst-098","query":"Quelle est la différence entre un advisor et un filtre ?","entry":"Quelle est la différence entre un advisor et un intercepteur ?","judgment":"NO","language":"fr","tags":["near-miss"]}
+{"id":"c-tst-099","query":"Please tell me the maximum request size.","entry":"What is the maximum request size?","judgment":"YES","language":"en","tags":["politeness"]}
+{"id":"c-tst-100","query":"Peux-tu me dire quelle est la taille maximale d'une requête ?","entry":"Quelle est la taille maximale d'une requête ?","judgment":"YES","language":"fr","tags":["politeness"]}
