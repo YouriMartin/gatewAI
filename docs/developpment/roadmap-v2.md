@@ -578,7 +578,8 @@ has already handed over to the heuristic and the cascade stops there rather than
 buy a model call for an outage.
 
 Each level reached is recorded in `routing_decision.escalated_to` (migration
-`V5`) and counted in `gatewai_classifier_cascade_level_total{level}`, so the
+`V5`) and counted in `gatewai_cascade_escalations_total{to_level}` (renamed from
+the batch-4 name in batch 6), so the
 escalation rate is observable in production and not only in the harness.
 
 ### 4.2 Client pinning (D3) — ✅ implemented
@@ -616,37 +617,80 @@ flattering single number is the point of having a harness at all.
 
 ---
 
-## Batch 6 — Observability
+## Batch 6 — Observability — ✅ done
 
 Extension of the Micrometer/Prometheus stack in place — no parallel mechanism.
-Names registered **dotted** (D8); the Prometheus rendering is shown for reference.
+Names registered **dotted** (D8); the Prometheus rendering is shown for
+reference.
+
+Two corrections found while implementing:
+
+- **D27 — `gatewai.conformal.set.size` is routing-only.** The plan tags it by
+  target, but the cache's prediction set is over candidate *documents* and its
+  size beyond one is never recorded — batch 3 chose `conformal_status`
+  (`EMPTY_SET` / `SINGLETON` / `AMBIGUOUS`) precisely because the shape is what
+  matters there. Emitting a cache size would have meant inventing a number
+  nothing measured, so the status rides as a tag on
+  `gatewai.cache.decisions` instead and the summary stays routing-only.
+- **D28 — there was no Grafana dashboard to add a panel to.** The stack
+  provisioned Grafana empty, so "add a drift panel to the existing dashboard"
+  had no target: dashboards lived in whatever the last person clicked together.
+  The batch therefore ships the dashboard as a **committed file**
+  (`docker/grafana/dashboards/gatewai-decisions.json`) with datasource and
+  dashboard provisioning, which is also what makes a panel change reviewable.
+
+### 6.1 Decision metrics — ✅
 
 | Meter (registered) | Prometheus | Type | Tags |
 |---|---|---|---|
 | `gatewai.routing.decisions` | `gatewai_routing_decisions_total` | counter | `tier`, `reason`, `strategy` |
 | `gatewai.routing.margin` | `gatewai_routing_margin` | summary | `tier` |
 | `gatewai.cascade.escalations` | `gatewai_cascade_escalations_total` | counter | `to_level` |
-| `gatewai.cache.decisions` | `gatewai_cache_decisions_total` | counter | `outcome` |
+| `gatewai.cache.decisions` | `gatewai_cache_decisions_total` | counter | `outcome`, `conformal_status` |
 | `gatewai.cache.similarity` | `gatewai_cache_similarity` | summary | — |
-| `gatewai.conformal.set.size` | `gatewai_conformal_set_size` | summary | `target` |
-| `gatewai.conformal.calibration.stale` | `gatewai_conformal_calibration_stale` | gauge | — |
+| `gatewai.conformal.set.size` | `gatewai_conformal_set_size` | summary | `target` (routing, D27) |
+| `gatewai.routing.config.changes` | `gatewai_routing_config_changes_total` | counter | — |
+| `gatewai.conformal.calibration.stale` | `gatewai_conformal_calibration_stale` | gauge | `target` (kept from batch 3) |
 
-`gatewai.cache.decisions{outcome}` **supersedes** the existing
-`gatewai.cache.hits` / `.misses`: keep both for one release, document the
-deprecation in [`../technical/observability.md`](../technical/observability.md),
-and update the Grafana dashboard rather than leaving two sources of truth.
+Per D9, decision metrics got a sibling out port — `DecisionMetricsRecorder`,
+fed the same `RoutingDecision` / `CacheDecision` objects that are persisted, so
+a series cannot drift from the row it aggregates. It is called from the advisor
+and the cache tracer rather than from `AsyncDecisionRecorder`, because decision
+persistence is switchable (`gatewai.decisions.enabled=false`) and turning the
+trace off must not also blind the dashboards.
 
-Per D9, decision metrics need a port that does not take a `RequestLog` — add a
-sibling out port (e.g. `DecisionMetricsRecorder`) so the domain stays
-framework-free.
+The batch-4 counter `gatewai.classifier.cascade.level` is **removed**, not kept
+in parallel: it counted the same events as `gatewai.cascade.escalations` from
+the classifier instead of from the decision. One source of truth, and the
+cascade classifier no longer touches Micrometer at all.
 
-Add to the existing Grafana dashboard a tier-distribution drift panel correlated
-with `routing_config_version` changes: a mix change **without** a config change is
-an input-drift signal.
+`gatewai.cache.decisions{outcome}` **supersedes** `gatewai.cache.hits` /
+`.misses`, which distinguished neither a bypass, nor a failed lookup, nor a
+deliberate refusal on an ambiguous set — all three were "a miss". Both are
+emitted for one release, the deprecation and the migration query are in
+[`../technical/observability.md`](../technical/observability.md), and the
+bundled dashboard already uses the new one.
 
-OTel span attributes (`chosen_tier`, `decision_reason`, `effective_strategy`, and
-a **bucketed** margin — never the raw value, cardinality) are conditional on
-adopting a tracing dependency (D2). Deferred, not blocking.
+### 6.2 Drift panel — ✅
+
+The tier mix as a **share**, with routing-config edits overlaid as bars. A mix
+that moves at an edit is the edit; a mix that moves while the edit series stays
+flat is the incoming traffic drifting, which re-reading the configuration will
+never explain. That is why `gatewai.routing.config.changes` exists — a log line
+cannot be graphed beside the mix, a counter can. The margin panel beside it is
+the same signal earlier: decisions holding steady while margins collapse.
+
+Verified live, not only in unit tests: the stack was booted from
+`docker-compose.observability.yml`, and Grafana provisioned the datasource and
+the dashboard on first start with no provisioning errors.
+
+### 6.3 Tracing — deferred, as planned
+
+OTel span attributes (`chosen_tier`, `decision_reason`, `effective_strategy`, a
+**bucketed** margin — never the raw value, cardinality) remain conditional on
+adopting a tracing dependency (D2). The correlation id already joins a request
+to its decision rows, so the aggregate questions are answered by the meters
+above and the per-request ones by the tables.
 
 ---
 
@@ -790,7 +834,7 @@ Batch 2   Routing + cache decision persistence           ✅ done
 Batch 5   Evaluation                                                ✅ done
 Batch 3   Conformal calibration (cache first)                       ✅ done
 Batch 4   Calibrated cascade routing (+ client pinning)          ✅ done
-Batch 6   Observability
+Batch 6   Observability                                          ✅ done
 Batch 7   Occlusion attribution
 Batch 8   Counterfactuals
 Batch 9   API and dashboard

@@ -25,9 +25,6 @@ import io.github.yourimartin.gatewai.domain.model.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,14 +42,12 @@ class CascadeComplexityClassifierTest {
   private ClassifierProperties properties;
   private EmbeddingComplexityClassifier embedding;
   private LlmComplexityClassifier llm;
-  private MeterRegistry registry;
 
   @BeforeEach
   void setUp() {
     properties = new ClassifierProperties();
     embedding = mock(EmbeddingComplexityClassifier.class);
     llm = mock(LlmComplexityClassifier.class);
-    registry = new SimpleMeterRegistry();
   }
 
   @Test
@@ -220,23 +215,6 @@ class CascadeComplexityClassifierTest {
   }
 
   @Test
-  @DisplayName("every level reached is counted: the escalation rate is the cost")
-  void levelsAreCounted() {
-    when(embedding.classify("hello"))
-        .thenReturn(routed(ModelTier.LOCAL, 0.90, 0.30, 0.20));
-    CascadeComplexityClassifier cascade = cascade(calibrated());
-
-    cascade.classify("```code```");
-    cascade.classify("hello");
-    cascade.classify("hello");
-
-    assertEquals(1.0, counted("deterministic"));
-    assertEquals(2.0, counted("embedding"));
-    assertEquals(0.0, counted("llm"),
-        "a level that never fired must still be scraped, as zero");
-  }
-
-  @Test
   @DisplayName("the justification of the level that decided is kept verbatim")
   void innerJustificationIsNotReinterpreted() {
     ClassificationJustification reported =
@@ -250,15 +228,10 @@ class CascadeComplexityClassifierTest {
     assertSame(reported, cascadeOf(outcome).decided());
   }
 
-  private double counted(String level) {
-    return registry.get("gatewai.classifier.cascade.level")
-        .tag("level", level).counter().count();
-  }
-
   private CascadeComplexityClassifier cascade(CalibrationUseCase calibrations) {
     return new CascadeComplexityClassifier(properties,
         new HeuristicComplexityClassifier(properties), embedding, llm,
-        calibrations, registry);
+        calibrations);
   }
 
   private static CalibrationUseCase calibrated() {

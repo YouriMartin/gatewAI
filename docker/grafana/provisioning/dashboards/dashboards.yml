@@ -1,0 +1,13 @@
+# Loads every dashboard JSON under /var/dashboards (v2 batch 6). The dashboards
+# are committed so "the Grafana dashboard" is a file that can be reviewed and
+# diffed, not a screenshot someone rebuilt by hand.
+apiVersion: 1
+
+providers:
+  - name: gatewai
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/dashboards
+      foldersFromFilesStructure: false

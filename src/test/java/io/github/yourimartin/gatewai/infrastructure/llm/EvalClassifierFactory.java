@@ -5,8 +5,6 @@ import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-
 import org.springframework.ai.embedding.EmbeddingModel;
 
 /**
@@ -80,8 +78,7 @@ public final class EvalClassifierFactory {
     return new CascadeComplexityClassifier(properties, heuristic,
         new EmbeddingComplexityClassifier(embeddingModel, properties, heuristic,
             calibrations),
-        new HeuristicLevelThree(properties, heuristic), calibrations,
-        new SimpleMeterRegistry());
+        new HeuristicLevelThree(properties, heuristic), calibrations);
   }
 
   /**

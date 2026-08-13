@@ -118,7 +118,7 @@ particular:
   server, and with level 3 stubbed by the heuristic the cascade scores 6 points
   below the routes alone. Turn it on only where the classifier model is better
   than the heuristic on hard prompts, and watch
-  `gatewai_classifier_cascade_level_total`.
+  `gatewai_cascade_escalations_total`.
 - **A client can bypass routing.** Naming a registered model id pins it (v2
   batch 4), which is the point — the gateway is also a plain proxy — but it means
   the green router only governs traffic that does not pin. Set

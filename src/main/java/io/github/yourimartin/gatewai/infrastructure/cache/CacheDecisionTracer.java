@@ -10,6 +10,7 @@ import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
 import org.slf4j.Logger;
@@ -31,9 +32,12 @@ class CacheDecisionTracer {
       LoggerFactory.getLogger(CacheDecisionTracer.class);
 
   private final DecisionRecorder recorder;
+  private final DecisionMetricsRecorder metrics;
 
-  CacheDecisionTracer(DecisionRecorder recorder) {
+  CacheDecisionTracer(DecisionRecorder recorder,
+                      DecisionMetricsRecorder metrics) {
     this.recorder = recorder;
+    this.metrics = metrics;
   }
 
   /** Records a hit or a miss, with the scores that separated them. */
@@ -43,7 +47,7 @@ class CacheDecisionTracer {
       Double best = score(candidates, 0);
       Double runnerUp = score(candidates, 1);
 
-      recorder.record(new CacheDecision(
+      publish(new CacheDecision(
           UUID.randomUUID(),
           correlationId(),
           Instant.now(),
@@ -74,7 +78,7 @@ class CacheDecisionTracer {
 
   private void record(String userText, CacheOutcome outcome, double threshold) {
     try {
-      recorder.record(new CacheDecision(
+      publish(new CacheDecision(
           UUID.randomUUID(),
           correlationId(),
           Instant.now(),
@@ -87,6 +91,16 @@ class CacheDecisionTracer {
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }
+  }
+
+  /**
+   * Trace and metrics, from the same object (v2 batch 6). Metrics are published
+   * here rather than from the recorder so that switching decision persistence
+   * off does not also switch the dashboards off.
+   */
+  private void publish(CacheDecision decision) {
+    recorder.record(decision);
+    metrics.record(decision);
   }
 
   private static Double score(List<Document> candidates, int index) {

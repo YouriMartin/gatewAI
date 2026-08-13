@@ -116,6 +116,7 @@ Progress: _(to be kept up to date)_
 - [x] Phase 8 — provider-agnostic egress: `gatewai.providers.<name>` instances (anthropic | openai | openai-compatible | ollama, N allowed), `EgressProviderConfiguration` factory + fail-fast validation, no fallback provider (`UnknownModelException` → 400), local-first defaults (3 Qwen tiers on Ollama, zero API keys)
 - [x] Phase 9 — classifier V3 (default): semantic routes — embedding similarity (max-over-utterances, local Ollama embeddings, in-memory index) over admin-editable routes (name + tier + example prompts, bilingual defaults), `DelegatingComplexityClassifier` strategy dispatch, dashboard route editor
 - [x] v2 batch 4 — calibrated cascade routing (`strategy=cascade`, opt-in): deterministic signals → embedding routes → classifier model, escalating on the conformal set **and** the `top1−top2` margin band; `escalated_to` traced, escalation rate metered and evaluated; client pinning of registered model ids (`CLIENT_PINNED`)
+- [x] v2 batch 6 — decision observability: `DecisionMetricsRecorder` out port + Micrometer adapter (`gatewai_routing_decisions_total`, `_routing_margin`, `_cascade_escalations_total`, `_cache_decisions_total`, `_cache_similarity`, `_conformal_set_size`, `_routing_config_changes_total`), provisioned Grafana dashboard with the tier-mix-vs-config-edits drift panel; `gatewai_cache_hits/misses` deprecated for one release
 
 ## Frontend build (mono-repo)
 - Svelte+Vite app in `src/main/frontend`, built into `target/classes/static` (bundled in the jar).

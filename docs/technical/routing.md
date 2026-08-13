@@ -188,8 +188,9 @@ it costs when it does not. That is why the cascade is **opt-in and `embedding`
 remains the default**.
 
 Each level reached is recorded in `routing_decision.escalated_to` and counted in
-`gatewai_classifier_cascade_level_total{level}`, so the escalation rate — the
-cost of the cascade — is observable in production, not only in the harness.
+`gatewai_cascade_escalations_total{to_level}` (v2 batch 6), so the escalation
+rate — the cost of the cascade — is observable in production, not only in the
+harness.
 A decision that reached level 3 is `AMBIGUOUS_ESCALATED`, and carries the route
 scores it escalated on as evidence.
 

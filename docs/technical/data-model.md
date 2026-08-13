@@ -105,7 +105,11 @@ describe today's rules rather than the ones that applied. Every change is logged
 with its timestamp by `RoutingConfigVersionTracker`.
 
 Retention is `gatewai.decisions.retention-days` (90 by default); a scheduled
-purge drops older rows. Set `gatewai.decisions.enabled=false` to record nothing.
+purge drops older rows. Set `gatewai.decisions.enabled=false` to record nothing —
+which stops the rows, **not** the metrics: since v2 batch 6 the same decision
+objects are also published to Micrometer, from the advisor rather than from the
+recorder, so switching the trace off does not blind the dashboards. See
+[`observability.md`](observability.md).
 
 ## `conformal_calibration` (v2 batch 3)
 

@@ -1,0 +1,12 @@
+# Points Grafana at the Prometheus of the same compose file, so the bundled
+# dashboard works on first start with nothing to click (v2 batch 6).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: gatewai-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

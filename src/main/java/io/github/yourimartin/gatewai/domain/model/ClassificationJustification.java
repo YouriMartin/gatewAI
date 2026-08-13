@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.domain.model;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Why a request was classified into a tier (v2 batch 1).
@@ -22,6 +23,33 @@ public sealed interface ClassificationJustification {
    * one is {@link Fallback#fallbackFrom()}.
    */
   ClassificationStrategy strategy();
+
+  /**
+   * The route scores behind a justification, wherever they ended up sitting
+   * (v2 batch 6).
+   *
+   * <p>The embedding level reports them four different ways depending on what
+   * happened to its answer — it decided ({@link Embedding}), it handed over
+   * below threshold ({@link Fallback#evidence()}), the cascade kept its answer
+   * ({@link Cascade#decided()}) or the cascade escalated past it
+   * ({@link Cascade#escalatedOn()}). Every reader that wants the margin or the
+   * candidates needs all four cases, and by batch 6 four copies of that
+   * {@code switch} existed. This is the one, on the sealed type itself, so a new
+   * variant cannot quietly go unhandled.
+   *
+   * @return the scores, or empty when no embedding ran at all
+   */
+  static Optional<Embedding> routeScores(
+      ClassificationJustification justification) {
+    return switch (justification) {
+      case null -> Optional.empty();
+      case Embedding embedding -> Optional.of(embedding);
+      case Fallback fallback -> routeScores(fallback.evidence());
+      case Cascade cascade -> routeScores(cascade.escalatedOn())
+          .or(() -> routeScores(cascade.decided()));
+      default -> Optional.empty();
+    };
+  }
 
   /** Which heuristic rule fired, in the order the classifier evaluates them. */
   enum HeuristicRule {

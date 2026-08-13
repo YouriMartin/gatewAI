@@ -21,6 +21,7 @@ import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
 import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
@@ -49,6 +50,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   private final ComplexityClassifier classifier;
   private final ModelRegistry modelRegistry;
   private final DecisionRecorder decisionRecorder;
+  private final DecisionMetricsRecorder decisionMetrics;
   private final RoutingConfigVersionTracker configVersion;
   private final CalibrationUseCase calibrations;
   private final ClassifierProperties properties;
@@ -56,12 +58,14 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   RoutingAdvisor(ComplexityClassifier classifier,
                  ModelRegistry modelRegistry,
                  DecisionRecorder decisionRecorder,
+                 DecisionMetricsRecorder decisionMetrics,
                  RoutingConfigVersionTracker configVersion,
                  CalibrationUseCase calibrations,
                  ClassifierProperties properties) {
     this.classifier = classifier;
     this.modelRegistry = modelRegistry;
     this.decisionRecorder = decisionRecorder;
+    this.decisionMetrics = decisionMetrics;
     this.configVersion = configVersion;
     this.calibrations = calibrations;
     this.properties = properties;
@@ -200,7 +204,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       CalibrationState calibration =
           calibrations.state(CalibrationTarget.ROUTING);
 
-      decisionRecorder.record(new RoutingDecision(
+      publish(new RoutingDecision(
           UUID.randomUUID(),
           correlationId(),
           Instant.now(),
@@ -234,7 +238,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   private void recordPinned(String userText, ModelDefinition pinned,
                             long latencyMs) {
     try {
-      decisionRecorder.record(new RoutingDecision(
+      publish(new RoutingDecision(
           UUID.randomUUID(),
           correlationId(),
           Instant.now(),
@@ -256,6 +260,19 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     } catch (RuntimeException e) {
       LOG.warn("Could not build pinned routing decision: {}", e.toString());
     }
+  }
+
+  /**
+   * Sends the decision to the trace and to the metrics (v2 batch 6).
+   *
+   * <p>Both, from the same object, so an aggregate can never disagree with the
+   * row behind it. The metrics call is <b>not</b> made from the recorder:
+   * persistence is switchable ({@code gatewai.decisions.enabled=false}) and
+   * turning the trace off must not also blind the dashboards.
+   */
+  private void publish(RoutingDecision decision) {
+    decisionRecorder.record(decision);
+    decisionMetrics.record(decision);
   }
 
   /**

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,9 @@ class CacheDecisionTracerTest {
   @Mock
   private DecisionRecorder recorder;
 
+  @Mock
+  private DecisionMetricsRecorder metrics;
+
   @Captor
   private ArgumentCaptor<CacheDecision> captor;
 
@@ -42,7 +47,7 @@ class CacheDecisionTracerTest {
 
   @BeforeEach
   void setUp() {
-    tracer = new CacheDecisionTracer(recorder);
+    tracer = new CacheDecisionTracer(recorder, metrics);
   }
 
   @Test
@@ -102,7 +107,7 @@ class CacheDecisionTracerTest {
     tracer.bypassed("  ");
     assertEquals(CacheOutcome.BYPASS, captured().outcome());
 
-    tracer = new CacheDecisionTracer(recorder);
+    tracer = new CacheDecisionTracer(recorder, metrics);
     tracer.failed("q", 0.92);
     assertEquals(CacheOutcome.ERROR, captured().outcome());
   }
@@ -142,6 +147,16 @@ class CacheDecisionTracerTest {
     tracer.decided("q", List.of(best), best, 0.92, ConformalStatus.SINGLETON);
 
     assertNull(captured().matchedEntryAgeSeconds());
+  }
+
+  @Test
+  void theTraceAndTheMetricsSeeTheSameDecision() {
+    tracer.bypassed("   ");
+
+    ArgumentCaptor<CacheDecision> metered =
+        ArgumentCaptor.forClass(CacheDecision.class);
+    verify(metrics).record(metered.capture());
+    assertSame(captured(), metered.getValue());
   }
 
   private CacheDecision captured() {

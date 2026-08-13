@@ -23,6 +23,7 @@ import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
@@ -57,6 +58,9 @@ class RoutingAdvisorTest {
   private DecisionRecorder decisionRecorder;
 
   @Mock
+  private DecisionMetricsRecorder decisionMetrics;
+
+  @Mock
   private RoutingConfigVersionTracker configVersion;
 
   @Mock
@@ -78,7 +82,7 @@ class RoutingAdvisorTest {
   void setUp() {
     properties = new ClassifierProperties();
     advisor = new RoutingAdvisor(classifier, modelRegistry,
-        decisionRecorder, configVersion, CalibrationFixtures.none(0.60),
+        decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
         properties);
   }
 
@@ -388,6 +392,24 @@ class RoutingAdvisorTest {
 
     assertEquals("claude-sonnet-4-20250514",
         capturedDecision().chosenModelId());
+  }
+
+  @Test
+  void theTraceAndTheMetricsSeeTheSameDecision() {
+    // One object, two sinks (v2 batch 6): an aggregate that disagreed with the
+    // row behind it would be worse than no aggregate.
+    ChatClientRequest request = buildRequest("Refactor this class");
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    ArgumentCaptor<RoutingDecision> metered =
+        ArgumentCaptor.forClass(RoutingDecision.class);
+    verify(decisionMetrics).record(metered.capture());
+    assertSame(capturedDecision(), metered.getValue());
   }
 
   private RoutingDecision capturedDecision() {

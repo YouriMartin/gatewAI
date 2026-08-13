@@ -20,6 +20,7 @@ import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
@@ -61,6 +62,9 @@ class RoutingAdvisorPinningTest {
   private DecisionRecorder decisionRecorder;
 
   @Mock
+  private DecisionMetricsRecorder decisionMetrics;
+
+  @Mock
   private RoutingConfigVersionTracker configVersion;
 
   @Mock
@@ -82,7 +86,7 @@ class RoutingAdvisorPinningTest {
   void setUp() {
     properties = new ClassifierProperties();
     advisor = new RoutingAdvisor(classifier, modelRegistry,
-        decisionRecorder, configVersion, CalibrationFixtures.none(0.60),
+        decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
         properties);
   }
 

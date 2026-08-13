@@ -1,0 +1,733 @@
+{
+  "uid": "gatewai-decisions",
+  "title": "gatewAI \u2014 decisions, confidence and footprint",
+  "description": "Committed with the code (v2 batch 6). Every series here is the aggregate of a row in routing_decision / cache_decision.",
+  "tags": [
+    "gatewai"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "editable": true,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Routing decisions",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Tier mix vs routing-config edits (drift)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum by (tier) (rate(gatewai_routing_decisions_total[$__rate_interval])) / ignoring(tier) group_left sum(rate(gatewai_routing_decisions_total[$__rate_interval]))",
+          "legendFormat": "{{tier}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "increase(gatewai_routing_config_changes_total[$__rate_interval])",
+          "legendFormat": "config edits",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "config edits"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 60
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Share of requests per tier, with routing-rule edits overlaid. A mix that moves at an edit is the edit; a mix that moves while the edit series stays flat is the incoming traffic drifting."
+    },
+    {
+      "type": "timeseries",
+      "title": "Why (decision reason)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum by (reason) (rate(gatewai_routing_decisions_total[$__rate_interval]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "match / ambiguous_escalated / client_pinned / below_threshold_fallback / error_fallback / no_model_for_tier. A rising fallback rate is a degraded router, not a busy one."
+    },
+    {
+      "type": "row",
+      "title": "Confidence",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Routing margin (top1 - top2)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_routing_margin{quantile=\"0.5\"}",
+          "legendFormat": "p50 {{tier}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_routing_margin{quantile=\"0.95\"}",
+          "legendFormat": "p95 {{tier}}",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "How far ahead the winning route was. Margins collapsing while the mix holds is the early shape of input drift."
+    },
+    {
+      "type": "timeseries",
+      "title": "Conformal prediction set size (routing)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_conformal_set_size{quantile=\"0.5\"}",
+          "legendFormat": "p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_conformal_set_size{quantile=\"0.95\"}",
+          "legendFormat": "p95",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Tiers that cleared the calibrated threshold. A set pinned at 3 means the threshold has stopped separating anything."
+    },
+    {
+      "type": "stat",
+      "title": "Cascade escalation rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 11,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum(rate(gatewai_cascade_escalations_total{to_level=\"llm\"}[$__rate_interval])) / sum(rate(gatewai_cascade_escalations_total[$__rate_interval]))",
+          "legendFormat": "to the model",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.35
+              },
+              {
+                "color": "red",
+                "value": 0.6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Share of cascade traffic that reached the classifier model \u2014 the cost of the cascade. No data means the cascade is off."
+    },
+    {
+      "type": "row",
+      "title": "Semantic cache",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache decisions",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum by (outcome) (rate(gatewai_cache_decisions_total[$__rate_interval]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum(rate(gatewai_cache_decisions_total{conformal_status=\"ambiguous\"}[$__rate_interval]))",
+          "legendFormat": "refused: ambiguous",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Supersedes gatewai_cache_hits_total / _misses_total. A miss caused by an ambiguous prediction set is a deliberate refusal, not a lookup that found nothing."
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache similarity vs the threshold in force",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_cache_similarity{quantile=\"0.5\"}",
+          "legendFormat": "similarity p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_cache_similarity{quantile=\"0.95\"}",
+          "legendFormat": "similarity p95",
+          "refId": "B",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_conformal_threshold{target=\"cache\"}",
+          "legendFormat": "threshold",
+          "refId": "C",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Where the candidates sit relative to the bar they have to clear. The two moving together is a calibration doing its job."
+    },
+    {
+      "type": "row",
+      "title": "Calibration and footprint",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Calibration degraded (per target)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "gatewai_conformal_calibration_stale",
+          "legendFormat": "{{target}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "1 = the fixed threshold is in force instead of a calibration (never calibrated, gone stale, or switched off)."
+    },
+    {
+      "type": "timeseries",
+      "title": "Decision recording failures",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 29,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum by (kind) (rate(gatewai_decisions_write_failures_total[$__rate_interval]))",
+          "legendFormat": "write {{kind}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum by (kind) (rate(gatewai_decisions_metric_failures_total[$__rate_interval]))",
+          "legendFormat": "metric {{kind}}",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Tracing is best-effort by design, so a non-zero rate means the trace has holes \u2014 not that requests are failing."
+    },
+    {
+      "type": "timeseries",
+      "title": "gCO2: emitted vs avoided",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gatewai-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum(rate(gatewai_co2_grams_total[$__rate_interval]))",
+          "legendFormat": "emitted",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gatewai-prometheus"
+          },
+          "expr": "sum(rate(gatewai_co2_avoided_grams_total[$__rate_interval]))",
+          "legendFormat": "avoided",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Avoided is cache hits plus routing below the premium baseline. Read it next to the tier mix above: sending everything to the smallest model would maximise this panel and ruin the answers."
+    }
+  ]
+}
