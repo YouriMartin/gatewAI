@@ -124,6 +124,26 @@ particular:
   the green router only governs traffic that does not pin. Set
   `gatewai.classifier.client-pinning=false` to make routing mandatory.
 
+## Attribution is an approximation, and reads more precise than it is
+
+Since v2 batch 7 the gateway can say which parts of a prompt carried its routing
+decision, by removing each segment and measuring what the similarity loses
+([`attribution.md`](../technical/attribution.md)).
+
+- **It assumes contributions are roughly additive**, which is strictly false for
+  a contextual encoder: removing "not" changes what every other word means. The
+  method is a useful indication of *which words mattered*, not a decomposition
+  of the decision. The `share` column looks like a percentage — it is a
+  normalization of positive contributions, nothing more.
+- **It explains the match, not the ranking.** Why the winning route beat the
+  others is a different question.
+- **It costs n + 1 local embedding calls**, capped at 20 segments and cached, and
+  it runs only when someone asks. It is still the heaviest thing v2 can ask of
+  the embedding model.
+- **Sentence boundaries are imperfect.** The JDK's `BreakIterator` breaks after
+  abbreviations ("Ask Dr. | Martin…"), which costs one extra segment. Accepted
+  rather than patched per language.
+
 ## Single-instance assumptions (not cluster-ready)
 
 - The **deferred-job store is in-memory**: queued async jobs are **lost on

@@ -207,6 +207,13 @@ it per request, so the cache search, this classifier and the cache store use one
 vector instead of three
 ([ADR 0007](adr/0007-memoized-embedding-model.md)).
 
+### Explaining a route match
+
+Which parts of a prompt drove its similarity to the matched route is answered on
+demand by occlusion attribution (v2 batch 7) — see
+[`attribution.md`](attribution.md). It is never computed while routing: it costs
+one embedding call per prompt segment plus one.
+
 ## The RoutingAdvisor
 
 `RoutingAdvisor implements CallAdvisor, StreamAdvisor`, `getOrder()` =

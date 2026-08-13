@@ -694,26 +694,75 @@ above and the per-request ones by the tables.
 
 ---
 
-## Batch 7 — Occlusion attribution (on demand)
+## Batch 7 — Occlusion attribution — ✅ done
 
-1. Segment the prompt (sentences, clauses if too long)
-2. `sim_full = similarity(embed(prompt), best utterance of the chosen route)`
-3. For each segment *j*: `attribution_j = sim_full − similarity(embed(prompt minus j), same utterance)`
-4. Normalize, sort
+Which parts of a prompt carried its routing decision: embed the prompt, find the
+route it matched, then embed it again with each segment removed and see what the
+similarity loses. Method, cost and limits in
+[`../technical/attribution.md`](../technical/attribution.md).
 
-Cap the segment count (suggested 20, group beyond) · parallelize on the virtual
-threads already in use · cache by `(prompt_hash, embedding_model_version)` ·
-applicable **only** when the effective strategy is `EMBEDDING`, otherwise return
-batch 1's justification as is.
+Three corrections found while implementing:
 
-Two operational notes: the per-request memo from 0.2 must not be used as the
-occlusion cache (different lifetime, unbounded growth), and n+1 embedding calls
-against local Ollama is the one place v2 can visibly load the box — rate-limit
-the endpoint.
+- **D29 — the cache key needs the routing config version.** The plan keys
+  reports on `(prompt_hash, embedding_model_version)`, which is not enough: an
+  attribution decomposes the similarity to *the matched route's closest
+  example*, so editing a route — or its examples — changes what the numbers are
+  even about. Without that third component a cached report keeps explaining a
+  decision the gateway no longer takes. Same reasoning as
+  `routing_config_version` on a decision row, and the opposite of D26's
+  conclusion for the cascade band: there, the knob changed no similarity; here,
+  it changes the very quantity being decomposed.
+- **D30 — the JDK cannot split the sentences a gateway actually receives.**
+  `BreakIterator` (the locale-aware option on a JVM without ICU) only breaks
+  before a capital letter, so `"refactor this service. add tests."` is one
+  sentence to it — and one segment is not an attribution. Segmentation is
+  therefore four passes: line breaks, `BreakIterator`, terminators it walked
+  past, then clauses when a segment is too long. Its opposite quirk, breaking
+  after "Dr.", is accepted and documented rather than patched with per-language
+  abbreviation lists.
+- **D31 — "rate-limit the endpoint" has no endpoint yet.** The plan puts
+  `POST /v1/admin/decisions/explain` in batch 9, so the rate-limit requirement
+  moves there with it (`RateLimitFilter` currently covers
+  `POST /v1/chat/completions*` only). What bounds the cost meanwhile is
+  structural: the segment cap, the bounded LRU cache, and the fact that nothing
+  computes an attribution unless a caller asks.
 
-**Limit to document**: occlusion assumes approximate additivity of contributions,
-strictly false for a contextual encoder. A useful approximation, not an exact
-decomposition.
+### 7.1 Method — ✅
+
+`Occlusion` (domain) does the arithmetic — contributions, normalization over the
+positive ones, ranking — with no embedding in sight, so it is tested on numbers
+chosen by hand rather than against whatever a model happens to output. Negative
+contributions keep their sign: a segment whose removal *raises* the similarity
+was pulling away from the matched route, which is a finding.
+
+`PromptSegmentation` (domain) carries **offsets**, not just text: occluding by
+substring search would remove the wrong copy whenever a sentence repeats. Above
+the cap, adjacent segments are grouped rather than dropped, so the attributions
+cover the whole prompt instead of a sample of it.
+
+### 7.2 Cost — ✅
+
+n + 1 embedding calls, capped at `gatewai.attribution.max-segments` (20), run
+concurrently on a virtual-thread executor (not structured concurrency, still a
+preview feature). Reports are cached in a **bounded** LRU keyed as per D29 —
+bounded because prompts are user input and an unbounded map keyed by prompt is a
+memory leak with a plausible name. It is a separate port from the batch-0.2
+per-request memo, as the plan required, for exactly the lifetime reason it gave.
+
+### 7.3 Applicability — ✅
+
+Only `embedding` and `cascade` decide by similarity, so only they have
+similarity to attribute; `heuristic` and `llm` return
+`NOT_APPLICABLE_STRATEGY` **without embedding anything**. An empty prompt and an
+empty route list are statuses too. A genuine embedding failure is not: it
+propagates, because this runs off the request path and an admin asking why is
+owed an error rather than a plausible-looking report.
+
+### Acceptance
+
+Use case, domain method and cache ship with unit tests (bag-of-words embedder,
+so every expected similarity is computable by hand). **Not reachable over HTTP
+until batch 9**, which is where the plan puts the endpoint.
 
 ---
 
@@ -778,15 +827,16 @@ than theoretical.
 replay) · ~~`docs/technical/conformal-calibration.md`~~ ✅ shipped with batch 3
 (method, the asymmetric guarantees, results, degradation, limits) ·
 ~~`docs/technical/evaluation.md`~~ ✅ shipped with batch 5 (datasets, harness,
-fixtures, metrics, findings).
+fixtures, metrics, findings) · ~~`docs/technical/attribution.md`~~ ✅ shipped
+with batch 7 (occlusion method, segmentation, cost, limits).
 
 **Update**: `routing.md` — "Future work: cascade routing" becomes implemented ·
 `semantic-cache.md` — calibrated threshold, traced decision, top-k change ·
 `data-model.md` — the two new tables and the `request_log.correlation_id` column ·
 `observability.md` — new meters and the cache-counter deprecation ·
 `testing-and-quality.md` — Flyway, Testcontainers, the evaluation task ·
-`limitations.md` — marginal (not individual) coverage, approximate additivity of
-occlusion, dependence on calibration-set exchangeability · `api-reference.md` —
+~~`limitations.md`~~ ✅ marginal (not individual) coverage (batch 3), approximate
+additivity of occlusion (batch 7), dependence on calibration-set exchangeability · `api-reference.md` —
 the two new endpoints · `roadmap-post-v1.md` — mark done: cascade routing, shared
 embedding, versioned migrations, threshold feedback loop; and fix the stale
 streaming bullet (D10).
@@ -835,7 +885,7 @@ Batch 5   Evaluation                                                ✅ done
 Batch 3   Conformal calibration (cache first)                       ✅ done
 Batch 4   Calibrated cascade routing (+ client pinning)          ✅ done
 Batch 6   Observability                                          ✅ done
-Batch 7   Occlusion attribution
+Batch 7   Occlusion attribution                                  ✅ done
 Batch 8   Counterfactuals
 Batch 9   API and dashboard
 Batch 10  Documentation                  ← continuous
