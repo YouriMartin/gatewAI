@@ -38,6 +38,7 @@ Emitted by `MicrometerMetricsRecorder` on every served request:
 | `gatewai_decisions_write_failures_total` | counter | `kind` (`routing`/`cache`) | decision rows that could not be persisted (v2 batch 2) |
 | `gatewai_conformal_calibration_stale` | gauge | `target` (`cache`/`routing`) | 1 when the fixed threshold is in force instead of a calibration (v2 batch 3) |
 | `gatewai_conformal_threshold` | gauge | `target` | the similarity threshold actually applied |
+| `gatewai_classifier_cascade_level_total` | counter | `level` (`deterministic`/`embedding`/`llm`) | classifications by the deepest cascade level reached (v2 batch 4) |
 
 `gatewai_conformal_calibration_stale` is the same idea applied to calibration:
 falling back to a fixed threshold is invisible in the responses by construction,

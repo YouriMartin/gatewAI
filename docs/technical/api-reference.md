@@ -149,8 +149,11 @@ Returns `RoutingConfigView`:
  ]}
 ```
 
-`strategy` ∈ `embedding` | `heuristic` | `llm`; `tier` ∈ `local` |
-`cloud_entry` | `cloud_premium`.
+`strategy` ∈ `embedding` | `heuristic` | `llm` | `cascade`; `tier` ∈ `local` |
+`cloud_entry` | `cloud_premium`. `embedding` and `cascade` require at least one
+route. The cascade's ambiguity band is configuration, not part of this payload
+(`gatewai.classifier.cascade-margin-band`, see
+[`routing.md`](routing.md)).
 
 ### `PUT /v1/admin/routing`
 Body: a `RoutingConfigView`. Applies at runtime (next request); invalid config →

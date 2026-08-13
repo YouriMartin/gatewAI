@@ -1,8 +1,11 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import org.springframework.ai.embedding.EmbeddingModel;
 
@@ -51,6 +54,57 @@ public final class EvalClassifierFactory {
   /** The production heuristic classifier, for the zero-cost baseline. */
   public static ComplexityClassifier heuristicClassifier(RoutingConfig config) {
     return new HeuristicComplexityClassifier(propertiesOf(config));
+  }
+
+  /**
+   * The production cascade (v2 batch 4), with the <b>escalation gates it really
+   * uses</b> and a stand-in at level 3.
+   *
+   * <p>Levels 1 and 2 and both gates are the shipped code, which is what the
+   * escalation rate measures: how often the gateway would pay for a model call.
+   * Level 3 cannot be: the harness is hermetic and there is no model server, so
+   * the classifier model is replaced by the heuristic. The consequence is
+   * explicit in the report — the escalation rate is exact, the accuracy is a
+   * <em>lower bound</em>, the one where escalating buys nothing at all.
+   *
+   * @param marginBand the ambiguity band to score, so the report can sweep it
+   */
+  public static ComplexityClassifier cascadeClassifier(
+      EmbeddingModel embeddingModel, RoutingConfig config,
+      CalibrationUseCase calibrations, double marginBand) {
+
+    ClassifierProperties properties = propertiesOf(config);
+    properties.setCascadeMarginBand(marginBand);
+    HeuristicComplexityClassifier heuristic =
+        new HeuristicComplexityClassifier(properties);
+    return new CascadeComplexityClassifier(properties, heuristic,
+        new EmbeddingComplexityClassifier(embeddingModel, properties, heuristic,
+            calibrations),
+        new HeuristicLevelThree(properties, heuristic), calibrations,
+        new SimpleMeterRegistry());
+  }
+
+  /**
+   * Level 3 with the model taken out: it answers like the heuristic would.
+   *
+   * <p>A subclass rather than a mock so the cascade is wired exactly as Spring
+   * wires it, and so this file stays the only place where the harness knows
+   * anything about how the classifiers are built.
+   */
+  private static final class HeuristicLevelThree extends LlmComplexityClassifier {
+
+    private final HeuristicComplexityClassifier heuristic;
+
+    private HeuristicLevelThree(ClassifierProperties properties,
+                                HeuristicComplexityClassifier heuristic) {
+      super(null, properties, null, heuristic);
+      this.heuristic = heuristic;
+    }
+
+    @Override
+    public ClassificationOutcome classify(String userText) {
+      return heuristic.classify(userText);
+    }
   }
 
   private static ClassifierProperties propertiesOf(RoutingConfig config) {

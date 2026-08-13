@@ -71,6 +71,33 @@ class ClassifierProperties {
   private double routeSimilarityThreshold = 0.60;
 
   /**
+   * Cascade strategy: how close the runner-up route has to be for the tier to
+   * count as ambiguous and the classifier model to be worth calling
+   * ({@code top1 − top2} below this escalates).
+   *
+   * <p>The default is measured, not guessed: on the labelled test set it sends
+   * 24 % of requests to the model and those 24 % contain 53 % of the routing
+   * errors. Raising it buys more of the remaining errors at a proportional cost
+   * in model calls — the trade-off curve is in the evaluation report.
+   *
+   * <p>Deliberately <b>not</b> part of {@code RoutingConfig}, and so not part of
+   * the routing config version: that version exists to invalidate a conformal
+   * calibration when the similarities it was fitted on stop describing the
+   * system, and this band changes no similarity. See
+   * {@code docs/technical/routing.md}.
+   */
+  private double cascadeMarginBand = 0.02;
+
+  /**
+   * Whether a client naming a <b>registered</b> model id gets it, unclassified
+   * (v2 batch 4). On by default: the gateway is then a plain proxy for callers
+   * that already know what they want, and a router for everyone else. Turn it
+   * off to make routing mandatory — an unregistered model id is still a 400,
+   * pinning or not.
+   */
+  private boolean clientPinning = true;
+
+  /**
    * Embedding strategy: the semantic routes. Default routes carry bilingual
    * EN/FR examples (runtime data, like the premium keywords) so both languages
    * classify well out of the box; add languages by adding examples.
@@ -148,6 +175,22 @@ class ClassifierProperties {
 
   void setRouteSimilarityThreshold(double routeSimilarityThreshold) {
     this.routeSimilarityThreshold = routeSimilarityThreshold;
+  }
+
+  double getCascadeMarginBand() {
+    return cascadeMarginBand;
+  }
+
+  void setCascadeMarginBand(double cascadeMarginBand) {
+    this.cascadeMarginBand = cascadeMarginBand;
+  }
+
+  boolean isClientPinning() {
+    return clientPinning;
+  }
+
+  void setClientPinning(boolean clientPinning) {
+    this.clientPinning = clientPinning;
   }
 
   List<Route> getRoutes() {

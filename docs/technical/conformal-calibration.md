@@ -81,11 +81,17 @@ Three things worth saying plainly:
   calibrated 0.4588 removes almost all of those hand-overs, and English accuracy
   doubles. French loses four points on the way: a lower bar admits more
   near-misses, and French was already clearing the old one.
-- **The routing prediction set is currently not a decision.** At α = 0.10 the set
-  usually contains all three tiers, so the router still takes the top-ranked
-  route and records the set as evidence. Making the set act — escalate when it is
-  not a singleton — is batch 4's cascade; the column is filled now so that batch
-  has data the day it lands.
+- **The routing prediction set is not a decision on its own.** At α = 0.10 it
+  usually contains all three tiers — 70 of 100 test prompts — so the router takes
+  the top-ranked route and records the set as evidence. v2 batch 4 made the set
+  act, and had to measure exactly this to do it: escalating whenever the set is
+  not a singleton, as planned, would have called the classifier model for 70 % of
+  requests. The cascade therefore reads the set *and* the margin — empty
+  escalates, a singleton decides, several tiers escalate only inside a margin
+  band — which lands at 23 % escalation. Details in
+  [`routing.md`](routing.md#cascade-opt-in--cascadecomplexityclassifier-v2-batch-4).
+  The set is still worth its column: singletons are right 93 % of the time
+  against 79 % for the rest.
 - **The cache trades hit rate for correctness.** Fewer wrong answers means more
   model calls, which for a gateway that exists to save carbon is a real cost, not
   a free win. The dial is `gatewai.conformal.cache-alpha` and its consequences

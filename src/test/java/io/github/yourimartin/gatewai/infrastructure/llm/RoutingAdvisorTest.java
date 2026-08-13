@@ -71,12 +71,15 @@ class RoutingAdvisorTest {
   @Captor
   private ArgumentCaptor<ChatClientRequest> requestCaptor;
 
+  private ClassifierProperties properties;
   private RoutingAdvisor advisor;
 
   @BeforeEach
   void setUp() {
+    properties = new ClassifierProperties();
     advisor = new RoutingAdvisor(classifier, modelRegistry,
-        decisionRecorder, configVersion, CalibrationFixtures.none(0.60));
+        decisionRecorder, configVersion, CalibrationFixtures.none(0.60),
+        properties);
   }
 
   // ---- Routing tests ----

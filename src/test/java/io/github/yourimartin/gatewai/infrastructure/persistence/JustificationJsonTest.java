@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
@@ -126,6 +127,32 @@ class JustificationJsonTest {
 
     assertTrue(json.contains("\"type\":\"heuristic\""), json);
     assertTrue(json.contains("\"matchedKeyword\":\"debug\""), json);
+  }
+
+  @Test
+  void cascadeRoundTripsWithTheEvidenceItEscalatedOn() {
+    var original = new ClassificationJustification.Cascade(
+        CascadeLevel.LLM, 0.02,
+        new ClassificationJustification.Llm("multi-step", "qwen2.5:1.5b"),
+        new ClassificationJustification.Embedding(List.of(
+            new ClassificationJustification.RouteCandidate(
+                "casual-chat", ModelTier.LOCAL, "hello", 0.71, 1)),
+            0.71, 0.01, 0.60));
+
+    assertEquals(original, roundTrip(original));
+  }
+
+  @Test
+  void cascadeThatDecidedEarlyHasNoEvidence() {
+    var original = new ClassificationJustification.Cascade(
+        CascadeLevel.DETERMINISTIC, 0.02,
+        ClassificationJustification.Heuristic.of(HeuristicRule.CODE_FENCE),
+        null);
+
+    var restored = (ClassificationJustification.Cascade) roundTrip(original);
+
+    assertEquals(original, restored);
+    assertNull(restored.escalatedOn());
   }
 
   private static ClassificationJustification roundTrip(

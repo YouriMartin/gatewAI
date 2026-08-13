@@ -27,10 +27,11 @@ intensity (kWh/1k tokens), and tier. Default registry:
 
 ## Classification
 
-`ComplexityClassifier` (out port) has three implementations, selected per call
+`ComplexityClassifier` (out port) has four implementations, selected per call
 by `gatewai.classifier.strategy` through the `@Primary`
-`DelegatingComplexityClassifier` (the seam where a future cascade mode will
-live, see [Future work](#future-work-cascade-routing)):
+`DelegatingComplexityClassifier` — which is also where the **cascade** chains
+all three rather than choosing one (see
+[Cascade](#cascade-opt-in--cascadecomplexityclassifier-v2-batch-4)):
 
 The port returns a `ClassificationOutcome` — the tier **and** a
 `ClassificationJustification` (v2 batch 1). Every strategy already computed its
@@ -45,6 +46,7 @@ a new strategy cannot be added without every reader saying what it renders:
 | `Llm` | the model's own `reasoning` and the classifier model id |
 | `Fallback` | the strategy that stepped aside, the cause, what actually decided, and the evidence it had gathered first |
 | `FailSafe` | no strategy decided — premium was chosen defensively |
+| `Cascade` | how far the cascade went (`CascadeLevel`), the band in force, the justification of the level that decided, and the route scores it escalated on |
 
 `Fallback` is what makes a **degraded** decision distinguishable from a nominal
 one: the same tier reached by the heuristic means something quite different when
@@ -128,18 +130,76 @@ heuristic when `fallback-to-heuristic=true` (default), otherwise to
 `CLOUD_PREMIUM` (fail safe toward answer quality). `ClassifierProperties` holds the
 system prompt and rules.
 
-### Future work: cascade routing
+### Cascade (opt-in) — `CascadeComplexityClassifier` (v2 batch 4)
 
-Planned evolution (approach "C"): instead of a single strategy, chain them by
-increasing cost with confidence gates — deterministic signals (code fences,
-length) → embedding routes → **escalate to the LLM classifier only when the
-best route similarity lands in an ambiguous band** (e.g. between the threshold
-and threshold + 0.1). This mirrors the vLLM Semantic Router architecture:
-each stage is more expensive but rarely reached.
-`DelegatingComplexityClassifier` is the intended seam — a `cascade` strategy
-would live there, reusing the three existing classifiers unchanged. See
-[`../developpment/roadmap-v2.md`](../developpment/roadmap-v2.md) for the planned
-implementation with calibrated gates.
+Instead of choosing one strategy, chain all three by increasing cost with
+confidence gates (`gatewai.classifier.strategy=cascade`). The three classifiers
+are reused **unchanged**; the cascade owns only the gates.
+
+| Level | What runs | Cost | Reached when |
+|---|---|---|---|
+| 1 `DETERMINISTIC` | code fence, prompt past the premium length, blank text | free | always tried first |
+| 2 `EMBEDDING` | semantic routes | one local embedding (already paid by the cache, [ADR 0007](adr/0007-memoized-embedding-model.md)) | level 1 found no certainty |
+| 3 `LLM` | the classifier model | a model call | level 2's prediction set leaves the tier open |
+
+Level 1 is a **subset** of the heuristic — `deterministicSignal()`, not
+`classify()`. The premium keywords are deliberately excluded: "analyse" in a
+one-line question is a guess about intent, which is exactly the guess the routes
+make better. Level 1's default (`LOCAL`) is a fallback, not a signal, so "no
+rule fired" means *ask the next level*, never "cheapest tier".
+
+**The gate** (`ConformalPredictionSet.escalates`, domain) reads batch 3's
+prediction set — the tiers whose best route cleared the calibrated threshold:
+
+- **empty** → escalate. No route is credible, and the alternative is keywords;
+- **one tier** → decided. On the labelled set these are right 93 % of the time;
+- **several tiers** → escalate **only** when `top1 − top2 < cascade-margin-band`.
+
+That last line is the batch's main correction. Escalating on "the set is not a
+singleton", as planned, escalates **70 % of requests** — at α = 0.10 the set
+usually holds all three tiers (this is what batch 3 recorded as D23). The set
+alone is not discriminating; the margin is. The rule is identical with or
+without a calibration in force — the calibration moves the threshold the set is
+built on, not the way the set is read — so an uncalibrated gateway cascades on
+the fixed band and records `NOT_CALIBRATED` beside the decision.
+
+An **embedding outage is not an ambiguity**: when level 2 produced no scores at
+all (no routes, model unreachable) it has already handed over to the heuristic,
+and the cascade stops there rather than buy a model call for an outage.
+
+Measured at the shipped band of 0.02 on the labelled test set:
+
+| Margin band | Escalation rate | Error capture | Accuracy (worst case) |
+|---|---|---|---|
+| 0.01 | 15 % | 42 % | 81 % |
+| **0.02** | **23 %** | **61 %** | **77 %** |
+| 0.03 | 28 % | 73 % | 78 % |
+| 0.05 | 38 % | 84 % | 69 % |
+
+Read those columns together. **Escalation rate** is exact — levels 1–2 and both
+gates are the shipped code. **Error capture** is the share of the run's routing
+errors sitting inside the escalated bucket: at 0.02, 23 % of traffic holds 61 %
+of the errors, five times denser than the rest, so the gate is picking the right
+requests. **Accuracy is a lower bound only**: a hermetic run has no model
+server, so level 3 answers like the heuristic — the case where escalating buys
+nothing. The cascade is worth running exactly when the classifier model beats
+the heuristic on the requests it is handed; the 6-point drop from 83 % is what
+it costs when it does not. That is why the cascade is **opt-in and `embedding`
+remains the default**.
+
+Each level reached is recorded in `routing_decision.escalated_to` and counted in
+`gatewai_classifier_cascade_level_total{level}`, so the escalation rate — the
+cost of the cascade — is observable in production, not only in the harness.
+A decision that reached level 3 is `AMBIGUOUS_ESCALATED`, and carries the route
+scores it escalated on as evidence.
+
+The band is set through `gatewai.classifier.cascade-margin-band` and is
+deliberately **not** part of `RoutingConfig` — and therefore not part of
+`routing_config_version`. That version exists to invalidate a conformal
+calibration when the similarities it was fitted on stop describing the system;
+the band changes no similarity, and making it bump the version would force a
+recalibration for a knob the calibration does not depend on. Exposing it in the
+admin API is v2 batch 9's work.
 
 The request embedding is **already shared**: `MemoizingEmbeddingModel` memoizes
 it per request, so the cache search, this classifier and the cache store use one
@@ -152,15 +212,20 @@ vector instead of three
 `HIGHEST_PRECEDENCE + 1` (right after the cache). On `adviseCall`:
 
 1. Extract the user text; blank → pass through.
-2. `tier = classifier.classify(userText)`.
-3. `candidates = modelRegistry.findByTier(tier)`. If empty, log and pass through
+2. If the client named a **registered** model id and
+   `gatewai.classifier.client-pinning` is on (default): honour it, leave the
+   prompt untouched, record `CLIENT_PINNED` and stop (v2 batch 4). An
+   **unregistered** id is not honoured — the egress has no fallback provider,
+   so honouring it would turn a routed request into a 400.
+3. `tier = classifier.classify(userText)`.
+4. `candidates = modelRegistry.findByTier(tier)`. If empty, log and pass through
    (use the default model).
-4. Otherwise take the first candidate and **rewrite the prompt** with that model
+5. Otherwise take the first candidate and **rewrite the prompt** with that model
    id (`reroutePrompt` preserves temperature/maxTokens/topP), then
    `chain.nextCall(routedRequest)`.
 
-So the **requested `model` is a hint**: the router overrides it with the tier's
-configured model id. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
+So the **requested `model` is a hint unless it is registered**: an unknown id is
+overridden by the tier's configured model, a known one is honoured as sent. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
 streamed prompt the same way.
 
 ## Traced decisions (v2 batch 2)
@@ -171,6 +236,10 @@ justification as JSONB, a one-word `decision_reason`
 (`MATCH` · `BELOW_THRESHOLD_FALLBACK` · `ERROR_FALLBACK` · `NO_MODEL_FOR_TIER`),
 the decision-only latency, and the version of the rules in force. See
 [`data-model.md`](data-model.md).
+
+A **pinned** request is the one row with no justification at all: no classifier
+ran, and `chosen_model_id` / `chosen_tier` already say everything a `Pinned`
+justification variant could have carried.
 
 Two things it deliberately does **not** do. It never blocks or throws — a
 database that is down costs the trace, not the completion. And **a cache hit
@@ -210,9 +279,9 @@ with zero API keys. Cloud is opt-in by repointing a tier's registry entry.
 
 There is **no fallback provider**: a model id absent from the registry (or
 mapping to an unbuilt instance) raises `UnknownModelException`, returned to the
-client as an OpenAI-style 400 (`unknown_model`). Clients may also pin any
-registered model id directly — routing only rewrites it when it classifies the
-prompt.
+client as an OpenAI-style 400 (`unknown_model`). Clients may pin any registered
+model id directly (v2 batch 4): the router honours it and skips classification
+altogether.
 
 Implementation note: `OllamaChatModel` hard-casts the prompt options to
 `OllamaChatOptions`, so the delegating model rebuilds the prompt with native
@@ -223,8 +292,9 @@ Ollama instances pull their registry models at startup per
 
 ## Configuration reference
 
-`gatewai.classifier.*`: `strategy` (`embedding`|`heuristic`|`llm`), `model-id`
-(blank → entry model), `temperature`, `fallback-to-heuristic`,
+`gatewai.classifier.*`: `strategy` (`embedding`|`heuristic`|`llm`|`cascade`),
+`cascade-margin-band` (0..1, default 0.02), `client-pinning` (default true),
+`model-id` (blank → entry model), `temperature`, `fallback-to-heuristic`,
 `entry-length-threshold`, `premium-length-threshold`, `premium-keywords`,
 `route-similarity-threshold` (0..1, default 0.60),
 `routes[n].name` / `routes[n].tier` / `routes[n].examples[m]` (defaults with

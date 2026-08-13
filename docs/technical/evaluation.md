@@ -149,9 +149,8 @@ Negative cases are built from the ways meaning flips under small edits:
 
 ## Metrics
 
-All six metrics named in the v2 plan appear in `report.json`. Two are emitted as
-`null` with the reason attached rather than omitted, so the report's shape stops
-changing and the gaps stay visible.
+All six metrics named in the v2 plan appear in `report.json`, and since v2
+batch 4 all six are measured.
 
 | Metric | Status |
 |---|---|
@@ -159,10 +158,10 @@ changing and the gaps stay visible.
 | Cache accuracy | measured (false-positive / false-negative rates + a threshold sweep) |
 | Estimated savings | measured (€ and gCO2 vs an all-premium baseline) |
 | Decision latency p50/p95 | recorded live at fixture time |
-| Escalation rate | `null` — no cascade to escalate through until batch 4 |
+| Escalation rate | measured since v2 batch 4 (see below) |
 | Conformal coverage | measured since v2 batch 3 (see below) |
 
-Three deliberate choices:
+Four deliberate choices:
 
 - **Accuracy is split by direction.** Over-routing wastes money and carbon;
   under-routing returns an answer the chosen tier could not give. Both cost one
@@ -172,12 +171,43 @@ Three deliberate choices:
   savings section, with the count.
 - **Decision latency cannot be measured hermetically** — replay is a hash-map
   lookup. It is measured live during recording and labelled as such.
+- **The cascade's accuracy is published as a lower bound, not a number.** The
+  escalation rate is exact — levels 1 and 2 and both gates are the shipped code
+  — but level 3 is a model, and a hermetic run has none. It is stubbed by the
+  heuristic, which is the case where escalating buys nothing, so the accuracy
+  printed beside the escalation rate is the floor rather than the expectation.
 
 The savings figure rests on two stated assumptions: prompt tokens ≈ characters/4,
 and a constant 400 completion tokens per request whichever tier serves it
 (holding it constant is what isolates the routing decision). It runs through the
 production `CarbonCalculator` and the shipped registry coefficients, so it moves
 when they move.
+
+### Escalation rate (v2 batch 4)
+
+Scored at five margin bands, the shipped one among them, so the default is
+visibly a trade-off:
+
+| Margin band | Escalation rate | Error capture | Accuracy (lower bound) |
+|---|---|---|---|
+| 0.01 | 15 % | 42 % | 81 % |
+| **0.02 (shipped)** | **23 %** | **61 %** | **77 %** |
+| 0.03 | 28 % | 73 % | 78 % |
+| 0.05 | 38 % | 84 % | 69 % |
+| 0.08 | 49 % | 92 % | 63 % |
+
+**Error capture** is the share of the run's routing errors sitting inside the
+escalated bucket — the ceiling on what escalating can fix, since the cascade can
+only correct a decision it escalated. At the shipped band, 23 % of traffic holds
+61 % of the errors: five times denser than the rest, so the gate is picking the
+right requests rather than requests at random (asserted on every build).
+
+The accuracy column is the pessimistic bound described above, and it is
+**below** the 83 % the routes reach alone. That is not a defect of the cascade,
+it is its condition of use stated numerically: handing 23 % of traffic to a
+34 %-accurate classifier costs 6 points, so the cascade pays only where the
+classifier model beats the heuristic on the requests it is given. The build
+holds that worst case at no more than 8 points (`cascadeWorstCaseAccuracyLossMax`).
 
 ---
 

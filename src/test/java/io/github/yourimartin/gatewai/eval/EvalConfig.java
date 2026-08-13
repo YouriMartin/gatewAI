@@ -86,6 +86,14 @@ final class EvalConfig {
     return number("gatewai.cache.similarity-threshold", 0.92);
   }
 
+  /**
+   * The cascade's ambiguity band (v2 batch 4): how close the runner-up route
+   * has to be for the classifier model to be worth calling.
+   */
+  double cascadeMarginBand() {
+    return number(CLASSIFIER_PREFIX + "cascade-margin-band", 0.02);
+  }
+
   /** Risk level the routing calibration is fitted at (v2 batch 3). */
   double routingAlpha() {
     return number("gatewai.conformal.routing-alpha", 0.10);

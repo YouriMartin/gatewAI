@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -35,6 +36,7 @@ final class RoutingEvaluator {
     Map<String, Score> byLanguage = new LinkedHashMap<>();
     Map<String, Integer> effectiveStrategies = new LinkedHashMap<>();
     Map<String, Integer> fallbackCauses = new LinkedHashMap<>();
+    Map<String, Integer> cascadeLevels = new LinkedHashMap<>();
     List<Miss> misses = new ArrayList<>();
     List<Prediction> predictions = new ArrayList<>();
     List<Double> margins = new ArrayList<>();
@@ -42,6 +44,8 @@ final class RoutingEvaluator {
     int correct = 0;
     int overRouted = 0;
     int underRouted = 0;
+    int escalated = 0;
+    int errorsEscalated = 0;
 
     for (RoutingSample sample : samples) {
       ClassificationOutcome outcome = classifier.classify(sample.prompt());
@@ -58,6 +62,15 @@ final class RoutingEvaluator {
       }
 
       ClassificationJustification justification = outcome.justification();
+      if (justification instanceof ClassificationJustification.Cascade cascade) {
+        cascadeLevels.merge(cascade.level().name(), 1, Integer::sum);
+        if (cascade.level() == CascadeLevel.LLM) {
+          escalated++;
+          if (!hit) {
+            errorsEscalated++;
+          }
+        }
+      }
       effectiveStrategies.merge(justification.strategy().name(), 1, Integer::sum);
       if (justification instanceof ClassificationJustification.Fallback fallback) {
         fallbackCauses.merge(fallback.cause().name(), 1, Integer::sum);
@@ -79,6 +92,7 @@ final class RoutingEvaluator {
 
     return new Result(dataset, strategy, samples.size(), correct, overRouted, underRouted,
         confusion, predicted, byTag, byLanguage, effectiveStrategies, fallbackCauses,
+        cascadeLevels, escalated, errorsEscalated,
         mean(margins), List.copyOf(misses), List.copyOf(predictions));
   }
 
@@ -95,6 +109,13 @@ final class RoutingEvaluator {
       case ClassificationJustification.Fallback fallback ->
           fallback.evidence() instanceof ClassificationJustification.Embedding embedding
               ? Optional.of(embedding) : Optional.empty();
+      case ClassificationJustification.Cascade cascade -> {
+        Optional<ClassificationJustification.Embedding> escalatedOn =
+            cascade.escalatedOn() == null
+                ? Optional.empty() : embeddingEvidence(cascade.escalatedOn());
+        yield escalatedOn.isPresent()
+            ? escalatedOn : embeddingEvidence(cascade.decided());
+      }
       default -> Optional.empty();
     };
   }
@@ -122,6 +143,14 @@ final class RoutingEvaluator {
    * @param byLanguage          accuracy per language: the known FR risk, measured
    * @param effectiveStrategies which strategy actually decided, and how often
    * @param fallbackCauses      why the configured strategy stepped aside
+   * @param cascadeLevels       how far the cascade went, and how often — empty
+   *                            for every other strategy
+   * @param escalated           cases that reached the classifier model: the cost
+   *                            of the cascade, stated in requests
+   * @param errorsEscalated     misrouted cases <b>inside</b> that bucket. The
+   *                            cascade can only fix what it escalates, so this
+   *                            over the total number of errors is the ceiling on
+   *                            what escalating can buy
    * @param meanMargin          mean {@code top1 - top2} over decisions that had
    *                            route scores; batch 3 calibrates on this
    * @param misses              every wrong case, named, so a regression is
@@ -136,10 +165,23 @@ final class RoutingEvaluator {
                 Map<String, Score> byTag, Map<String, Score> byLanguage,
                 Map<String, Integer> effectiveStrategies,
                 Map<String, Integer> fallbackCauses,
+                Map<String, Integer> cascadeLevels,
+                int escalated, int errorsEscalated,
                 double meanMargin, List<Miss> misses, List<Prediction> predictions) {
 
     double accuracy() {
       return total == 0 ? 0 : (double) correct / total;
+    }
+
+    /** Share of requests that reached the classifier model. */
+    double escalationRate() {
+      return total == 0 ? 0 : (double) escalated / total;
+    }
+
+    /** Share of this run's errors that escalating had a chance to fix. */
+    double errorCapture() {
+      int errors = total - correct;
+      return errors == 0 ? 0 : (double) errorsEscalated / errors;
     }
   }
 

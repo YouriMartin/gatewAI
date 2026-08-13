@@ -90,8 +90,9 @@ class GatewayMcpTools {
       @ToolParam(description = "The user prompt to complete.")
       String prompt,
       @ToolParam(required = false,
-          description = "Optional preferred model id; the router may override "
-              + "it based on the prompt's complexity.")
+          description = "Optional model id. A registered id is honoured as sent "
+              + "(no classification); anything else is overridden by the router "
+              + "based on the prompt's complexity.")
       String model) {
     String requestedModel = (model == null || model.isBlank()) ? null : model.trim();
     LlmRequest request = new LlmRequest(

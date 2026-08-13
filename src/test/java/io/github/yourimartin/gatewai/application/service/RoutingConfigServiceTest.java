@@ -68,6 +68,22 @@ class RoutingConfigServiceTest {
   }
 
   @Test
+  void acceptsCascadeStrategyWithRoutes() {
+    service.update(config("cascade", ROUTES));
+
+    verify(port).update(any());
+  }
+
+  @Test
+  void rejectsCascadeWithoutRoutes() {
+    // Level 2 of the cascade is the semantic routes: without them the cascade
+    // is the heuristic and a model call, which is the worst of both.
+    assertThrows(IllegalArgumentException.class, () ->
+        service.update(config("cascade", List.of())));
+    verify(port, never()).update(any());
+  }
+
+  @Test
   void strategyIsCaseInsensitive() {
     service.update(config("LLM", ROUTES));
 

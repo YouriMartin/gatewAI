@@ -71,7 +71,11 @@ key cannot be recovered — create a new one.
 Read and hot-tune the router without a restart:
 
 - **Strategy** — `embedding` (default: semantic routes, works in any language),
+  `cascade` (routes first, classifier model only on an ambiguous tier),
   `heuristic` (free: length + keywords) or `llm` (small-model classifier).
+  `embedding` and `cascade` need at least one route; the cascade's ambiguity
+  band is set in configuration
+  (`gatewai.classifier.cascade-margin-band`), not here.
 - **Entry threshold (chars)** — text longer than this routes at least to the entry
   tier (heuristic, and fallback of the other strategies).
 - **Premium threshold (chars)** — text longer than this routes to premium.

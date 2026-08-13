@@ -25,7 +25,7 @@ following details do **not** hold and change the work.
 |---|---|---|---|
 | D1 | The shared request embedding is a plumbing change | `SearchRequest` (Spring AI 2.0) exposes **only a `String` query** — no precomputed-vector entry point. `PgVectorStore.getQueryEmbedding` calls `embeddingModel.embed(query)` internally (`PgVectorStore.java:391`) | Passing a vector into the cache would mean bypassing `VectorStore`, which [ADR 0005](../technical/adr/0005-depend-on-vectorstore-interface.md) forbids. **Solution: memoize at the `EmbeddingModel` level** — see 0.2 |
 | D2 | A correlation id exists (OTel) | `RequestContext(clientId, traceId)` exists, but `traceId` is bound to **`null`** (`ApiKeyAuthenticationFilter.java:62`) and nothing ever sets it. **No tracing dependency in `pom.xml`** (no `micrometer-tracing`, no OTel) | `correlation_id` is a new capability, not a field to read. New batch **0.3**. OTel spans (Lot 6 of the spec) require a new dependency — treated as optional |
-| D3 | `CLIENT_PINNED` traces an existing behaviour | `RoutingAdvisor.adviseCall` classifies **unconditionally** on any non-blank user text and always rewrites the model id (`RoutingAdvisor.java:44-68`). A client cannot pin a model today; `routing.md` overstates this | Either implement real pinning (recommended, see 4.2) or drop the enum value. Tracing a reason that can never occur is worse than not having it |
+| D3 | `CLIENT_PINNED` traces an existing behaviour | `RoutingAdvisor.adviseCall` classifies **unconditionally** on any non-blank user text and always rewrites the model id (`RoutingAdvisor.java:44-68`). A client cannot pin a model today; `routing.md` overstates this | Either implement real pinning (recommended, see 4.2) or drop the enum value. Tracing a reason that can never occur is worse than not having it. **Settled in batch 4: implemented** |
 | D4 | `runner_up_score` is free | `gatewai.cache.top-k=1` and `similarity-threshold=0.92` are applied **inside the store** | With top-k=1 there is no runner-up, and with a 0.92 floor a runner-up below threshold is never returned. Observing the cache margin honestly requires top-k ≥ 2 and moving the threshold decision into the advisor — see 2.2 |
 | D5 | `ClassificationResult` name collision | Confirmed: package-private `record ClassificationResult(ModelTier tier, String reasoning)` in `infrastructure.llm`. Note the field is `reasoning`, not `reason` | New return type named **`ClassificationOutcome`**; the LLM justification carries `reasoning` verbatim |
 | D6 | `carbon_record_ref` points at the carbon record | `RequestLog.id` is a `UUID` generated in `ChatCompletionService` **after** the call; advisors never see it. `RequestLog` has no correlation column | The join key must be the correlation id: add `correlationId` to `RequestLog` + `RequestLogEntity`, and reference *that*, not a FK to `request_log.id` |
@@ -362,12 +362,13 @@ Adversarial cases are tagged so they can be scored separately: `keyword-trap`
 `cross-lingual` and `volatile` on the cache side. A test asserts no evaluation
 prompt is a copy of a route example — it caught five while the set was written.
 
-### 5.2 Metrics — ✅ (four of six; two are gated on later batches)
+### 5.2 Metrics — ✅ (four of six at the time; all six since batch 4)
 
 Routing accuracy, cache false-positive/false-negative rates, estimated savings
-and decision latency are measured. Escalation rate and conformal coverage are
-emitted as `null` with their reason attached — batch 4 and batch 3 respectively —
-so the report's shape stops changing and the gaps stay visible.
+and decision latency were measured here. Escalation rate and conformal coverage
+were emitted as `null` with their reason attached — batch 4 and batch 3
+respectively — so the report's shape stopped changing and the gaps stayed
+visible. Batch 3 filled in coverage, batch 4 the escalation rate.
 
 Routing accuracy is split by **direction**: over-routing wastes money and carbon,
 under-routing returns an answer the chosen tier could not give. Same point of
@@ -521,40 +522,97 @@ Verified end to end against a live Postgres and Ollama, not only in unit tests:
 
 ---
 
-## Batch 4 — Calibrated cascade routing
+## Batch 4 — Calibrated cascade routing — ✅ done
 
 The evolution already planned in
 [`../technical/routing.md`](../technical/routing.md), with batch 3's gates.
 
-### 4.1 The cascade
+Three corrections found while implementing:
 
-1. Deterministic signals (code fence, length) — zero cost
-2. Embedding routes — one local embedding call (free after 0.2 if the cache
-   already embedded)
-3. LLM classifier — reached **only** when level 2's conformal set is not a
-   singleton
+- **D24 — the prediction set is not a gate; the set *and* the margin are.** The
+  plan said "escalate when level 2's conformal set is not a singleton". Measured
+  on the labelled test set at α = 0.10, that fires on **70 of 100 prompts**: the
+  set usually holds all three tiers, exactly as D23 had recorded. A cascade that
+  calls the model for 70 % of requests is a cost, not a saving. The shipped gate
+  keeps the set where it discriminates (empty → escalate, singleton → decide —
+  singletons are right 93 % of the time against 79 % for the rest) and settles
+  the ambiguous case on the **margin** batch 3 said would become the gate:
+  escalate only when `top1 − top2 < cascade-margin-band`. At the shipped 0.02
+  that is 23 % escalation holding 61 % of the errors.
+- **D25 — pinning is the absence of a classification, so it gets no
+  justification.** A `Pinned` variant of the sealed hierarchy would have carried
+  nothing that `chosen_model_id` and `chosen_tier` do not already hold, and
+  would have forced `strategy()` — "the strategy that decided" — to return null
+  or a fake enum value. `decision_reason = CLIENT_PINNED` with a null
+  justification says the same thing; `RoutingDecision` now states the invariant
+  (justification null **exactly when** the reason is `CLIENT_PINNED`), so batch
+  1's "an explanation can never go missing" keeps a single, named exception.
+- **D26 — the ambiguity band must not be part of `routing_config_version`.**
+  Every other routing knob is, and the band changes outcomes, so it looked like
+  it belonged. It does not: that version exists to detect when a fitted
+  calibration stops describing the system, and the band changes no similarity.
+  Including it would mark the routing calibration `STALE` — a 14 s refit — every
+  time an operator tuned a knob the calibration does not depend on. It is
+  therefore `gatewai.classifier.cascade-margin-band` (config, documented), and
+  admin-API exposure moves to batch 9 with the rest of the routing UI work.
 
-Implemented as a `CASCADE` value of `ClassifierStrategy`, dispatched in
-`DelegatingComplexityClassifier` — the seam designed for it — **reusing the three
-classifiers unchanged**. Note that level 1 is a *subset* of
-`HeuristicComplexityClassifier` (code fence and length, not keywords), so it
-needs an explicit entry point rather than a call to `classify`.
+### 4.1 The cascade — ✅
 
-Each level reached is recorded in `escalated_to`. The share of requests reaching
-level 3 is a first-class metric: it is the cost of the cascade.
+`CASCADE` is a value of `ClassificationStrategy`, dispatched in
+`DelegatingComplexityClassifier` — the seam designed for it — reusing the three
+classifiers unchanged. Level 1 is the heuristic's *certain* subset through a new
+`deterministicSignal()` entry point (code fence, premium length, blank), never
+`classify()`: the premium keywords are a guess about intent, which is what the
+routes do better, and the heuristic's `LOCAL` default is a fallback rather than a
+signal.
 
-### 4.2 Client pinning (see D3)
+The gate is `ConformalPredictionSet.escalates` in the domain, shared with the
+`RoutingAdvisor` so the set recorded on a decision is by construction the set it
+escalated on. The rule is identical calibrated or not — the calibration moves the
+threshold the set is built on, not how the set is read — so an uncalibrated
+gateway cascades on the fixed band and records `NOT_CALIBRATED`, which is the
+acceptance criterion "uses the fixed band and says so".
 
-Decide and implement, so `CLIENT_PINNED` is a real reason: when the client
-requests a **registered** model id, skip classification and honour it, recording
-`CLIENT_PINNED`. This matches what `routing.md` already claims and makes the
-gateway usable as a plain proxy for callers who know what they want. If rejected,
-remove the enum value instead.
+An embedding **outage** is not an ambiguity: with no route scores at all, level 2
+has already handed over to the heuristic and the cascade stops there rather than
+buy a model call for an outage.
 
-### Acceptance
+Each level reached is recorded in `routing_decision.escalated_to` (migration
+`V5`) and counted in `gatewai_classifier_cascade_level_total{level}`, so the
+escalation rate is observable in production and not only in the harness.
 
-Existing strategies stay selectable and unchanged · the escalation rate is
-exposed · without a valid calibration, the cascade uses the fixed band and says so.
+### 4.2 Client pinning (D3) — ✅ implemented
+
+A client naming a **registered** model id gets it, unclassified, traced as
+`CLIENT_PINNED`. An **unregistered** id is still routed: the egress has no
+fallback provider, so honouring it would turn a routed request into a 400.
+`gatewai.classifier.client-pinning=false` makes routing mandatory again. This
+makes the gateway a plain proxy for callers who know what they want — and makes
+what `routing.md` already claimed true, which is what D3 asked for.
+
+### Acceptance — all met
+
+- **Existing strategies stay selectable and unchanged** — `embedding` remains
+  the default; the cascade is opt-in.
+- **The escalation rate is exposed** — in the decision table, in Prometheus, and
+  in the evaluation report, swept across five margin bands with the shipped one
+  among them and asserted against a committed ceiling.
+- **Without a valid calibration the cascade uses the fixed band and says so.**
+
+### What the numbers say, including the uncomfortable part
+
+At the shipped band, escalation targets errors: 23 % of traffic holds 61 % of the
+routing errors, five times the density of the rest — asserted on every build, so
+a gate that started picking requests at random would fail it.
+
+What the harness **cannot** say is whether escalating fixes them. Level 3 is a
+model and a hermetic run has none, so it is stubbed by the heuristic: the case
+where escalating buys nothing. That floor is 77 % against 83 % for the routes
+alone — handing 23 % of traffic to a 34 %-accurate classifier costs 6 points.
+The cascade pays exactly where the classifier model beats the heuristic on the
+requests it is given, and the build holds the worst case at ≤ 8 points
+(`cascadeWorstCaseAccuracyLossMax`). Publishing that bound rather than a
+flattering single number is the point of having a harness at all.
 
 ---
 
@@ -731,7 +789,7 @@ Batch 1   Uniform explanation contract                            ✅ done
 Batch 2   Routing + cache decision persistence           ✅ done
 Batch 5   Evaluation                                                ✅ done
 Batch 3   Conformal calibration (cache first)                       ✅ done
-Batch 4   Calibrated cascade routing (+ client pinning)
+Batch 4   Calibrated cascade routing (+ client pinning)          ✅ done
 Batch 6   Observability
 Batch 7   Occlusion attribution
 Batch 8   Counterfactuals
@@ -746,8 +804,10 @@ branch. `./mvnw test` green before every commit.
 
 ## Open decisions (to settle before batch 0)
 
-1. **Client pinning (D3)** — implement real pinning in 4.2, or drop
-   `CLIENT_PINNED`? Recommendation: implement; the docs already promise it.
+1. **Client pinning (D3)** — ✅ **settled in batch 4**: implemented. A
+   registered model id is honoured and traced as `CLIENT_PINNED`; an
+   unregistered one is still routed; `client-pinning=false` makes routing
+   mandatory.
 2. **Opt-in plaintext prompt storage** — needed for true replay of an
    `explain` on a past decision (a hash cannot be re-embedded). Include in v2
    behind a default-off flag with retention, or defer to the guardrails/PII work?
@@ -765,10 +825,9 @@ branch. `./mvnw test` green before every commit.
 - [x] All three classifiers produce a usable justification
 - [x] Cache and routing decisions persisted and versioned (replay API: batch 9)
 - [x] Cache and routing thresholds calibrated, with a tested fallback to fixed values
-- [ ] Cascade routing implemented, its gates calibrated
-- [~] Six quality metrics published and tracked in CI — four measured and
-      baselined, escalation rate and conformal coverage emitted as `null` until
-      batches 4 and 3 land
+- [x] Cascade routing implemented, its gates calibrated
+- [x] Six quality metrics published and tracked in CI — all six measured and
+      baselined since batch 4
 - [x] The request embedding is computed once per request
 - [ ] The dashboard exposes "why this decision"
 - [x] Versioned migrations in place

@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
@@ -34,6 +35,7 @@ final class JustificationJson {
   private static final String LLM = "llm";
   private static final String FALLBACK = "fallback";
   private static final String FAIL_SAFE = "failSafe";
+  private static final String CASCADE = "cascade";
 
   private JustificationJson() {
   }
@@ -89,6 +91,14 @@ final class JustificationJson {
         node.set("evidence", fallback.evidence() == null
             ? null : toNode(fallback.evidence()));
       }
+      case ClassificationJustification.Cascade cascade -> {
+        node.put(TYPE, CASCADE);
+        node.put("level", cascade.level().name());
+        node.put("marginBand", cascade.marginBand());
+        node.set("decided", toNode(cascade.decided()));
+        node.set("escalatedOn", cascade.escalatedOn() == null
+            ? null : toNode(cascade.escalatedOn()));
+      }
       case ClassificationJustification.FailSafe failSafe -> {
         node.put(TYPE, FAIL_SAFE);
         node.put("fallbackFrom", failSafe.fallbackFrom().name());
@@ -123,6 +133,11 @@ final class JustificationJson {
           FallbackCause.valueOf(text(node, "cause")),
           fromNode(node.get("effective")),
           fromNode(node.get("evidence")));
+      case CASCADE -> new ClassificationJustification.Cascade(
+          CascadeLevel.valueOf(text(node, "level")),
+          node.path("marginBand").asDouble(),
+          fromNode(node.get("decided")),
+          fromNode(node.get("escalatedOn")));
       case FAIL_SAFE -> new ClassificationJustification.FailSafe(
           ClassificationStrategy.valueOf(text(node, "fallbackFrom")),
           FallbackCause.valueOf(text(node, "cause")));

@@ -356,6 +356,7 @@ async function revoke(id: string) {
             Strategy
             <select bind:value={routing.strategy}>
               <option value="embedding">embedding (semantic routes)</option>
+              <option value="cascade">cascade (routes, model on ambiguity)</option>
               <option value="heuristic">heuristic</option>
               <option value="llm">llm</option>
             </select>

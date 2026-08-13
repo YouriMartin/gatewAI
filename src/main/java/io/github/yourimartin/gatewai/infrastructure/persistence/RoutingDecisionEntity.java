@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -84,6 +85,15 @@ class RoutingDecisionEntity {
   @Column(name = "conformal_alpha", updatable = false)
   private Double conformalAlpha;
 
+  /**
+   * The deepest cascade level reached (v2 batch 4). Null when the cascade was
+   * not the configured strategy, so the escalation rate is
+   * {@code count(escalated_to = 'LLM') / count(escalated_to is not null)}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "escalated_to", updatable = false, length = 32)
+  private CascadeLevel escalatedTo;
+
   protected RoutingDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -107,6 +117,7 @@ class RoutingDecisionEntity {
         : decision.conformalSet().stream().map(Enum::name)
             .collect(Collectors.joining(","));
     this.conformalAlpha = decision.conformalAlpha();
+    this.escalatedTo = decision.escalatedTo();
   }
 
   RoutingDecision toDomain() {
@@ -115,7 +126,7 @@ class RoutingDecisionEntity {
         embeddingModel, routingConfigVersion, strategy, effectiveStrategy,
         JustificationJson.fromJson(justification), decisionReason,
         chosenTier, chosenModelId, routingLatencyMs,
-        conformalSetToDomain(), conformalAlpha);
+        conformalSetToDomain(), conformalAlpha, escalatedTo);
   }
 
   private List<ModelTier> conformalSetToDomain() {

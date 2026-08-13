@@ -16,7 +16,10 @@ import org.springframework.stereotype.Service;
 class RoutingConfigService implements RoutingConfigUseCase {
 
   private static final Set<String> STRATEGIES =
-      Set.of("heuristic", "embedding", "llm");
+      Set.of("heuristic", "embedding", "llm", "cascade");
+
+  /** Strategies whose level 2 (or only level) needs semantic routes. */
+  private static final Set<String> NEED_ROUTES = Set.of("embedding", "cascade");
 
   private final RoutingConfigPort port;
 
@@ -40,7 +43,7 @@ class RoutingConfigService implements RoutingConfigUseCase {
         ? null : config.strategy().toLowerCase(Locale.ROOT);
     if (strategy == null || !STRATEGIES.contains(strategy)) {
       throw new IllegalArgumentException(
-          "strategy must be 'heuristic', 'embedding' or 'llm'");
+          "strategy must be 'heuristic', 'embedding', 'llm' or 'cascade'");
     }
     if (config.entryLengthThreshold() < 0 || config.premiumLengthThreshold() < 0) {
       throw new IllegalArgumentException("thresholds must be >= 0");
@@ -58,9 +61,9 @@ class RoutingConfigService implements RoutingConfigUseCase {
   }
 
   private static void validateRoutes(RoutingConfig config, String strategy) {
-    if ("embedding".equals(strategy) && config.routes().isEmpty()) {
+    if (NEED_ROUTES.contains(strategy) && config.routes().isEmpty()) {
       throw new IllegalArgumentException(
-          "embedding strategy requires at least one route");
+          strategy + " strategy requires at least one route");
     }
     Set<String> names = new HashSet<>();
     for (SemanticRoute route : config.routes()) {

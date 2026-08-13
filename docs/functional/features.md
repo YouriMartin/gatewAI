@@ -52,14 +52,24 @@ to the cheapest **tier** that can handle it:
 - `CLOUD_PREMIUM` — complex requests (architecture, debugging, algorithms,
   security analysis, long reasoning) needing a premium model.
 
-Two classification strategies are available:
+Four classification strategies are available:
 
-- **Heuristic** (default) — zero cost, zero latency. Uses text length and
-  keyword/code-block detection. Routes to premium on signals like code blocks,
-  long text (> 500 chars by default), or keywords such as *refactor*,
-  *architecture*, *analyze*, *debug*, *security* (bilingual EN/FR keyword list).
+- **Embedding** (default) — semantic routes: the request is compared to example
+  prompts describing each route, in embedding space, so it works in any
+  language. One local embedding call, no LLM call.
+- **Heuristic** — zero cost, zero latency. Uses text length and keyword/code-block
+  detection. Routes to premium on signals like code blocks, long text (> 500
+  chars by default), or keywords such as *refactor*, *architecture*, *analyze*,
+  *debug*, *security* (bilingual EN/FR keyword list).
 - **LLM** — a small/cheap model returns a structured tier label. More nuanced, at
   the cost of a small classification call.
+- **Cascade** — the three chained by increasing cost: deterministic signals, then
+  the semantic routes, then the classifier model **only** when the routes leave
+  the tier genuinely open (~23 % of requests on the labelled set). Opt-in; worth
+  it where the classifier model is better than the heuristic on hard prompts.
+
+A client that names a **registered** model id gets it directly: routing only
+classifies requests that do not pin a model.
 
 The thresholds, keywords and strategy are **hot-configurable** at runtime (see
 Routing configuration below) — no restart.

@@ -184,6 +184,45 @@ public sealed interface ClassificationJustification {
   }
 
   /**
+   * A cascade decision (v2 batch 4): how far it had to go, and what decided
+   * there.
+   *
+   * <p>Wrapping rather than flattening keeps two questions separable — which
+   * classifier produced the tier ({@link #strategy()}, unchanged for every
+   * reader that already understood the three strategies) and what the cascade
+   * paid to get it ({@link #level()}). The evidence that triggered an escalation
+   * rides along for the same reason a below-threshold hand-over carries the
+   * route scores: "the top two routes were 0.011 apart, inside a 0.02 band" is
+   * the whole explanation of why a model call was worth making.
+   *
+   * @param level       the deepest level reached, which is what the decision cost
+   * @param marginBand  the ambiguity band in force at decision time
+   * @param decided     the justification of the level that produced the tier
+   * @param escalatedOn what the embedding level had computed when it handed over,
+   *                    null when it was not reached or did not escalate
+   */
+  record Cascade(CascadeLevel level, double marginBand,
+                 ClassificationJustification decided,
+                 ClassificationJustification escalatedOn)
+      implements ClassificationJustification {
+
+    public Cascade {
+      if (level == null) {
+        throw new IllegalArgumentException("level is required");
+      }
+      if (decided == null) {
+        throw new IllegalArgumentException("decided justification is required");
+      }
+    }
+
+    /** The strategy that decided at {@link #level()} — never {@code CASCADE}. */
+    @Override
+    public ClassificationStrategy strategy() {
+      return decided.strategy();
+    }
+  }
+
+  /**
    * No strategy decided: the request was routed to the premium tier defensively.
    *
    * <p>Happens when the LLM classifier fails and {@code fallback-to-heuristic}

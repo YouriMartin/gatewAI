@@ -128,7 +128,8 @@ class AsyncDecisionRecorderTest {
         "nomic-embed-text", "cfgversion0000001",
         ClassificationStrategy.EMBEDDING, ClassificationStrategy.EMBEDDING,
         ClassificationJustification.Heuristic.of(HeuristicRule.DEFAULT),
-        DecisionReason.MATCH, ModelTier.LOCAL, "qwen2.5:0.5b", 4L, null, null);
+        DecisionReason.MATCH, ModelTier.LOCAL, "qwen2.5:0.5b", 4L, null, null,
+        null);
   }
 
   private static CacheDecision cacheDecision() {

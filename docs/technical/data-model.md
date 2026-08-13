@@ -57,14 +57,18 @@ decision. Both join back to `request_log` on `correlation_id`.
 differ on a hand-over) · `justification` (**JSONB**, the sealed
 `ClassificationJustification` from batch 1) · `decision_reason` ·
 `chosen_tier` / `chosen_model_id` · `routing_latency_ms` (the decision only,
-excluding the LLM call) · `conformal_set` / `conformal_alpha` (v2 batch 3).
+excluding the LLM call) · `conformal_set` / `conformal_alpha` (v2 batch 3) ·
+`escalated_to` (v2 batch 4).
+
+`decision_reason` ∈ `MATCH` · `AMBIGUOUS_ESCALATED` · `CLIENT_PINNED` ·
+`BELOW_THRESHOLD_FALLBACK` · `ERROR_FALLBACK` · `NO_MODEL_FOR_TIER`.
 
 `cache_decision`: `outcome` (`HIT` \| `MISS` \| `BYPASS` \| `ERROR`) ·
 `similarity_score` and `runner_up_score` (the implicit margin) · `threshold` ·
 `matched_entry_id` / `matched_entry_age_seconds` · `origin_correlation_id` ·
 `embedding_model` · `conformal_status` (v2 batch 3).
 
-Four properties worth knowing:
+Six properties worth knowing:
 
 - **A cache hit has no routing decision.** The cache runs upstream of the
   router, so a hit short-circuits before any routing happens. That asymmetry is
@@ -82,6 +86,17 @@ Four properties worth knowing:
   distinction explicitly (`EMPTY_SET` vs `NOT_CALIBRATED` vs
   `STALE_CALIBRATION`), which is what separates a deliberate refusal
   (`AMBIGUOUS`) from a plain miss.
+- **`escalated_to` is null for every strategy but the cascade**, which is what
+  makes the escalation rate countable from this table alone:
+  `count(*) FILTER (WHERE escalated_to = 'LLM') / count(*)` over the rows where
+  it is not null. The values are the levels of `CascadeLevel`
+  (`DETERMINISTIC` \| `EMBEDDING` \| `LLM`), each one more expensive than the
+  last, so the column is also the cost of the decision.
+- **A pinned decision has no justification at all.** `justification` is null
+  exactly when `decision_reason = 'CLIENT_PINNED'` (v2 batch 4): no classifier
+  ran, and `chosen_model_id` / `chosen_tier` already hold the entire
+  explanation — the client asked for that model. Every other row has one, which
+  is batch 1's invariant.
 
 `routing_config_version` is a short hash of the live `RoutingConfig` (strategy,
 thresholds, keywords, routes and their examples, order included). The rules are
@@ -149,6 +164,8 @@ startup instead of silently altering a table.
 | `V1__baseline.sql` | `request_log` + `api_client`, byte-for-byte what `ddl-auto=update` used to create |
 | `V2__request_log_correlation_id.sql` | `request_log.correlation_id` + its index |
 | `V3__decision_tables.sql` | `routing_decision` + `cache_decision` and their indexes |
+| `V4__conformal_calibration.sql` | `conformal_calibration`, plus `routing_decision.conformal_set` / `conformal_alpha` and `cache_decision.conformal_status` |
+| `V5__cascade_routing.sql` | `routing_decision.escalated_to` |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

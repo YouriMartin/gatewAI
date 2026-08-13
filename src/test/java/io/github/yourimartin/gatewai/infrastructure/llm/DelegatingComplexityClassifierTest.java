@@ -24,6 +24,7 @@ class DelegatingComplexityClassifierTest {
   private HeuristicComplexityClassifier heuristic;
   private EmbeddingComplexityClassifier embedding;
   private LlmComplexityClassifier llm;
+  private CascadeComplexityClassifier cascade;
   private DelegatingComplexityClassifier classifier;
 
   @BeforeEach
@@ -32,8 +33,9 @@ class DelegatingComplexityClassifierTest {
     heuristic = mock(HeuristicComplexityClassifier.class);
     embedding = mock(EmbeddingComplexityClassifier.class);
     llm = mock(LlmComplexityClassifier.class);
+    cascade = mock(CascadeComplexityClassifier.class);
     classifier = new DelegatingComplexityClassifier(
-        properties, heuristic, embedding, llm);
+        properties, heuristic, embedding, llm, cascade);
   }
 
   @Test
@@ -64,6 +66,17 @@ class DelegatingComplexityClassifierTest {
     assertEquals(ModelTier.CLOUD_PREMIUM, classifier.classify("hi").tier());
     verify(heuristic, never()).classify(anyString());
     verify(embedding, never()).classify(anyString());
+  }
+
+  @Test
+  void cascadeStrategyDelegatesToTheCascade() {
+    properties.setStrategy(ClassificationStrategy.CASCADE);
+    when(cascade.classify("hi")).thenReturn(outcome(ModelTier.CLOUD_ENTRY));
+
+    assertEquals(ModelTier.CLOUD_ENTRY, classifier.classify("hi").tier());
+    verify(heuristic, never()).classify(anyString());
+    verify(embedding, never()).classify(anyString());
+    verify(llm, never()).classify(anyString());
   }
 
   @Test
@@ -102,6 +115,7 @@ class DelegatingComplexityClassifierTest {
       case HEURISTIC -> heuristic.classify("hi");
       case EMBEDDING -> embedding.classify("hi");
       case LLM -> llm.classify("hi");
+      case CASCADE -> cascade.classify("hi");
     }).thenReturn(outcome(ModelTier.LOCAL));
     return classifier.classify("hi").justification();
   }

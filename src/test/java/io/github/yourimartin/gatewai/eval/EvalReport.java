@@ -79,6 +79,7 @@ final class EvalReport {
     putScores(node.putObject("byLanguage"), result.byLanguage());
     putCounts(node.putObject("effectiveStrategies"), result.effectiveStrategies());
     putCounts(node.putObject("fallbackCauses"), result.fallbackCauses());
+    putCounts(node.putObject("cascadeLevels"), result.cascadeLevels());
 
     ArrayNode misses = node.putArray("misses");
     for (RoutingEvaluator.Miss miss : result.misses()) {
@@ -115,6 +116,7 @@ final class EvalReport {
     appendScores("Accuracy by language", result.byLanguage());
     appendCounts("Effective strategy", result.effectiveStrategies());
     appendCounts("Fallback causes", result.fallbackCauses());
+    appendCounts("Cascade level reached", result.cascadeLevels());
 
     if (!result.misses().isEmpty()) {
       markdown.append("Misrouted (first ").append(MISSES_SHOWN).append("): ");
@@ -277,6 +279,66 @@ final class EvalReport {
         .append(" | ").append(percent(coverage.rate()))
         .append(" | ").append(percent(coverage.standardError()))
         .append(" |\n");
+  }
+
+  /**
+   * The cascade's cost and what it can buy (v2 batch 4).
+   *
+   * <p>Two numbers, and they have to be read together. The escalation rate is
+   * exact — levels 1 and 2 and both gates are the shipped code. The accuracy
+   * beside it is a <b>lower bound</b>: the harness has no model server, so
+   * level 3 answers like the heuristic, which is the case where escalating buys
+   * nothing. What the model could buy is bounded by the error capture: the
+   * cascade can only fix a decision it escalated.
+   *
+   * @param band  the margin band this run was scored at
+   * @param sweep escalation rate and error capture at other bands, so the
+   *              default is visibly a trade-off and not a magic number
+   */
+  void escalation(RoutingEvaluator.Result cascade, RoutingEvaluator.Result routes,
+                  double band, Map<Double, RoutingEvaluator.Result> sweep) {
+
+    ObjectNode node = metrics().putObject("escalationRate");
+    node.put("value", round(cascade.escalationRate()));
+    node.put("marginBand", band);
+    node.put("escalatedToModel", cascade.escalated());
+    node.put("total", cascade.total());
+    node.put("errorCapture", round(cascade.errorCapture()));
+    node.put("accuracyLowerBound", round(cascade.accuracy()));
+    node.put("accuracyWithoutCascade", round(routes.accuracy()));
+    node.put("meaning",
+        "share of requests reaching the classifier model; accuracy is a lower "
+            + "bound, level 3 is stubbed by the heuristic in a hermetic run");
+
+    ArrayNode points = node.putArray("bandSweep");
+    sweep.forEach((sweptBand, result) -> {
+      ObjectNode entry = points.addObject();
+      entry.put("marginBand", round(sweptBand));
+      entry.put("escalationRate", round(result.escalationRate()));
+      entry.put("errorCapture", round(result.errorCapture()));
+      entry.put("accuracyLowerBound", round(result.accuracy()));
+    });
+
+    markdown.append("## Cascade escalation\n\n")
+        .append("At a margin band of ").append(band).append(", ")
+        .append(percent(cascade.escalationRate()))
+        .append(" of requests reach the classifier model, and those requests ")
+        .append("hold ").append(percent(cascade.errorCapture()))
+        .append(" of the run's routing errors — the ceiling on what escalating ")
+        .append("can fix. Accuracy here (")
+        .append(percent(cascade.accuracy()))
+        .append(") is a lower bound: level 3 is stubbed by the heuristic, so it ")
+        .append("is what the cascade scores when the model adds nothing, against ")
+        .append(percent(routes.accuracy())).append(" for the routes alone.\n\n")
+        .append("| Margin band | Escalation rate | Error capture | Accuracy (lower bound) |\n")
+        .append("|---|---|---|---|\n");
+    sweep.forEach((sweptBand, result) -> markdown.append("| ")
+        .append(round(sweptBand))
+        .append(" | ").append(percent(result.escalationRate()))
+        .append(" | ").append(percent(result.errorCapture()))
+        .append(" | ").append(percent(result.accuracy()))
+        .append(" |\n"));
+    markdown.append('\n');
   }
 
   /** Records a metric the plan asks for that no shipped code can produce yet. */

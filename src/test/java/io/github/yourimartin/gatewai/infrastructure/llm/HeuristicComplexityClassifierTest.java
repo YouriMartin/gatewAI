@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
@@ -235,6 +236,35 @@ class HeuristicComplexityClassifierTest {
     assertEquals(HeuristicRule.CODE_FENCE, rule(classifier.classify("a ``` b")));
     assertEquals(HeuristicRule.PREMIUM_KEYWORD,
         rule(classifier.classify("debug it")));
+  }
+
+  // ---- The cascade's level 1 (v2 batch 4) ----
+
+  @Test
+  void deterministicSignalFiresOnlyOnTheCertainRules() {
+    assertEquals(HeuristicRule.BLANK_TEXT, signal(null));
+    assertEquals(HeuristicRule.CODE_FENCE, signal("a ``` b"));
+    assertEquals(HeuristicRule.PREMIUM_LENGTH, signal("x".repeat(501)));
+  }
+
+  @Test
+  void deterministicSignalStaysSilentWhereTheHeuristicWouldGuess() {
+    // A keyword and the entry length are indicative, not certain: the cascade
+    // must pay for the routes rather than settle for them.
+    assertTrue(classifier.deterministicSignal("debug it").isEmpty());
+    assertTrue(classifier.deterministicSignal("x".repeat(150)).isEmpty());
+    assertTrue(classifier.deterministicSignal("Hello!").isEmpty());
+  }
+
+  @Test
+  void deterministicSignalAgreesWithTheFullHeuristicWhenItFires() {
+    String text = "a ``` b";
+    assertEquals(classifier.classify(text).tier(),
+        classifier.deterministicSignal(text).orElseThrow().tier());
+  }
+
+  private HeuristicRule signal(String text) {
+    return rule(classifier.deterministicSignal(text).orElseThrow());
   }
 
   private static HeuristicRule rule(ClassificationOutcome outcome) {

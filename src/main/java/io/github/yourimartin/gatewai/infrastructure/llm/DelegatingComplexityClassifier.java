@@ -16,8 +16,9 @@ import org.springframework.stereotype.Component;
  * knows which strategy was <em>configured</em>, and the outcome already says
  * which one <em>decided</em>.
  *
- * <p>This is also the seam for a future cascade mode (deterministic signals →
- * embedding routes → LLM on ambiguity, see {@code docs/technical/routing.md}).
+ * <p>This is also the seam the cascade lives in (v2 batch 4): {@code CASCADE}
+ * chains the same three classifiers by increasing cost rather than choosing one
+ * of them — see {@link CascadeComplexityClassifier}.
  */
 @Component
 @Primary
@@ -27,15 +28,18 @@ class DelegatingComplexityClassifier implements ComplexityClassifier {
   private final HeuristicComplexityClassifier heuristic;
   private final EmbeddingComplexityClassifier embedding;
   private final LlmComplexityClassifier llm;
+  private final CascadeComplexityClassifier cascade;
 
   DelegatingComplexityClassifier(ClassifierProperties properties,
                                  HeuristicComplexityClassifier heuristic,
                                  EmbeddingComplexityClassifier embedding,
-                                 LlmComplexityClassifier llm) {
+                                 LlmComplexityClassifier llm,
+                                 CascadeComplexityClassifier cascade) {
     this.properties = properties;
     this.heuristic = heuristic;
     this.embedding = embedding;
     this.llm = llm;
+    this.cascade = cascade;
   }
 
   @Override
@@ -44,6 +48,7 @@ class DelegatingComplexityClassifier implements ComplexityClassifier {
       case HEURISTIC -> heuristic.classify(userText);
       case EMBEDDING -> embedding.classify(userText);
       case LLM -> llm.classify(userText);
+      case CASCADE -> cascade.classify(userText);
     };
   }
 }

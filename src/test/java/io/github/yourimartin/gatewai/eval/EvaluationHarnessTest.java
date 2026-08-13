@@ -5,9 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.text.Normalizer;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,6 +47,12 @@ class EvaluationHarnessTest {
   /** The plan's target for a calibration set batch 3 can fit a quantile on. */
   private static final int MINIMUM_CALIBRATION_SIZE = 200;
 
+  /**
+   * Margin bands the cascade is scored at. The shipped band must be one of
+   * them, so the report always shows the default next to what it gives up.
+   */
+  private static final double[] BAND_SWEEP = {0.01, 0.02, 0.03, 0.05, 0.08};
+
   /** Standard errors of slack allowed around a conformal guarantee. */
   private static final double COVERAGE_TOLERANCE_SIGMA = 2.0;
 
@@ -58,6 +67,8 @@ class EvaluationHarnessTest {
   private static RoutingEvaluator.Result routingTestResult;
   private static RoutingEvaluator.Result heuristicBaselineResult;
   private static RoutingEvaluator.Result routingTestCalibratedResult;
+  private static RoutingEvaluator.Result cascadeTestResult;
+  private static Map<Double, RoutingEvaluator.Result> cascadeBandSweep;
   private static CacheEvaluator.Result cacheCalibrationResult;
   private static CacheEvaluator.Result cacheTestResult;
   private static CacheEvaluator.Result cacheTestCalibratedResult;
@@ -123,6 +134,24 @@ class EvaluationHarnessTest {
         "cache-test", cacheTest, similarities.similarities(),
         cacheFit.similarityThreshold());
 
+    // --- v2 batch 4: the cascade, on the same calibrated threshold.
+    cascadeBandSweep = new LinkedHashMap<>();
+    for (double band : BAND_SWEEP) {
+      cascadeBandSweep.put(band, RoutingEvaluator.evaluate(
+          "routing-test", "cascade", routingTest,
+          EvalClassifierFactory.cascadeClassifier(replay, routingConfig,
+              CalibrationFixtures.applied(routingFit,
+                  routingConfig.routeSimilarityThreshold()), band)));
+    }
+    cascadeTestResult = cascadeBandSweep.get(config.cascadeMarginBand());
+    if (cascadeTestResult == null) {
+      // The shipped band has to be one of the swept ones, or the report would
+      // publish a trade-off curve that does not contain the default.
+      throw new IllegalStateException("The configured cascade margin band ("
+          + config.cascadeMarginBand() + ") is not in the sweep "
+          + Arrays.toString(BAND_SWEEP));
+    }
+
     routingCoverage = HarnessCalibrator.routingCoverage(
         routingTest, embeddingClassifier, routingFit);
     cacheWrongAnswerRate = HarnessCalibrator.cacheWrongAnswerRate(
@@ -142,9 +171,10 @@ class EvaluationHarnessTest {
     report.cache("cacheTestCalibrated", cacheTestCalibratedResult);
     report.savings(savings, routingTestCalibratedResult);
     report.decisionLatency(vectors.decisionLatency());
+    report.routing("routingTestCascade", cascadeTestResult);
     report.conformal(routingFit, routingCoverage, cacheFit, cacheWrongAnswerRate);
-    report.pending("escalationRate",
-        "no cascade to escalate through until batch 4 lands");
+    report.escalation(cascadeTestResult, routingTestCalibratedResult,
+        config.cascadeMarginBand(), cascadeBandSweep);
     report.write(EvalPaths.REPORT_DIR);
 
     System.out.printf(
@@ -300,6 +330,36 @@ class EvaluationHarnessTest {
   @DisplayName("routing still saves the carbon it claims to")
   void savingsMeetBaseline() {
     assertMetric("gramsCo2SavedRatioMin", savings.gramsCo2SavedRatio());
+  }
+
+  @Test
+  @DisplayName("the cascade escalates to the model no more often than budgeted")
+  void cascadeEscalationRateMeetsBaseline() {
+    assertAtMost("cascadeEscalationRateMax", cascadeTestResult.escalationRate());
+  }
+
+  @Test
+  @DisplayName("the cascade's worst case stays bounded")
+  void cascadeWorstCaseLossMeetsBaseline() {
+    // Level 3 is stubbed by the heuristic, so this is the case where escalating
+    // buys nothing at all: 24% of traffic handed to a 34%-accurate classifier.
+    // It costs accuracy, and that is the honest floor to hold — the cascade is
+    // worth running only where the classifier model beats the heuristic on the
+    // requests it is given, which no hermetic run can measure.
+    assertAtMost("cascadeWorstCaseAccuracyLossMax",
+        routingTestCalibratedResult.accuracy() - cascadeTestResult.accuracy());
+  }
+
+  @Test
+  @DisplayName("escalating targets the errors: they concentrate in the escalated bucket")
+  void escalatedRequestsAreDenserInErrorsThanTheRest() {
+    double escalatedShare = cascadeTestResult.escalationRate();
+    double errorShare = cascadeTestResult.errorCapture();
+
+    assertTrue(errorShare > escalatedShare,
+        ("escalation holds %.0f%% of traffic but only %.0f%% of the errors: the "
+            + "gate is picking requests at random")
+            .formatted(escalatedShare * 100, errorShare * 100));
   }
 
   @Test

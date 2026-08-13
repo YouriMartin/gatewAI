@@ -26,7 +26,12 @@ import java.util.UUID;
  * @param strategy              the configured strategy
  * @param effectiveStrategy     the strategy that actually decided — differs
  *                              from {@code strategy} on a hand-over
- * @param justification         the full reason, serialized as JSON
+ * @param justification         the full reason, serialized as JSON.
+ *                              <b>Null exactly when</b> {@code decisionReason}
+ *                              is {@link DecisionReason#CLIENT_PINNED} — the one
+ *                              path where no classifier ran, and where the model
+ *                              the client asked for is already the answer
+ *                              ({@code chosenModelId}, {@code chosenTier})
  * @param decisionReason        one-word summary of the justification
  * @param chosenTier            the tier the request was classified into
  * @param chosenModelId         the model it was rewritten to, null when the
@@ -39,6 +44,10 @@ import java.util.UUID;
  *                              calibration applied and nothing qualified
  * @param conformalAlpha        the risk level that set was built at, null with
  *                              {@code conformalSet}
+ * @param escalatedTo           the deepest level the cascade reached (v2 batch
+ *                              4), null when the configured strategy was not
+ *                              the cascade — which is what makes the escalation
+ *                              rate countable from this table alone
  */
 public record RoutingDecision(
     UUID id,
@@ -56,7 +65,8 @@ public record RoutingDecision(
     String chosenModelId,
     long routingLatencyMs,
     List<ModelTier> conformalSet,
-    Double conformalAlpha
+    Double conformalAlpha,
+    CascadeLevel escalatedTo
 ) {
 
   public RoutingDecision {
