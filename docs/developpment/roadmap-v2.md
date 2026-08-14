@@ -821,7 +821,7 @@ wearing the costume of a feature. **Not reachable over HTTP until batch 9.**
 
 ---
 
-## Batch 9 — API and dashboard
+## Batch 9 — API and dashboard — ✅ done
 
 **`GET /v1/admin/decisions/{correlationId}`** — the raw persisted decision, cache
 and routing, no recomputation.
@@ -860,12 +860,73 @@ click, with confidence, attribution and counterfactuals. The Svelte dashboard an
 hot route editing already exist, which is what makes this demonstrable rather
 than theoretical.
 
+Four corrections found while implementing:
+
+- **D34 — "detail on click" needs a list to click.** The plan specifies two
+  endpoints, both of which require a correlation id the operator does not have
+  yet. `GET /v1/admin/decisions?limit=20` is therefore added, and it is **merged
+  across both tables**: a cache hit short-circuits the chain and never reaches
+  the router, so a history built on routing rows alone would omit exactly the
+  requests the cache answered.
+- **D35 — `decisionId` does not exist outside the database.** A decision row's
+  surrogate id is never exposed anywhere; the correlation id is on the response
+  header (`X-Request-Id`), in the logs and on the carbon record — it is the join
+  key D6 introduced for precisely this. The explain endpoint therefore takes
+  `correlationId`.
+- **D36 — the analysis cannot be replayed, and must say so.** The plan's shape
+  has `attribution` and `counterfactuals` as bare lists, which forces the answer
+  "nothing carried this decision" when the truth is "the prompt was never
+  stored". Both sections keep their batch-7/8 status field, and explaining a
+  stored decision returns `PROMPT_UNAVAILABLE` rather than an empty list. The
+  reverse holds for a prompt: full analysis, `decision: null`, because none was
+  taken. This is open decision #2 (opt-in plaintext storage) still being open,
+  visible in the contract instead of hidden in it.
+- **D26 closed here.** The cascade ambiguity band is now editable over
+  `GET`/`PUT /v1/admin/routing` and in the dashboard, while staying **outside**
+  `RoutingConfig`: it is applied through its own port method, so a band-only
+  edit leaves `routing_config_version` — and therefore the conformal
+  calibration — untouched.
+
+### 9.1 The endpoints — ✅
+
+`DecisionHistory` is a new **out** port, separate from `DecisionRecorder`
+because the contracts are opposite: writing must never block or throw, reading is
+a synchronous admin query whose failure is worth surfacing.
+`DecisionExplanationUseCase` composes it with batches 3, 7 and 8 — the class owns
+no new machinery, only the judgement of which questions are answerable about
+which request.
+
+`404 decision_not_found` names the three reasons a trace can be missing (purged,
+never recorded, `gatewai.decisions.enabled=false`), because the only one an
+operator can act on is the last.
+
+### 9.2 Auth and cost — ✅
+
+Admin-only, asserted per verb in `AdminDecisionControllerTest`: a trace names
+route examples, cache entries and other requests' correlation ids, so it is
+strictly more sensitive than the completions endpoint it explains.
+`POST .../explain` is added to `RateLimitFilter` (D31, deferred here from batch
+7) — it embeds a prompt once per segment plus one. The `GET`s are not limited:
+they read rows.
+
+Reflection hints cover the new views **and** every `ClassificationJustification`
+variant, since the sealed interface is serialized by concrete type **[post-v1]**.
+
+### 9.3 Dashboard — ✅
+
+A "why this decision" panel: the last 20 requests with cache outcome, tier,
+reason and margin; click for the stored decision, its confidence and its
+provenance; paste a prompt for the segment bars (red where a segment pulled
+*away* from the matched route) and the counterfactuals. The provenance line is
+always shown — two explanations taken either side of a route edit are not
+comparable, and that is where a reader sees it.
+
 ---
 
 ## Batch 10 — Documentation (continuous)
 
-**Create**: `docs/technical/decision-tracing.md` (decision model, versioning,
-replay) · ~~`docs/technical/conformal-calibration.md`~~ ✅ shipped with batch 3
+**Create**: ~~`docs/technical/decision-tracing.md`~~ ✅ shipped with batch 9
+(decision model, versioning, what replays and what does not) · ~~`docs/technical/conformal-calibration.md`~~ ✅ shipped with batch 3
 (method, the asymmetric guarantees, results, degradation, limits) ·
 ~~`docs/technical/evaluation.md`~~ ✅ shipped with batch 5 (datasets, harness,
 fixtures, metrics, findings) · ~~`docs/technical/attribution.md`~~ ✅ shipped
@@ -928,7 +989,7 @@ Batch 4   Calibrated cascade routing (+ client pinning)          ✅ done
 Batch 6   Observability                                          ✅ done
 Batch 7   Occlusion attribution                                  ✅ done
 Batch 8   Counterfactuals                                 ✅ done
-Batch 9   API and dashboard
+Batch 9   API and dashboard                               ✅ done
 Batch 10  Documentation                  ← continuous
 ```
 
@@ -958,13 +1019,14 @@ branch. `./mvnw test` green before every commit.
 ## Definition of done
 
 - [x] All three classifiers produce a usable justification
-- [x] Cache and routing decisions persisted and versioned (replay API: batch 9)
+- [x] Cache and routing decisions persisted, versioned and readable back
+      (`/v1/admin/decisions`, batch 9)
 - [x] Cache and routing thresholds calibrated, with a tested fallback to fixed values
 - [x] Cascade routing implemented, its gates calibrated
 - [x] Six quality metrics published and tracked in CI — all six measured and
       baselined since batch 4
 - [x] The request embedding is computed once per request
-- [ ] The dashboard exposes "why this decision"
+- [x] The dashboard exposes "why this decision"
 - [x] Versioned migrations in place
 - [x] `limitations.md` covers the new methodological limits
 - [ ] No latency regression on the nominal path

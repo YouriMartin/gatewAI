@@ -25,17 +25,24 @@ class AdminRoutingController {
 
   @GetMapping
   RoutingConfigView get() {
-    return RoutingConfigView.of(useCase.current());
+    return RoutingConfigView.of(useCase.current(), useCase.cascadeMarginBand());
   }
 
+  /**
+   * The band is applied alongside the config but stays out of it (v2 batch 9,
+   * closing D26): a band-only edit leaves {@code routing_config_version}
+   * untouched, and therefore leaves the conformal calibration valid.
+   */
   @PutMapping
   ResponseEntity<RoutingConfigView> update(
       @RequestBody RoutingConfigView body) {
     try {
       useCase.update(body.toDomain());
+      useCase.updateCascadeMarginBand(body.cascadeMarginBand());
     } catch (IllegalArgumentException e) {
       return ResponseEntity.badRequest().build();
     }
-    return ResponseEntity.ok(RoutingConfigView.of(useCase.current()));
+    return ResponseEntity.ok(
+        RoutingConfigView.of(useCase.current(), useCase.cascadeMarginBand()));
   }
 }

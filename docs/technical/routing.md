@@ -199,8 +199,11 @@ deliberately **not** part of `RoutingConfig` — and therefore not part of
 `routing_config_version`. That version exists to invalidate a conformal
 calibration when the similarities it was fitted on stop describing the system;
 the band changes no similarity, and making it bump the version would force a
-recalibration for a knob the calibration does not depend on. Exposing it in the
-admin API is v2 batch 9's work.
+recalibration for a knob the calibration does not depend on. Since v2 batch 9 it
+is tunable over `GET`/`PUT /v1/admin/routing` and in the dashboard, still outside
+`RoutingConfig`: it rides on the same request and is applied through its own
+port method, so a band-only edit leaves the version — and the calibration —
+untouched.
 
 The request embedding is **already shared**: `MemoizingEmbeddingModel` memoizes
 it per request, so the cache search, this classifier and the cache store use one

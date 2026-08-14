@@ -2,6 +2,8 @@ package io.github.yourimartin.gatewai.adapter.in.web;
 
 import java.util.List;
 
+import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
+
 import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -30,7 +32,29 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       RoutingConfigView.class,
       RoutingConfigView.RouteView.class,
       CalibrationView.class,
-      RecalibrateRequest.class);
+      RecalibrateRequest.class,
+      // Decision trace and explanations (v2 batch 9). The justification is a
+      // sealed interface: its implementations are serialized by their concrete
+      // type, so each one is registered rather than relying on the interface.
+      DecisionView.class,
+      DecisionView.Cache.class,
+      DecisionView.Routing.class,
+      DecisionView.Confidence.class,
+      ExplainRequest.class,
+      ExplanationView.class,
+      ExplanationView.Attribution.class,
+      ExplanationView.Segment.class,
+      ExplanationView.Counterfactuals.class,
+      ExplanationView.Alternative.class,
+      ExplanationView.CarbonRef.class,
+      ExplanationView.Provenance.class,
+      ClassificationJustification.Heuristic.class,
+      ClassificationJustification.Embedding.class,
+      ClassificationJustification.RouteCandidate.class,
+      ClassificationJustification.Llm.class,
+      ClassificationJustification.Fallback.class,
+      ClassificationJustification.Cascade.class,
+      ClassificationJustification.FailSafe.class);
 
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader) {

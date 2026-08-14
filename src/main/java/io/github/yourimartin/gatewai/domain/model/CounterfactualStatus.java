@@ -30,5 +30,14 @@ public enum CounterfactualStatus {
    * anyway — so no wording of the request would have changed where it went.
    * The chosen route is still reported; only the alternatives are empty.
    */
-  NO_ALTERNATIVE_TIER
+  NO_ALTERNATIVE_TIER,
+
+  /**
+   * A stored decision was asked to explain itself and the prompt is gone
+   * (v2 batch 9). Ranking routes means embedding the request, and only its hash
+   * was kept. The route scores the decision was <em>taken</em> with are still in
+   * the trace's justification — what cannot be rebuilt is the comparison
+   * against today's routes.
+   */
+  PROMPT_UNAVAILABLE
 }

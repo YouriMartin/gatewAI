@@ -350,3 +350,119 @@ button.link {
   font: inherit;
   resize: vertical;
 }
+
+/* Why this decision (v2 batch 9) */
+.admin .hint {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+table.decisions tbody tr {
+  cursor: pointer;
+}
+
+table.decisions tbody tr:hover,
+table.decisions tbody tr.selected {
+  background: #161b22;
+}
+
+table.decisions code {
+  color: var(--muted);
+}
+
+.explain-prompt {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+}
+
+.explain-prompt textarea {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2d333b;
+  border-radius: 6px;
+  background: #0d1117;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.explanation {
+  border: 1px solid #2d333b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.explanation h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.explanation h3:first-child {
+  margin-top: 0;
+}
+
+.explanation .detail {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.segments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.segment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 2fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.segment-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segment-bar {
+  background: #161b22;
+  border-radius: 4px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.segment-fill {
+  background: var(--accent, #3fb950);
+  height: 100%;
+}
+
+/* A segment that pulled the other way is a finding, not noise. */
+.segment-fill.negative {
+  background: #f85149;
+}
+
+.segment-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.counterfactuals {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.counterfactuals .gap {
+  color: var(--muted);
+}
+
+.provenance {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

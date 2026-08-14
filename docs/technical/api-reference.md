@@ -186,6 +186,79 @@ the α asked for (the message says how many cases it would need); `400
 invalid_alpha` when α is outside `(0,1)`. See
 [`conformal-calibration.md`](conformal-calibration.md).
 
+## Admin — decisions (`ROLE_ADMIN`)
+
+Why a request went where it did (v2 batch 9). Admin-only: a trace names route
+examples, cache entries and other requests' correlation ids, so it is strictly
+more sensitive than the completions endpoint it explains.
+
+### `GET /v1/admin/decisions?limit=20`
+The most recent requests' decisions, newest first (`limit` capped at 200).
+Merged across the cache and routing tables, so requests the cache answered — the
+ones that never reach the router — are in the list.
+
+### `GET /v1/admin/decisions/{correlationId}`
+One request's decisions, **exactly as persisted, with nothing recomputed**:
+
+```json
+{"correlationId": "b3f1…", "at": "2026-08-14T09:12:11Z",
+ "cache": {"outcome": "MISS", "similarityScore": 0.71, "runnerUpScore": 0.42,
+           "threshold": 0.9423, "conformalStatus": "EMPTY_SET",
+           "matchedEntryId": null, "matchedEntryAgeSeconds": null,
+           "originCorrelationId": null, "embeddingModel": "nomic-embed-text"},
+ "routing": {"chosenTier": "CLOUD_PREMIUM", "chosenModelId": "qwen3:14b",
+             "decisionReason": "MATCH", "strategy": "EMBEDDING",
+             "effectiveStrategy": "EMBEDDING", "escalatedTo": null,
+             "routingLatencyMs": 12, "justification": { },
+             "confidence": {"topScore": 0.81, "margin": 0.12,
+                            "threshold": 0.60,
+                            "conformalSet": ["CLOUD_PREMIUM"], "alpha": 0.05},
+             "promptHash": "…", "promptLength": 42,
+             "embeddingModel": "nomic-embed-text",
+             "routingConfigVersion": "c1bb83ddd18f7771"}}
+```
+
+`routing` is **null on a cache hit** — the router never ran, and saying so is the
+point. `404 decision_not_found` when nothing was recorded under that id (purged,
+never recorded, or `gatewai.decisions.enabled=false`).
+
+The correlation id is the one echoed on every response as `X-Request-Id`, and
+the same key the carbon record uses.
+
+### `POST /v1/admin/decisions/explain`
+Exactly one of `{"correlationId": "…"}` or `{"prompt": "…"}` — both, or neither,
+is `400 invalid_explain_request`. **Rate-limited** like the chat endpoints:
+explaining a prompt costs one local embedding call per segment plus one.
+
+```json
+{"decision": { }, "attribution": {"status": "COMPUTED", "route": "code-and-analysis",
+   "tier": "CLOUD_PREMIUM", "matchedUtterance": "…", "similarity": 0.81,
+   "segments": [{"segment": "…", "contribution": 0.07, "share": 0.62, "rank": 1}]},
+ "counterfactuals": {"status": "COMPUTED", "chosenRoute": "code-and-analysis",
+   "chosenTier": "CLOUD_PREMIUM", "chosenUtterance": "…",
+   "chosenSimilarity": 0.81,
+   "alternatives": [{"tier": "LOCAL", "route": "casual-chat",
+                     "nearestUtterance": "…", "similarity": 0.77,
+                     "delta": 0.04, "rank": 1}]},
+ "carbon": {"correlationId": "b3f1…"},
+ "provenance": {"embeddingModelVersion": "nomic-embed-text",
+                "routingConfigVersion": "c1bb83ddd18f7771",
+                "calibrationDate": "2026-08-11T18:34:50Z", "status": "VALID"}}
+```
+
+The two inputs answer different questions, and the response says which:
+
+| Input | `decision` | `attribution` / `counterfactuals` |
+|---|---|---|
+| `correlationId` | the stored trace | `PROMPT_UNAVAILABLE` — only hashes are stored, so a past request cannot be re-embedded |
+| `prompt` | `null` — no request was made | computed against the rules in force **now** |
+
+`provenance` is never omitted: every number above is relative to an embedding
+model, a routing config version and a calibration. `carbon` **references** the
+carbon record by correlation id rather than copying it — the figures live in the
+green report. Method and limits:
+[`attribution.md`](attribution.md), [`decision-tracing.md`](decision-tracing.md).
+
 ## MCP
 
 `POST /mcp` — Model Context Protocol server (streamable HTTP), same Bearer auth.
@@ -203,6 +276,6 @@ Tools: `routed_chat`, `green_report`, `carbon_intensity`. See [`mcp.md`](mcp.md)
 
 `200` ok · `201` client created · `202` async accepted · `204` revoked · `400`
 bad input · `401` missing/invalid key · `403` non-admin on admin route · `404`
-unknown async id · `409` calibration impossible on the labelled set · `429` rate
-limited (`Retry-After`) · `500` internal error ·
+unknown async id or unrecorded correlation id · `409` calibration impossible on
+the labelled set · `429` rate limited (`Retry-After`) · `500` internal error ·
 `502`/`503` upstream provider error (chat ingress, see [Errors](#errors)).

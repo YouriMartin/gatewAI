@@ -27,5 +27,14 @@ public enum AttributionStatus {
   NO_ROUTES_CONFIGURED,
 
   /** Nothing to segment. */
-  EMPTY_PROMPT
+  EMPTY_PROMPT,
+
+  /**
+   * A stored decision was asked to explain itself and the prompt is gone
+   * (v2 batch 9). Only hashes are persisted, so occlusion — which must re-embed
+   * the text — cannot run on a past request. Not a failure and not a bug: it is
+   * the privacy property doing what it says, and the alternative is storing
+   * every prompt in plaintext forever.
+   */
+  PROMPT_UNAVAILABLE
 }

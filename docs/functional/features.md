@@ -131,12 +131,30 @@ bootstrap admin client is created at first start and its key is logged once — 
 
 Admins can read and change the routing rules **at runtime**:
 
-- `GET /v1/admin/routing` — current strategy, length thresholds and premium
-  keywords.
+- `GET /v1/admin/routing` — current strategy, length thresholds, premium
+  keywords, semantic routes and the cascade's ambiguity band.
 - `PUT /v1/admin/routing` — update them. Changes take effect immediately, no
   restart.
 
-The dashboard exposes this as a form.
+The dashboard exposes this as a form. The ambiguity band rides on the same
+endpoint but is deliberately not part of the routing config version: tuning it
+changes no similarity, so it must not invalidate a conformal calibration.
+
+## Explaining a decision
+
+Every routing and cache decision is recorded, and can be read back (admin only):
+
+- `GET /v1/admin/decisions` — the last requests as decided, merged across cache
+  and routing so requests the cache answered are in the list.
+- `GET /v1/admin/decisions/{correlationId}` — one request's decisions exactly as
+  persisted: outcome, tier, reason, confidence, and the rules version in force
+  at the time. Nothing is recomputed.
+- `POST /v1/admin/decisions/explain` — adds the analysis: which parts of a
+  prompt carried its match, and where the request would have gone instead.
+
+Because no plaintext prompt is stored, a **past** request replays its decision
+but not its analysis; paste the prompt to analyse it against the current rules.
+The dashboard shows all of this in a "why this decision" panel.
 
 ## Rate limiting
 

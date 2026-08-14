@@ -162,6 +162,23 @@ instead, and by how little it missed
   reflects the current configuration — and two answers taken either side of a
   route edit are not comparable.
 
+## A past decision replays; its analysis does not
+
+`POST /v1/admin/decisions/explain` returns the stored decision for a past
+request in full, but its attribution and counterfactuals come back as
+`PROMPT_UNAVAILABLE`
+([`decision-tracing.md`](../technical/decision-tracing.md)).
+
+- **No plaintext prompt is stored**, only a SHA-256 hash, and both analyses have
+  to re-embed the text. Paste the prompt to analyse it against the current
+  rules — which is a different question, and the response says so.
+- **The trace is not an audit log.** Rows are purged on a retention timer
+  (`gatewai.decisions.retention-days`, 90 days) and carry no actor. A 404 on a
+  request you know happened usually means retention passed, or recording is off.
+- **Traceability is not certification.** The trace supports the transparency
+  angle of the EU AI Act for a component that routes and caches; gatewAI is
+  infrastructure and claims no compliance of its own.
+
 ## Single-instance assumptions (not cluster-ready)
 
 - The **deferred-job store is in-memory**: queued async jobs are **lost on

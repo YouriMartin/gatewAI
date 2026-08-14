@@ -91,6 +91,35 @@ Read and hot-tune the router without a restart:
 Click **Save** to apply (`PUT /v1/admin/routing`); changes take effect on the next
 request. A `Saved ✓` confirmation appears.
 
+## Why this decision (admin only)
+
+The last 20 requests as the gateway decided them, and what carried each
+decision.
+
+- **The table** — one row per request: time, short correlation id, cache
+  outcome, chosen tier, decision reason, and the **margin** (`top1 − top2`).
+  A request the cache answered shows `HIT` and *served from cache* instead of a
+  tier: the router never ran, which is itself the explanation. A small margin is
+  the signal worth looking for — the tier was nearly something else.
+- **Click a row** — the decision as stored: tier and model, configured strategy
+  versus the one that actually decided (they differ on a hand-over), cascade
+  escalation, confidence (top score, margin, threshold, conformal set) and, for
+  a hit, which earlier request wrote the answer that was served.
+- **Paste a prompt** — the analysis, against the rules in force right now:
+  which segments carried the match (bars are each segment's share of the
+  positive contribution; a **red** bar is a segment that pulled *away* from the
+  matched route) and where the request would have gone instead — *"CLOUD_ENTRY,
+  had it looked more like «Summarize this article», missed by 0.04"*.
+
+Clicking a past request shows *"only prompt hashes are stored…"* under both
+analyses rather than an empty list. That is deliberate: no plaintext prompt is
+persisted, so a past request cannot be re-embedded. Paste the prompt to analyse
+it.
+
+The line at the bottom is the **provenance** — embedding model, routing config
+version, calibration status and date. Two explanations taken either side of a
+route edit are not comparable, and this is where you see it.
+
 ## Notes
 
 - All figures are scoped by your API key's client when per-client namespacing is

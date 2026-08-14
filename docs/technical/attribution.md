@@ -135,9 +135,11 @@ plausible-looking report built on a failed call.
 | `gatewai.attribution.max-segment-chars` | 200 | length past which a segment is cut into clauses |
 | `gatewai.attribution.cache-size` | 500 | bounded LRU of reports |
 
-The use case (`PromptAttributionUseCase`) ships with this batch; the endpoint
-that exposes it — `POST /v1/admin/decisions/explain`, admin-only and
-rate-limited — arrives with batch 9.
+Exposed since batch 9 by `POST /v1/admin/decisions/explain` (admin-only and
+rate-limited, [`api-reference.md`](api-reference.md)). Note what that endpoint
+can and cannot do: a **prompt** is analysed, a **past decision** answers
+`PROMPT_UNAVAILABLE`, because occlusion has to re-embed the text and only its
+hash was stored.
 
 ---
 
@@ -226,5 +228,7 @@ another would be a data leak wearing the costume of a feature.
 |---|---|---|
 | `gatewai.counterfactuals.max-alternatives` | 3 | how many alternative outcomes to keep, closest first |
 
-The use case (`RouteCounterfactualUseCase`) ships with this batch; like
-attribution, it becomes reachable over HTTP in batch 9.
+Exposed since batch 9 by the same endpoint, under `counterfactuals` (the domain
+calls the gap `gap`; the API renders it as `delta`). Like attribution, it needs
+the prompt: a past decision answers `PROMPT_UNAVAILABLE` — see
+[`decision-tracing.md`](decision-tracing.md).

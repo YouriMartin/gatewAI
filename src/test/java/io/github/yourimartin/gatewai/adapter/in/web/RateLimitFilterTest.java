@@ -79,6 +79,37 @@ class RateLimitFilterTest {
   }
 
   @Test
+  void limitsPromptExplanations() throws Exception {
+    // v2 batch 9: an explanation embeds the prompt once per segment plus one,
+    // against the same local model that serves traffic.
+    properties.setRequestsPerMinute(1);
+    authenticate("client");
+    MockHttpServletRequest first =
+        new MockHttpServletRequest("POST", "/v1/admin/decisions/explain");
+    filter.doFilter(first, new MockHttpServletResponse(), new MockFilterChain());
+
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+    filter.doFilter(new MockHttpServletRequest(
+        "POST", "/v1/admin/decisions/explain"), response, chain);
+
+    assertEquals(429, response.getStatus());
+    assertNull(chain.getRequest());
+  }
+
+  @Test
+  void doesNotLimitReadingTheDecisionTrace() throws Exception {
+    properties.setRequestsPerMinute(1);
+    authenticate("client");
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(new MockHttpServletRequest("GET", "/v1/admin/decisions"),
+        new MockHttpServletResponse(), chain);
+
+    assertNotNull(chain.getRequest(), "reading rows costs a query, not a model");
+  }
+
+  @Test
   void doesNotLimitUnauthenticatedRequests() throws Exception {
     properties.setRequestsPerMinute(1);
     MockFilterChain chain = new MockFilterChain();

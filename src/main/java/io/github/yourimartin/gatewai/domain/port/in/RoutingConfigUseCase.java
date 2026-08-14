@@ -13,4 +13,16 @@ public interface RoutingConfigUseCase {
    * @throws IllegalArgumentException if the config is invalid
    */
   void update(RoutingConfig config);
+
+  /**
+   * The cascade's ambiguity band (v2 batch 4). Read and written apart from the
+   * config because it is not part of {@code routing_config_version} — see
+   * {@code RoutingConfigPort#cascadeMarginBand()}.
+   */
+  double cascadeMarginBand();
+
+  /**
+   * @throws IllegalArgumentException if the band is outside {@code [0, 1]}
+   */
+  void updateCascadeMarginBand(double band);
 }

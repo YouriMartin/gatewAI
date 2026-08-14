@@ -52,4 +52,14 @@ class ClassifierRoutingConfigAdapter implements RoutingConfigPort {
             route.name(), route.tier(), route.examples()))
         .collect(Collectors.toCollection(ArrayList::new)));
   }
+
+  @Override
+  public double cascadeMarginBand() {
+    return properties.getCascadeMarginBand();
+  }
+
+  @Override
+  public void updateCascadeMarginBand(double band) {
+    properties.setCascadeMarginBand(band);
+  }
 }

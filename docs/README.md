@@ -26,6 +26,10 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 - [`native.md`](technical/native.md) — GraalVM native image (profile, runtime hints, caveats)
 - [`carbon-intensity-reliability.md`](technical/carbon-intensity-reliability.md) — carbon-intensity method & reliability
 - [`build-and-packaging.md`](technical/build-and-packaging.md) — Maven, frontend mono-repo, Docker, native
+- [`decision-tracing.md`](technical/decision-tracing.md) — what is recorded per decision, versioning, what replays
+- [`conformal-calibration.md`](technical/conformal-calibration.md) — calibrated cache and routing thresholds
+- [`attribution.md`](technical/attribution.md) — occlusion attribution and counterfactuals
+- [`evaluation.md`](technical/evaluation.md) — labelled datasets, harness, quality metrics
 - [`api-reference.md`](technical/api-reference.md) — REST endpoints + MCP tools
 - [`testing-and-quality.md`](technical/testing-and-quality.md) — test strategy, ArchUnit, Checkstyle, SpotBugs
 - [`adr/`](technical/adr/) — architecture decision records

@@ -15,14 +15,19 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Enforces per-client rate limits on the LLM endpoints (Phase 6.2). Runs after
- * authentication so the client id is known; only POSTs to
- * {@code /v1/chat/completions*} (sync + async submit) are limited — status polls
- * and admin/report calls are not. Returns {@code 429} with {@code Retry-After}.
+ * Enforces per-client rate limits on the endpoints that cost model calls
+ * (Phase 6.2, extended in v2 batch 9). Runs after authentication so the client
+ * id is known. Returns {@code 429} with {@code Retry-After}.
+ *
+ * <p>Limited: POSTs to {@code /v1/chat/completions*} (sync + async submit) and
+ * to {@code /v1/admin/decisions/explain}, which embeds a prompt once per segment
+ * plus one against the same local model that serves traffic. Not limited: status
+ * polls, reports, and the {@code GET} decision endpoints, which only read rows.
  */
 class RateLimitFilter extends OncePerRequestFilter {
 
   private static final String CHAT_PATH = "/v1/chat/completions";
+  private static final String EXPLAIN_PATH = "/v1/admin/decisions/explain";
 
   private final RateLimiter rateLimiter;
   private final RateLimitProperties properties;
@@ -63,7 +68,10 @@ class RateLimitFilter extends OncePerRequestFilter {
   }
 
   private static boolean appliesTo(HttpServletRequest request) {
-    return "POST".equalsIgnoreCase(request.getMethod())
-        && request.getRequestURI().startsWith(CHAT_PATH);
+    if (!"POST".equalsIgnoreCase(request.getMethod())) {
+      return false;
+    }
+    String path = request.getRequestURI();
+    return path.startsWith(CHAT_PATH) || path.equals(EXPLAIN_PATH);
   }
 }

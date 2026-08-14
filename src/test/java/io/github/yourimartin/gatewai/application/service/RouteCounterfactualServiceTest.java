@@ -279,5 +279,15 @@ class RouteCounterfactualServiceTest {
     public void update(RoutingConfig config) {
       this.config = config;
     }
+
+    @Override
+    public double cascadeMarginBand() {
+      return 0.02;
+    }
+
+    @Override
+    public void updateCascadeMarginBand(double band) {
+      throw new UnsupportedOperationException("not part of this test");
+    }
   }
 }

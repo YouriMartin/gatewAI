@@ -2,6 +2,7 @@ package io.github.yourimartin.gatewai.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,6 +58,7 @@ class AdminRoutingControllerTest {
         "premium_length_threshold": 600,
         "premium_keywords": ["refactor", "debug"],
         "route_similarity_threshold": 0.7,
+        "cascade_margin_band": 0.05,
         "routes": [
           {"name": "chat", "tier": "local",
            "examples": ["hello", "bonjour"]}
@@ -67,6 +69,7 @@ class AdminRoutingControllerTest {
   @Test
   void getReturnsCurrentConfig() throws Exception {
     when(useCase.current()).thenReturn(config());
+    when(useCase.cascadeMarginBand()).thenReturn(0.02);
 
     mockMvc.perform(get("/v1/admin/routing")
             .with(authentication(adminAuth())))
@@ -75,6 +78,7 @@ class AdminRoutingControllerTest {
         .andExpect(jsonPath("$.entry_length_threshold").value(100))
         .andExpect(jsonPath("$.premium_keywords[0]").value("refactor"))
         .andExpect(jsonPath("$.route_similarity_threshold").value(0.6))
+        .andExpect(jsonPath("$.cascade_margin_band").value(0.02))
         .andExpect(jsonPath("$.routes[0].name").value("code"))
         .andExpect(jsonPath("$.routes[0].tier").value("cloud_premium"))
         .andExpect(jsonPath("$.routes[0].examples[0]").value("refactor this"));
@@ -94,6 +98,10 @@ class AdminRoutingControllerTest {
         .andExpect(jsonPath("$.strategy").value("llm"))
         .andExpect(jsonPath("$.premium_length_threshold").value(600))
         .andExpect(jsonPath("$.routes[0].tier").value("local"));
+
+    // The band rides on the same endpoint but never enters RoutingConfig, so it
+    // cannot bump routing_config_version (v2 batch 4, D26).
+    verify(useCase).updateCascadeMarginBand(0.05);
   }
 
   @Test

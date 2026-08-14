@@ -2,12 +2,17 @@
 import {
   type ApiClientView,
   createClient,
+  type DecisionView,
   downloadReport,
+  type ExplanationView,
+  explainDecision,
+  explainPrompt,
   fetchGreenReport,
   fetchGreenSeries,
   type GreenReport,
   getRoutingConfig,
   listClients,
+  listDecisions,
   type RoutingConfig,
   revokeClient,
   updateRoutingConfig,
@@ -39,6 +44,14 @@ let keywordsText = $state('');
 let routesEdit = $state<RouteEdit[]>([]);
 let routingError = $state('');
 let routingSaved = $state(false);
+
+let decisions = $state<DecisionView[]>([]);
+let decisionsError = $state('');
+let explanation = $state<ExplanationView | null>(null);
+let explanationError = $state('');
+let selectedId = $state<string | null>(null);
+let explaining = $state(false);
+let promptText = $state('');
 
 let reportFrom = $state(isoDate(new Date(Date.now() - 30 * 86_400_000)));
 let reportTo = $state(isoDate(new Date()));
@@ -99,6 +112,7 @@ async function connect() {
     status = 'ok';
     await loadClients();
     await loadRouting();
+    await loadDecisions();
   } catch (e) {
     error = message(e);
     status = 'error';
@@ -163,6 +177,87 @@ async function saveRouting() {
   } catch (e) {
     routingError = message(e);
   }
+}
+
+async function loadDecisions() {
+  try {
+    decisions = await listDecisions(apiKey, 20);
+    decisionsError = '';
+  } catch (e) {
+    decisions = [];
+    decisionsError = message(e);
+  }
+}
+
+async function explainRow(decision: DecisionView) {
+  if (!decision.correlationId) {
+    return;
+  }
+  selectedId = decision.correlationId;
+  explaining = true;
+  explanationError = '';
+  try {
+    explanation = await explainDecision(apiKey, decision.correlationId);
+  } catch (e) {
+    explanation = null;
+    explanationError = message(e);
+  } finally {
+    explaining = false;
+  }
+}
+
+async function explainText() {
+  if (!promptText.trim()) {
+    return;
+  }
+  selectedId = null;
+  explaining = true;
+  explanationError = '';
+  try {
+    explanation = await explainPrompt(apiKey, promptText);
+  } catch (e) {
+    explanation = null;
+    explanationError = message(e);
+  } finally {
+    explaining = false;
+  }
+}
+
+// Why an analysis is missing, in words rather than an enum name. Each of these
+// is an answer, not a failure — see docs/technical/attribution.md.
+function statusNote(status: string): string {
+  switch (status) {
+    case 'PROMPT_UNAVAILABLE':
+      return 'Only prompt hashes are stored, so a past request cannot be re-embedded. Paste the prompt below to analyse it against the current rules.';
+    case 'NOT_APPLICABLE_STRATEGY':
+      return 'The active strategy does not decide by similarity, so there is no similarity to decompose.';
+    case 'NO_ROUTES_CONFIGURED':
+      return 'No semantic route is configured.';
+    case 'EMPTY_PROMPT':
+      return 'Nothing to analyse.';
+    case 'NO_ALTERNATIVE_TIER':
+      return 'Every configured route leads to the tier that won — no wording would have changed the outcome.';
+    default:
+      return '';
+  }
+}
+
+function num(value: number | null | undefined, digits = 3): string {
+  return value === null || value === undefined ? '—' : value.toFixed(digits);
+}
+
+function shortId(id: string | null): string {
+  return id ? id.slice(0, 8) : '—';
+}
+
+function clockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString();
+}
+
+// Shares are already normalized over the positive contributions; a negative
+// contribution took no share and gets no bar.
+function shareWidth(share: number): number {
+  return Math.max(0, Math.min(1, share)) * 100;
 }
 
 async function loadClients() {
@@ -297,6 +392,156 @@ async function revoke(id: string) {
     </section>
 
     <section class="admin">
+      <h2>Why this decision</h2>
+
+      {#if decisionsError}
+        <p class="error">
+          Decision trace unavailable: {decisionsError} (admin key required)
+        </p>
+      {/if}
+
+      <p class="hint">
+        The last 20 requests, as decided. Click one for its confidence and
+        provenance; paste a prompt below to see which words carry a routing
+        decision and where it would have gone instead.
+      </p>
+
+      {#if decisions.length > 0}
+        <table class="decisions">
+          <thead>
+            <tr>
+              <th>Time</th><th>Request</th><th>Cache</th><th>Tier</th>
+              <th>Reason</th><th>Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each decisions as decision (decision.correlationId ?? decision.at)}
+              <tr
+                class:selected={decision.correlationId === selectedId}
+                onclick={() => explainRow(decision)}
+              >
+                <td>{clockTime(decision.at)}</td>
+                <td><code>{shortId(decision.correlationId)}</code></td>
+                <td>{decision.cache?.outcome ?? '—'}</td>
+                <td>{decision.routing?.chosenTier ?? 'served from cache'}</td>
+                <td>{decision.routing?.decisionReason ?? '—'}</td>
+                <td>{num(decision.routing?.confidence?.margin ?? null)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+
+      <div class="explain-prompt">
+        <textarea
+          rows="3"
+          bind:value={promptText}
+          placeholder="Paste a prompt to explain it against the rules in force now"
+        ></textarea>
+        <button onclick={explainText} disabled={!promptText.trim() || explaining}>
+          {explaining ? 'Explaining…' : 'Explain this prompt'}
+        </button>
+      </div>
+
+      {#if explanationError}
+        <p class="error">Explanation failed: {explanationError}</p>
+      {/if}
+
+      {#if explanation}
+        <div class="explanation">
+          {#if explanation.decision?.routing}
+            {@const routing = explanation.decision.routing}
+            <h3>Decision</h3>
+            <p class="detail">
+              <strong>{routing.chosenTier}</strong>
+              {routing.chosenModelId ? ` → ${routing.chosenModelId}` : ''} ·
+              {routing.decisionReason} ·
+              {routing.strategy === routing.effectiveStrategy
+                ? routing.strategy
+                : `${routing.strategy} → ${routing.effectiveStrategy}`}
+              {routing.escalatedTo ? ` · escalated to ${routing.escalatedTo}` : ''}
+              · {routing.routingLatencyMs} ms
+            </p>
+            <p class="detail">
+              top {num(routing.confidence.topScore)} ·
+              margin {num(routing.confidence.margin)} ·
+              threshold {num(routing.confidence.threshold)} ·
+              set {routing.confidence.conformalSet
+                ? routing.confidence.conformalSet.join(', ') || '(empty)'
+                : 'not calibrated'}
+            </p>
+          {/if}
+
+          {#if explanation.decision?.cache}
+            {@const cache = explanation.decision.cache}
+            <h3>Cache</h3>
+            <p class="detail">
+              {cache.outcome} · similarity {num(cache.similarityScore)} ·
+              runner-up {num(cache.runnerUpScore)} ·
+              threshold {num(cache.threshold)} ·
+              {cache.conformalStatus ?? 'not calibrated'}
+              {cache.originCorrelationId
+                ? ` · answer written by ${shortId(cache.originCorrelationId)}`
+                : ''}
+            </p>
+          {/if}
+
+          <h3>What carried the match</h3>
+          {#if explanation.attribution.status === 'COMPUTED'}
+            <p class="detail">
+              route <strong>{explanation.attribution.route}</strong> ·
+              «{explanation.attribution.matchedUtterance}» ·
+              similarity {num(explanation.attribution.similarity)}
+            </p>
+            <div class="segments">
+              {#each explanation.attribution.segments as segment (segment.rank)}
+                <div class="segment-row">
+                  <span class="segment-text">{segment.segment}</span>
+                  <div class="segment-bar">
+                    <div
+                      class="segment-fill"
+                      class:negative={segment.contribution < 0}
+                      style={`width: ${shareWidth(segment.share)}%`}
+                    ></div>
+                  </div>
+                  <span class="segment-value">
+                    {segment.contribution >= 0 ? '+' : ''}{num(segment.contribution)}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="hint">{statusNote(explanation.attribution.status)}</p>
+          {/if}
+
+          <h3>Where it would have gone instead</h3>
+          {#if explanation.counterfactuals.status === 'COMPUTED'}
+            <ul class="counterfactuals">
+              {#each explanation.counterfactuals.alternatives as alt (alt.rank)}
+                <li>
+                  <strong>{alt.tier}</strong> — had it looked more like
+                  «{alt.nearestUtterance}»
+                  <span class="gap">(missed by {num(alt.delta)})</span>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="hint">{statusNote(explanation.counterfactuals.status)}</p>
+          {/if}
+
+          <p class="provenance">
+            {explanation.provenance.embeddingModelVersion ?? 'no embedding model'}
+            · rules {explanation.provenance.routingConfigVersion ?? 'n/a'}
+            · calibration {explanation.provenance.status ?? 'n/a'}
+            {explanation.provenance.calibrationDate
+              ? ` (${explanation.provenance.calibrationDate.slice(0, 10)})`
+              : ''}
+          </p>
+        </div>
+      {/if}
+    </section>
+
+    <section class="admin">
       <h2>API keys</h2>
 
       {#if adminError}
@@ -400,6 +645,23 @@ async function revoke(id: string) {
                 bind:value={routing.route_similarity_threshold}
               />
             </label>
+            <label class="threshold">
+              Cascade ambiguity band (0–1)
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                bind:value={routing.cascade_margin_band}
+              />
+            </label>
+            <p class="hint">
+              Cascade only: when the top two routes are within this band, the
+              classifier model decides. Wider means more escalations, so more
+              accuracy on ambiguous prompts and more model calls. It is not part
+              of the routing config version, so tuning it does not invalidate a
+              conformal calibration.
+            </p>
             {#each routesEdit as route, i (i)}
               <div class="route-card">
                 <div class="route-head">

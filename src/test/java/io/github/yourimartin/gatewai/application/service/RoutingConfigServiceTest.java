@@ -175,4 +175,25 @@ class RoutingConfigServiceTest {
         service.update(config("embedding", routes)));
     verify(port, never()).update(any());
   }
+
+  @Test
+  void cascadeMarginBandIsReadAndWrittenApartFromTheConfig() {
+    // v2 batch 9 (closing D26): the band is tunable over the admin API but is
+    // not part of RoutingConfig, so editing it cannot stale a calibration.
+    when(port.cascadeMarginBand()).thenReturn(0.02);
+    assertEquals(0.02, service.cascadeMarginBand());
+
+    service.updateCascadeMarginBand(0.05);
+
+    verify(port).updateCascadeMarginBand(0.05);
+    verify(port, never()).update(any());
+  }
+
+  @Test
+  void rejectsCascadeMarginBandOutsideZeroOne() {
+    assertThrows(IllegalArgumentException.class, () ->
+        service.updateCascadeMarginBand(-0.1));
+    assertThrows(IllegalArgumentException.class, () ->
+        service.updateCascadeMarginBand(1.5));
+  }
 }

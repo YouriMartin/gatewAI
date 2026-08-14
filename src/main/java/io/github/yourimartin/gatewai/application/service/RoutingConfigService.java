@@ -38,6 +38,25 @@ class RoutingConfigService implements RoutingConfigUseCase {
     port.update(config);
   }
 
+  @Override
+  public double cascadeMarginBand() {
+    return port.cascadeMarginBand();
+  }
+
+  /**
+   * A band of 0 disables escalation on ambiguity (the conformal set can still
+   * escalate); 1 escalates everything the routes answer. Both ends are legal
+   * settings, so the only invalid value is one outside them.
+   */
+  @Override
+  public void updateCascadeMarginBand(double band) {
+    if (band < 0 || band > 1) {
+      throw new IllegalArgumentException(
+          "cascade margin band must be within [0, 1]");
+    }
+    port.updateCascadeMarginBand(band);
+  }
+
   private static void validate(RoutingConfig config) {
     String strategy = config.strategy() == null
         ? null : config.strategy().toLowerCase(Locale.ROOT);
