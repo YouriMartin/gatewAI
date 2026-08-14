@@ -40,6 +40,7 @@ class OcclusionAttributionServiceTest {
 
   private CountingEmbedder embedder;
   private StubRoutingConfig routingConfig;
+  private SemanticRouteIndex index;
   private MapCache cache;
   private OcclusionAttributionService service;
 
@@ -47,9 +48,10 @@ class OcclusionAttributionServiceTest {
   void setUp() {
     embedder = new CountingEmbedder();
     routingConfig = new StubRoutingConfig(config("embedding"));
+    index = new SemanticRouteIndex(embedder);
     cache = new MapCache();
-    service = new OcclusionAttributionService(embedder, routingConfig, cache,
-        20, 200);
+    service = new OcclusionAttributionService(embedder, routingConfig, index,
+        cache, 20, 200);
   }
 
   @Test
@@ -110,7 +112,7 @@ class OcclusionAttributionServiceTest {
   @DisplayName("the cap bounds the cost whatever the prompt looks like")
   void segmentCapIsRespected() {
     OcclusionAttributionService capped = new OcclusionAttributionService(
-        embedder, routingConfig, cache, 3, 200);
+        embedder, routingConfig, index, cache, 3, 200);
 
     AttributionReport report = capped.attribute(
         "Refactor it. Add tests. Ship it. Then benchmark it. Finally document it.");

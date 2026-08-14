@@ -209,10 +209,16 @@ vector instead of three
 
 ### Explaining a route match
 
-Which parts of a prompt drove its similarity to the matched route is answered on
-demand by occlusion attribution (v2 batch 7) — see
-[`attribution.md`](attribution.md). It is never computed while routing: it costs
-one embedding call per prompt segment plus one.
+Two questions, both answered on demand and never while routing — see
+[`attribution.md`](attribution.md):
+
+- **which parts of the prompt** drove its similarity to the matched route, by
+  occlusion attribution (v2 batch 7), at one embedding call per segment plus one;
+- **where it would have gone instead**, by counterfactuals (v2 batch 8): the
+  nearest route per *other* tier, its closest example and the gap that separated
+  them. That gap is what says whether the chosen tier was a robust fact about the
+  request or a coin landing on its edge — and it costs one embedding call,
+  because the ranking behind it is the one routing already computes.
 
 ## The RoutingAdvisor
 

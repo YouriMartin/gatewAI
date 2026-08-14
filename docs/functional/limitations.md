@@ -144,6 +144,24 @@ decision, by removing each segment and measuring what the similarity loses
   abbreviations ("Ask Dr. | Martin…"), which costs one extra segment. Accepted
   rather than patched per language.
 
+## Counterfactuals explain the ranking, not the final tier
+
+Since v2 batch 8 the gateway can also say where a request would have gone
+instead, and by how little it missed
+([`attribution.md`](../technical/attribution.md)).
+
+- **They describe which route came closest**, which is the whole answer only when
+  the router took the routes' word for it. A similarity below threshold, a
+  fallback, a cascade escalation or a client-pinned model id can all send the
+  request somewhere the ranking does not predict — the stored decision is what
+  says what actually happened.
+- **A gap is not a probability.** It is a cosine difference against the routes
+  configured *now*: it says how close the ranking was, not how likely the other
+  outcome was.
+- **They move when the routes do.** Nothing is cached, so an answer always
+  reflects the current configuration — and two answers taken either side of a
+  route edit are not comparable.
+
 ## Single-instance assumptions (not cluster-ready)
 
 - The **deferred-job store is in-memory**: queued async jobs are **lost on

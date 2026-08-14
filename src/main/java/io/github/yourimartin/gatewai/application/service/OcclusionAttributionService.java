@@ -2,8 +2,6 @@ package io.github.yourimartin.gatewai.application.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,27 +59,23 @@ class OcclusionAttributionService implements PromptAttributionUseCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(OcclusionAttributionService.class);
 
-  /** Strategies that decide by similarity, and so have similarity to explain. */
-  private static final Set<String> SEMANTIC_STRATEGIES =
-      Set.of("embedding", "cascade");
-
   private final TextEmbedder embedder;
   private final RoutingConfigPort routingConfig;
+  private final SemanticRouteIndex index;
   private final AttributionCache cache;
   private final int maxSegments;
   private final int maxSegmentChars;
 
-  /** Example-embedding index, rebuilt when the routes change. */
-  private volatile RouteIndex index;
-
   OcclusionAttributionService(
       TextEmbedder embedder,
       RoutingConfigPort routingConfig,
+      SemanticRouteIndex index,
       AttributionCache cache,
       @Value("${gatewai.attribution.max-segments:20}") int maxSegments,
       @Value("${gatewai.attribution.max-segment-chars:200}") int maxSegmentChars) {
     this.embedder = embedder;
     this.routingConfig = routingConfig;
+    this.index = index;
     this.cache = cache;
     this.maxSegments = maxSegments;
     this.maxSegmentChars = maxSegmentChars;
@@ -96,13 +90,13 @@ class OcclusionAttributionService implements PromptAttributionUseCase {
       return AttributionReport.notComputed(
           AttributionStatus.EMPTY_PROMPT, embedder.modelId(), version);
     }
-    if (!isSemantic(config)) {
+    if (!config.decidesBySimilarity()) {
       // Not a failure: the honest answer is that this decision was not about
       // similarity at all, and saying so beats returning an empty list.
       return AttributionReport.notComputed(
           AttributionStatus.NOT_APPLICABLE_STRATEGY, embedder.modelId(), version);
     }
-    List<SemanticRoute> routes = usableRoutes(config);
+    List<SemanticRoute> routes = config.usableRoutes();
     if (routes.isEmpty()) {
       return AttributionReport.notComputed(
           AttributionStatus.NO_ROUTES_CONFIGURED, embedder.modelId(), version);
@@ -119,13 +113,14 @@ class OcclusionAttributionService implements PromptAttributionUseCase {
 
   private AttributionReport compute(String prompt, List<SemanticRoute> routes,
                                     String version) {
-    RouteIndex routeIndex = indexFor(routes);
+    List<EmbeddedRoute> routeIndex = index.forRoutes(routes);
     float[] promptVector = embedder.embed(prompt);
 
     List<ClassificationJustification.RouteCandidate> candidates =
-        RouteScoring.rank(promptVector, routeIndex.routes());
+        RouteScoring.rank(promptVector, routeIndex);
     ClassificationJustification.RouteCandidate best = candidates.getFirst();
-    float[] utterance = utteranceVector(routeIndex, best);
+    float[] utterance = SemanticRouteIndex.vectorOf(
+        routeIndex, best.route(), best.bestUtterance());
 
     List<PromptSegment> segments =
         PromptSegmentation.segment(prompt, maxSegments, maxSegmentChars);
@@ -193,58 +188,4 @@ class OcclusionAttributionService implements PromptAttributionUseCase {
     }
   }
 
-  /** The vector of the example the prompt matched, from the index. */
-  private static float[] utteranceVector(
-      RouteIndex index, ClassificationJustification.RouteCandidate best) {
-    for (EmbeddedRoute embedded : index.routes()) {
-      if (embedded.route().name().equals(best.route())) {
-        int position = embedded.route().examples().indexOf(best.bestUtterance());
-        if (position >= 0) {
-          return embedded.exampleVectors().get(position);
-        }
-      }
-    }
-    throw new IllegalStateException(
-        "The matched utterance is not in the index: " + best.route());
-  }
-
-  private static boolean isSemantic(RoutingConfig config) {
-    return config.strategy() != null && SEMANTIC_STRATEGIES.contains(
-        config.strategy().toLowerCase(Locale.ROOT));
-  }
-
-  private static List<SemanticRoute> usableRoutes(RoutingConfig config) {
-    return config.routes().stream()
-        .filter(route -> route.tier() != null && !route.examples().isEmpty())
-        .toList();
-  }
-
-  /**
-   * The example vectors, re-embedded only when the routes change (record
-   * equality on the snapshot, the same trick the classifier's index uses).
-   * Rebuilding per call would triple the cost of an attribution for nothing.
-   */
-  private RouteIndex indexFor(List<SemanticRoute> routes) {
-    RouteIndex current = index;
-    if (current != null && current.snapshot().equals(routes)) {
-      return current;
-    }
-
-    List<EmbeddedRoute> embedded = new ArrayList<>(routes.size());
-    for (SemanticRoute route : routes) {
-      List<float[]> vectors = new ArrayList<>(route.examples().size());
-      for (String example : route.examples()) {
-        vectors.add(embedder.embed(example));
-      }
-      embedded.add(new EmbeddedRoute(route, vectors));
-    }
-
-    RouteIndex fresh = new RouteIndex(routes, List.copyOf(embedded));
-    index = fresh;
-    return fresh;
-  }
-
-  private record RouteIndex(List<SemanticRoute> snapshot,
-                            List<EmbeddedRoute> routes) {
-  }
 }

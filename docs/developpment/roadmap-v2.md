@@ -766,17 +766,58 @@ until batch 9**, which is where the plan puts the endpoint.
 
 ---
 
-## Batch 8 — Counterfactuals
+## Batch 8 — Counterfactuals — ✅ done
 
-Route examples are indexed **in memory**, not in pgvector, so the search is local
-and nearly free — no SQL.
+Where the request would have gone instead: for each of the nearest non-chosen
+routes (limit 3), its tier, its closest example and the gap that separated it
+from the winner — *"the request would have gone to tier X had it looked more like
+⟨example⟩"*. Route examples are indexed **in memory**, not in pgvector, so the
+search is local and nearly free — no SQL. Method and limits in
+[`../technical/attribution.md`](../technical/attribution.md).
 
-For each of the top non-chosen routes (limit 3): nearest utterance and similarity
-gap with the chosen route. Rendered as *"the request would have gone to tier X had
-it looked more like ⟨example⟩"*.
+Two corrections found while implementing:
 
-Returned examples come from route **configuration**, never from user data —
-assert this explicitly in a test, since the same index would happily hold either.
+- **D32 — "top non-chosen routes" spends the list on non-answers.** Several
+  routes map to the same tier in the shipped configuration, so the routes ranked
+  2 and 3 are usually routes leading back to the tier that already won. "It
+  would have gone to `LOCAL`" about a request that went to `LOCAL` is not a
+  counterfactual, and three of them are a list with nothing in it. Alternatives
+  at the chosen tier are therefore excluded.
+- **D33 — one route per tier.** For the same reason, only the best-scoring route
+  of each other tier is kept: it is the one that would have won that tier, and
+  three ways to reach one tier crowd out the tiers the reader has not been told
+  about. The alternative offered is an *outcome*, which is what makes it worth
+  reading.
+
+### 8.1 The ranking read backwards — ✅
+
+`Counterfactuals` (domain) does the selection on candidates that were already
+scored — no embedding, no search, so it is tested on rankings written by hand.
+The whole cost of a report is the ranking itself: **one embedding call**, against
+an index that is already built.
+
+Nothing is cached, unlike attribution: a key would have to be kept in step with
+the routing config to save a single call, so counterfactuals recompute and are
+always current. `NO_ALTERNATIVE_TIER` is a status of its own — routes exist, one
+won, and no wording of the request would have changed where it went.
+
+### 8.2 Shared route index — ✅
+
+`SemanticRouteIndex` replaces the private index batch 7 kept inside the
+attribution service, and is used by both explanation services. Batch 9's explain
+endpoint answers both questions about one prompt, and two private indexes would
+embed every configured example twice and hold two copies. The classifier keeps
+its own on purpose: it is on the request path, reads a different configuration
+source, and must not have its latency coupled to an admin tool.
+
+### Acceptance
+
+Domain selection and the service ship with unit tests (bag-of-words embedder, so
+every gap is a subtraction the reader can check), including the one the plan
+asked for by name: **every returned utterance is a configured example, and none
+is any part of the request**. The same index would happily hold either, and an
+explanation quoting one client's prompt back to another would be a data leak
+wearing the costume of a feature. **Not reachable over HTTP until batch 9.**
 
 ---
 
@@ -886,7 +927,7 @@ Batch 3   Conformal calibration (cache first)                       ✅ done
 Batch 4   Calibrated cascade routing (+ client pinning)          ✅ done
 Batch 6   Observability                                          ✅ done
 Batch 7   Occlusion attribution                                  ✅ done
-Batch 8   Counterfactuals
+Batch 8   Counterfactuals                                 ✅ done
 Batch 9   API and dashboard
 Batch 10  Documentation                  ← continuous
 ```
