@@ -40,8 +40,8 @@ pool and picks the most suitable model per request. Notable traits:
 | **Headline metric** | Routing accuracy / cost-latency efficiency | **€ saved and gCO2 avoided**, with CSRD export |
 | **Form factor** | Envoy `ext_proc` in a serving data plane | **Standalone thin gateway** (one Spring Boot process) |
 | **Stack** | Go + Rust, Envoy / Kubernetes | **Java 25 / Spring Boot 4 / Spring AI**, advisor chain |
-| **Classifier** | Fine-tuned BERT category model | **Heuristics by default**, optional small-LLM structured-output classifier, hot-configurable |
-| **Caching** | Semantic cache | Semantic cache on **pgvector**, **local embeddings** (Ollama), **per-client namespacing** |
+| **Classifier** | Fine-tuned BERT category model | **Semantic routes by default** (in-process embedding similarity, calibrated threshold), heuristic fallback, optional small-LLM classifier and an opt-in cascade — all hot-configurable |
+| **Caching** | Semantic cache | Semantic cache on **pgvector**, **in-process embeddings** (bundled ONNX, no model server), **per-client namespacing** |
 | **Guardrails** | PII detection, prompt guard, tool selection, reasoning control | **None of these (yet)** |
 | **Carbon awareness** | Not a focus | **Carbon model, real-time grid intensity, avoided-CO2, temporal/geo-aware deferral** |
 | **Reporting/UI** | Routing/observability metrics | **Green dashboard + CSV/PDF CSRD reports** |

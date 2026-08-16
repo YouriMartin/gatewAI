@@ -5,6 +5,7 @@ import org.springframework.ai.transformers.TransformersEmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Primary;
 
 /**
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.Primary;
  * which is what makes them detectably stale when the model changes.
  */
 @Configuration
+@ImportRuntimeHints(EmbeddingNativeRuntimeHints.class)
 class EmbeddingConfiguration {
 
   @Bean

@@ -100,7 +100,7 @@ name, and pulls its chat models from Ollama on first start.
 
 Runtime config is environment-overridable (Spring relaxed binding), e.g.
 `ANTHROPIC_API_KEY`, `SPRING_DATASOURCE_URL/USERNAME/PASSWORD`,
-`SPRING_AI_OLLAMA_BASE_URL`, `ELECTRICITY_MAPS_TOKEN`. `.env.example` documents the
+`OLLAMA_BASE_URL`, `ELECTRICITY_MAPS_TOKEN`. `.env.example` documents the
 plug & play variables; `.env` is git-ignored.
 
 ## Native image (optional)

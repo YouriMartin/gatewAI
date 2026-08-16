@@ -182,7 +182,7 @@ re-record deliberately, not reactively.
   have made every future calibration look current forever. See
   [`../decisions.md`](../decisions.md).
 
-## A.5 — Native image, docs, ADR
+## A.5 — Native image, docs, ADR — ✅ done
 
 - ONNX Runtime loads a native library. Add the reflection/resource hints and
   extend `NativeRuntimeHintsTest`. Native status stays "native-ready, not
@@ -199,10 +199,46 @@ re-record deliberately, not reactively.
   registry table still lists Anthropic models; ADR 0003 still says "defaulting
   to Anthropic Claude"; ADR 0002 still says streaming short-circuit is deferred.
 
-**Acceptance**
-- No doc still tells a reader that Ollama is required for the cache or the
-  router.
-- Decision latency p50/p95 measured at fixture time and published.
+**Acceptance** — met:
+- Hints for all three invisible pieces (`onnx/**`, `ai/onnxruntime/native/**`,
+  `native/lib/**`) plus the `ai.onnxruntime` types JNI instantiates, in
+  `EmbeddingNativeRuntimeHints`, with `EmbeddingNativeRuntimeHintsTest` reading
+  the model path **from the shipped properties** so a renamed directory fails
+  here rather than in a native build nobody runs daily. Native status unchanged:
+  **native-ready, not validated**.
+- [ADR 0011](../technical/adr/0011-in-process-onnx-embedding.md) written, with
+  the alternatives that were real (keep Ollama / hosted embedding API) and the
+  consequences measured rather than guessed.
+- The three known drifts are fixed: `routing.md`'s registry table now shows the
+  local-first Qwen defaults, ADR 0003 no longer "defaults to Anthropic Claude",
+  ADR 0002 no longer calls the streaming short-circuit deferred.
+- No doc claims Ollama is needed to cache or route. The sweep also caught
+  `overview.md`, the vLLM comparison, `observability.md`, `README.md`, and a dead
+  `SPRING_AI_OLLAMA_BASE_URL` still exported by CI, `dev.sh` and the plug & play
+  compose for an auto-config that no longer exists.
+- Decision latency published: **p50 3.2 ms / p95 8.2 ms**, recorded live at
+  fixture time (34 / 44 ms before lot A).
+- Deviation: the hints live in `infrastructure/llm` with their own test rather
+  than extending the web-package `NativeRuntimeHintsTest` — see
+  [`../decisions.md`](../decisions.md).
+
+---
+
+## Lot A — done
+
+| Batch | Outcome |
+|---|---|
+| A.1 | Bean swap; jar 161 → 349 MiB; boots in 7.9 s with no model server |
+| A.2 | 384-dim schema; upgrade = `DROP TABLE vector_store`, verified both ways |
+| A.3 | `paraphrase-multilingual-MiniLM-L12-v2` chosen on measurements |
+| A.4 | Fixtures re-recorded, baselines re-set, calibrations re-fit; build green |
+| A.5 | Native hints, ADR 0011, doc drifts |
+
+What lot A actually bought: the **decision path** (cache, routing, attribution,
+counterfactuals) needs **Postgres alone**, decisions got ~10× faster (34 → 3.2 ms
+p50), and calibrated routing accuracy moved 83.0 % → 82.0 %. What it cost: a
+349 MiB jar, a Git LFS dependency for clones, and a mandatory
+`DROP TABLE vector_store` on upgrade.
 
 ---
 

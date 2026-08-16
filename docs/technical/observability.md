@@ -120,7 +120,8 @@ answer the per-request ones.
 
 ## Prometheus + Grafana demo
 
-The app manages its own `compose.yaml` (Postgres + Ollama). The observability
+The app manages its own `compose.yaml` (Postgres; Ollama behind the `inference`
+profile since v3 lot A). The observability
 stack is **separate** and started on demand:
 
 ```bash

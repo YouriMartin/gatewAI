@@ -7,6 +7,33 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot A — A.5 (native image, docs, ADR)
+
+- **The embedding hints live in `infrastructure/llm`, not in the web package.**
+  The plan says "extend `NativeRuntimeHintsTest`", which sits in
+  `adapter/in/web` alongside the DTO hints it covers. Putting ONNX resource
+  patterns there would have made the web adapter the home of an infrastructure
+  concern for no reason other than the test's address. `EmbeddingNativeRuntimeHints`
+  is imported by `EmbeddingConfiguration` and tested by a sibling
+  `EmbeddingNativeRuntimeHintsTest`; both hint sets keep the same shape.
+- **The resource hint embeds the model in the binary, and that is a choice with
+  a way out.** Registering `onnx/**` puts ~130 MB inside a native image. The
+  alternative — `file:` URIs and the model shipped beside the binary — is
+  documented in [`technical/native.md`](technical/native.md) rather than
+  configured by default, because the default should be the one that works
+  without extra deployment steps.
+- **JNI reachability is declared, not proven, and the docs say so.** The
+  `ai.onnxruntime` types the runtime instantiates from native code are
+  registered by name, but only a GraalVM build can show that set is complete.
+  Native status stays *native-ready, not validated* — v3 lot A added hints and a
+  test, not a claim.
+- **The drift sweep found more than the three known items.** `overview.md`, the
+  vLLM comparison, `observability.md` and `README.md` still described embeddings
+  as an Ollama concern, and `SPRING_AI_OLLAMA_BASE_URL` was still exported by
+  CI, `scripts/dev.sh` and the plug & play compose for an auto-configuration
+  A.1 excluded. Removed; `dev.sh` now passes `OLLAMA_BASE_URL`, which is the
+  variable the egress provider actually reads.
+
 ## v3 lot A — A.4 (fixtures, baselines, calibration)
 
 - **A latent bug from A.1, found by running the acceptance rather than assuming

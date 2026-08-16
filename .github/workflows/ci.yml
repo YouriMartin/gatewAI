@@ -80,6 +80,5 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/greenaiproxy
           SPRING_DATASOURCE_USERNAME: dev
           SPRING_DATASOURCE_PASSWORD: dev
-          SPRING_AI_OLLAMA_BASE_URL: http://localhost:11434
           GATEWAI_PROVIDERS_OLLAMA_PULLMODELSTRATEGY: 'never'
         run: ./mvnw -B -Pit test

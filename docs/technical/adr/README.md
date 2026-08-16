@@ -16,3 +16,4 @@ part that ages well.
 | [0008](0008-conformal-prediction-over-fixed-thresholds.md) | Calibrate thresholds by conformal prediction, not tuning or Platt scaling | Accepted |
 | [0009](0009-occlusion-over-gradient-attribution.md) | Explain a route match by occlusion, not by gradients | Accepted |
 | [0010](0010-trace-cache-decisions-like-routing.md) | Trace cache decisions at the same level as routing decisions | Accepted |
+| [0011](0011-in-process-onnx-embedding.md) | Run the embedding model in-process (ONNX) instead of on a model server | Accepted |

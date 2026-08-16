@@ -25,5 +25,8 @@ advisor, because it only needs the final response.
 - Each concern is isolated and unit-testable in isolation.
 - Honest nuance: the "three advisors" mental model is really **two advisors + one
   service-level step**; the docs state this so the code matches the description.
-- Streaming short-circuit is deferred — the `call` path is implemented, `adviseStream`
-  currently delegates.
+- Streaming is implemented on both advisors (Phase 7.5): `adviseStream` reroutes
+  the prompt like the `call` path, and a cache hit is replayed as a **synthetic
+  `Flux`** — the client gets the streaming UX with no model call. The store side
+  captures `clientId` eagerly, because `doOnComplete` runs on a reactive thread
+  where the Scoped Value is unbound.

@@ -15,9 +15,13 @@ intensity (kWh/1k tokens), and tier. Default registry:
 
 | Key | Provider | Model id | Tier | €/1k | kWh/1k |
 |---|---|---|---|---|---|
-| `claude-opus` | anthropic | claude-opus-4-8 | `CLOUD_PREMIUM` | 0.015 | 0.005 |
-| `claude-haiku` | anthropic | claude-haiku-4-5 | `CLOUD_ENTRY` | 0.003 | 0.002 |
-| `ollama-local` | ollama | qwen2.5:0.5b | `LOCAL` | 0.0 | 0.001 |
+| `local-small` | ollama | qwen2.5:0.5b | `LOCAL` | 0.0 | 0.0005 |
+| `local-medium` | ollama | qwen2.5:1.5b | `CLOUD_ENTRY` | 0.0 | 0.001 |
+| `local-large` | ollama | qwen2.5:3b | `CLOUD_PREMIUM` | 0.0 | 0.002 |
+
+The defaults are **local-first since Phase 8**: three Qwen sizes on the bundled
+Ollama, zero API keys. Cloud entries (`claude-opus`, `gpt-…`) ship commented in
+`application.properties` — repoint a tier's registry entry to opt in.
 
 > The energy intensities are **placeholders** (see
 > [`green-accounting.md`](green-accounting.md)). The model ids are configurable.
@@ -50,7 +54,7 @@ a new strategy cannot be added without every reader saying what it renders:
 
 `Fallback` is what makes a **degraded** decision distinguishable from a nominal
 one: the same tier reached by the heuristic means something quite different when
-it was reached because Ollama was unreachable. Causes are
+it was reached because the embedding failed. Causes are
 `NO_ROUTES_CONFIGURED`, `BELOW_THRESHOLD`, `EMBEDDING_ERROR`,
 `NO_TIER_RETURNED` and `LLM_ERROR`. On a below-threshold hand-over the route
 scores ride along as `evidence`, so "the best route only reached 0.41 against a
@@ -69,15 +73,18 @@ a tier and described by **example prompts** ("utterances"), e.g.:
 | `drafting-and-summaries` | `CLOUD_ENTRY` | "Summarize this article…", "Résume ce texte…" |
 | `code-and-analysis` | `CLOUD_PREMIUM` | "Refactor this Java service…", "Analyse la complexité…" |
 
-The request is embedded with the **same local Ollama embedding model as the
-semantic cache** (in-process ONNX, `paraphrase-multilingual-MiniLM-L12-v2`,
-384 dim) and compared to every example with cosine
-similarity; the route holding the closest example wins
+The request is embedded with the **same model as the semantic cache** —
+in-process ONNX, `paraphrase-multilingual-MiniLM-L12-v2`, 384 dim, no model
+server involved ([ADR 0011](adr/0011-in-process-onnx-embedding.md)) — and
+compared to every example with cosine similarity; the route holding the closest example wins
 (**max-over-utterances**, more robust than centroids when a route's examples
 are diverse — the ranking itself lives in the domain as `RouteScoring`, shared
 with the calibration so the two cannot drift). Below the threshold in force the
-heuristic decides; on embedding failure it also falls back to the heuristic,
-so routing never breaks because Ollama is unreachable.
+heuristic decides; on embedding failure it also falls back to the heuristic, so
+routing never breaks because embedding failed. Since v3 lot A that failure mode
+is much narrower: the model is in the JVM, so there is no server to be
+unreachable — what remains is a corrupt or missing model resource, which fails
+at startup instead.
 
 Properties of this approach:
 

@@ -17,9 +17,9 @@ Architecture rules are themselves a test (ArchUnit).
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
 | decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
-| embedding | the real ONNX model, in-process | `InProcessEmbeddingModelTest` |
+| embedding | the real ONNX model, in-process, and its native-image hints | `InProcessEmbeddingModelTest`, `EmbeddingNativeRuntimeHintsTest` |
 
-**556 tests** run in the default build (v3 lot A). Per the project convention,
+**559 tests** run in the default build (v3 lot A). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -187,5 +187,7 @@ MCP shipped). See [`architecture.md`](architecture.md).
 ## Native & manual validation
 
 Full GraalVM native compilation is validated in a dedicated CI, not the default
-build (see [`native.md`](native.md)). Reflection hints have their own test
-(`NativeRuntimeHintsTest`) using `RuntimeHintsPredicates`.
+build (see [`native.md`](native.md)). Reflection and resource hints have their own
+tests (`NativeRuntimeHintsTest`, `EmbeddingNativeRuntimeHintsTest`) using
+`RuntimeHintsPredicates` — they prove the hints are *declared*, never that an
+image works.

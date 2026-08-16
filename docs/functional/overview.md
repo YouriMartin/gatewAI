@@ -28,7 +28,7 @@ yourself.
 | Pillar | What gatewAI does | Outcome |
 |---|---|---|
 | **Cost** | A **semantic cache** short-circuits redundant requests before any model call; a **smart router** sends each request to the cheapest model that can handle it | Fewer and cheaper paid calls |
-| **Privacy** | Fully **on-premise**: embeddings are computed locally (Ollama), provider keys live only in your deployment, data does not transit a SaaS gateway | Keys and prompts stay under your control |
+| **Privacy** | Fully **on-premise**: embeddings are computed **inside the gateway process** (bundled ONNX model — no model server, no vendor), provider keys live only in your deployment, data does not transit a SaaS gateway | Keys and prompts stay under your control |
 | **Carbon** | **Green accounting** turns tokens into estimated kWh and gCO2, computes the **CO2 avoided** thanks to cache + routing, and exports **CSRD-friendly reports** | Quantified, reportable AI footprint |
 
 ## Who it is for

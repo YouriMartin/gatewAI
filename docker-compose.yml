@@ -60,9 +60,9 @@ services:
       - 'SPRING_DATASOURCE_URL=jdbc:postgresql://pgvector:5432/${POSTGRES_DB:-greenaiproxy}'
       - 'SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-dev}'
       - 'SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-dev}'
-      # Embeddings (Spring AI auto-config) and chat egress (gatewai.providers)
-      # both point at the bundled Ollama service.
-      - 'SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434'
+      # Chat egress only. Embeddings run in-process since v3 lot A, so the
+      # gateway needs no model server to cache or route — this points the
+      # `ollama` provider instance at the bundled service.
       - 'OLLAMA_BASE_URL=http://ollama:11434'
       # Optional cloud egress — only used if a registry tier references it.
       - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'

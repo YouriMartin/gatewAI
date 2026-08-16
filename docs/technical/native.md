@@ -34,9 +34,33 @@ explicitly:
 | Web DTOs (OpenAI, admin, reports…) | controller Jackson binding | `NativeRuntimeHints` (`@ImportRuntimeHints`) |
 | `ClassificationResult` | Spring AI Structured Output | `@RegisterReflectionForBinding` on `ChatClientConfiguration` |
 | `ElectricityMapsResponse` | RestClient body | `@RegisterReflectionForBinding` on `CarbonConfiguration` |
+| The ONNX model, both JNI libraries, `ai.onnxruntime.*` | in-process embeddings (v3 lot A) | `EmbeddingNativeRuntimeHints` (`@ImportRuntimeHints` on `EmbeddingConfiguration`) |
 
-Test: `NativeRuntimeHintsTest` checks the registration via
-`RuntimeHintsPredicates`.
+Tests: `NativeRuntimeHintsTest` and `EmbeddingNativeRuntimeHintsTest` check the
+registrations via `RuntimeHintsPredicates`.
+
+### The embedding model in a closed world (v3 lot A)
+
+Three things the image needs that no static analysis can find:
+
+- **the model** — `onnx/**`, named by a `classpath:` URI read from
+  configuration, so nothing in the bytecode mentions it;
+- **ONNX Runtime's JNI libraries** — `ai/onnxruntime/native/**`, extracted from
+  the library's own jar at first use;
+- **DJL's tokenizer library** — `native/lib/**`, extracted the same way. DJL's
+  `api` jar ships `META-INF/native-image` metadata (including
+  `--initialize-at-run-time` for its engine); the `tokenizers` jar does **not**,
+  which is why that pattern is declared here.
+
+Two consequences to plan for:
+
+- **The binary carries the model**: registering `onnx/**` embeds ~130 MB.
+  A deployment that would rather not can point
+  `spring.ai.embedding.transformer.onnx.model-uri` and `…tokenizer.uri` at
+  `file:` paths and ship the model beside the binary.
+- **JNI reachability is declared, not proven.** The `ai.onnxruntime` types the
+  runtime instantiates from native code are registered, but only a real GraalVM
+  build can show the set is complete. Treat the first native run as the test.
 
 ## Caveats to validate in a GraalVM CI
 
@@ -50,6 +74,12 @@ environment). To verify in a dedicated CI:
   reachable at build time (or use a build profile without a DataSource).
 - Add `org.graalvm.buildtools:native-maven-plugin` reachability metadata
   (already wired by the parent via `add-reachability-metadata`).
+- **ONNX Runtime + DJL under GraalVM** (v3 lot A) is the newest unknown: the
+  hints above cover resources and the JNI-facing types, but native libraries
+  loaded through `System.load` after extraction are exactly the case that tends
+  to need `--initialize-at-run-time` tuning. If the image builds but the first
+  embedding fails, start there. The JVM path is unaffected either way.
 
 Status: **native-ready** (config + hints + docs). Full-image validation to be
-done on a GraalVM runner.
+done on a GraalVM runner — unchanged by v3 lot A, which added hints and a test
+but no claim that the image works.

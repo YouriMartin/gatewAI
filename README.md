@@ -131,7 +131,7 @@ the gateway seeds an admin client with that exact key at startup. Use it as the
 The quickest way is the dev environment script (manages infra + backend):
 
 ```bash
-scripts/dev.sh start      # Postgres + Ollama (compose.yaml) + backend (mvnw spring-boot:run)
+scripts/dev.sh start      # Postgres + Ollama (compose.yaml, inference profile) + backend
 scripts/dev.sh restart    # bounce the backend only (infra stays up)
 scripts/dev.sh stop       # stop backend + infra (data kept)
 scripts/dev.sh status     # status, URLs; `logs` to tail, `clean` to wipe volumes

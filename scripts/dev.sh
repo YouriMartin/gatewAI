@@ -122,7 +122,7 @@ backend_start() {
   SPRING_DATASOURCE_URL="$DB_URL" \
   SPRING_DATASOURCE_USERNAME="$DB_USER" \
   SPRING_DATASOURCE_PASSWORD="$DB_PASS" \
-  SPRING_AI_OLLAMA_BASE_URL="$OLLAMA_URL" \
+  OLLAMA_BASE_URL="$OLLAMA_URL" \
   setsid ./mvnw -q -DskipFrontend spring-boot:run >"$BACK_LOG" 2>&1 </dev/null &
   echo $! >"$BACK_PID"
   ok "backend launched (pid $(cat "$BACK_PID")) — logs: $BACK_LOG"
