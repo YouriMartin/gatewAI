@@ -106,9 +106,10 @@ score is guessing with the user's answer.
 With no valid calibration the advisor degrades to exactly the previous behaviour
 — fixed threshold, best candidate wins — and records `NOT_CALIBRATED` or
 `STALE_CALIBRATION` so a degraded decision stays distinguishable. On the shipped
-labels, the calibrated threshold is `0.9423` at α = 0.10, which serves wrong
-answers 12.5 % of the time against the fixed threshold's 16.1 %, at the cost of a
-lower hit rate. Method, numbers and limits:
+labels and the in-process model (v3 batch A.4), the calibrated threshold is
+`0.9526` at α = 0.10, which serves wrong answers 14.3 % of the time — the same
+rate as the fixed 0.92 on this model — at the cost of a lower hit rate (13 %
+against 25 %). Method, numbers and limits:
 [`conformal-calibration.md`](conformal-calibration.md).
 
 ## Traced decisions (v2 batch 2)

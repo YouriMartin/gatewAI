@@ -62,28 +62,38 @@ round, so the cache is calibrated on the pairs that must never be served.
 Measured by the batch 5 harness, fitting on the calibration halves and scoring
 on the disjoint test halves (100 prompts, 100 pairs):
 
-| Routing | Fixed 0.60 | Calibrated 0.4588 |
+| Routing | Fixed 0.25 | Calibrated 0.2221 |
 |---|---|---|
-| Accuracy | 62.0 % | **83.0 %** |
-| English / French | 45.1 % / 79.6 % | **90.2 %** / 75.5 % |
-| Below-threshold hand-overs | 47 of 100 | **5 of 100** |
-| Over- / under-routed | 4 / 34 | 9 / 8 |
-| Empirical coverage (target 90 %) | — | **93.0 %** (1 s.e. 3.0 %) |
+| Accuracy | 81.0 % | **82.0 %** |
+| English / French | 78.4 % / 83.7 % | **80.4 %** / 83.7 % |
+| Below-threshold hand-overs | 7 of 100 | **4 of 100** |
+| Over- / under-routed | 12 / 7 | 13 / 5 |
+| Empirical coverage (target 90 %) | — | **91.0 %** (1 s.e. 3.0 %) |
 
-| Cache | Fixed 0.92 | Calibrated 0.9423 |
+| Cache | Fixed 0.92 | Calibrated 0.9526 |
 |---|---|---|
-| Wrong answers served (FP) | 16.1 % | **12.5 %** (target ≤ 10 %, 1 s.e. 4.0 %) |
-| Refused but servable (FN) | 45.5 % | 65.9 % |
-| Hit rate | 33.0 % | 22.0 % |
+| Wrong answers served (FP) | 14.3 % | **14.3 %** (target ≤ 10 %, 1 s.e. 4.0 %) |
+| Refused but servable (FN) | 61.4 % | 88.6 % |
+| Hit rate | 25.0 % | 13.0 % |
+
+> Numbers re-measured in **v3 batch A.4** on the in-process
+> `paraphrase-multilingual-MiniLM-L12-v2` (384 dim). On the previous model
+> (`nomic-embed-text`, 768 dim) the same method gave routing 62 % → 83 % at a
+> calibrated 0.4588, and cache FP 16.1 % → 12.5 % at 0.9423. A q̂ belongs to the
+> model that produced the similarities — which is exactly what the
+> `embedding_model` column is for.
 
 Three things worth saying plainly:
 
-- **The routing gain is the threshold, not the prediction set.** Batch 5 found
-  that 82 % of English prompts scored below 0.60 and were decided by the
-  heuristic, which sends short text to `LOCAL`. Lowering the threshold to a
-  calibrated 0.4588 removes almost all of those hand-overs, and English accuracy
-  doubles. French loses four points on the way: a lower bar admits more
-  near-misses, and French was already clearing the old one.
+- **The routing gain is the threshold, not the prediction set.** This is the
+  batch's most reusable finding, and v3 proved it twice. On the old model, 82 %
+  of English prompts scored below the guessed 0.60 and were decided by the
+  heuristic; calibrating to 0.4588 removed almost all of those hand-overs and
+  doubled English accuracy. On the new model the guess was wrong again and in the
+  same direction — 88 of 100 prompts below 0.60 — so v3 batch A.4 moved the
+  *fixed fallback* to 0.25 as well. A similarity threshold is a property of an
+  embedding model, never a constant to carry between them. What calibration adds
+  on top is the last two points (81 % → 82 %) **and** a stated guarantee.
 - **The routing prediction set is not a decision on its own.** At α = 0.10 it
   usually contains all three tiers — 70 of 100 test prompts — so the router takes
   the top-ranked route and records the set as evidence. v2 batch 4 made the set
@@ -91,7 +101,8 @@ Three things worth saying plainly:
   not a singleton, as planned, would have called the classifier model for 70 % of
   requests. The cascade therefore reads the set *and* the margin — empty
   escalates, a singleton decides, several tiers escalate only inside a margin
-  band — which lands at 23 % escalation. Details in
+  band — which lands at 10 % escalation on the current model (23 % on the model
+  batch 4 measured). Details in
   [`routing.md`](routing.md#cascade-opt-in--cascadecomplexityclassifier-v2-batch-4).
   The set is still worth its column: singletons are right 93 % of the time
   against 79 % for the rest.
@@ -102,10 +113,17 @@ Three things worth saying plainly:
 
 ### What the old constants were implicitly choosing
 
-On the shipped labelled set, `α = 0.20` yields a cache threshold of **0.9203** —
-the guessed 0.92, almost exactly. The old constant was not wrong so much as
-*unstated*: it was accepting a ~20 % wrong-answer rate, and nobody had written
-that down.
+On the v2 labelled set and model, `α = 0.20` yielded a cache threshold of
+**0.9203** — the guessed 0.92, almost exactly. The old constant was not wrong so
+much as *unstated*: it was accepting a ~20 % wrong-answer rate, and nobody had
+written that down.
+
+The v3 model rearranges the same trade: at the unchanged 0.92 it serves fewer
+wrong answers (14.3 %) and refuses far more servable pairs (61.4 %), and its
+α = 0.10 quantile lands at **0.9526**. The constant stayed because correctness is
+the side this cache errs on deliberately — but note what it costs now, 13 % hit
+rate against 22 % on the old model. That is the number to watch if the cache's
+carbon saving matters more than its precision in a given deployment.
 
 ### A floor no threshold can reach
 

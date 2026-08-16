@@ -54,7 +54,7 @@ it was reached because Ollama was unreachable. Causes are
 `NO_ROUTES_CONFIGURED`, `BELOW_THRESHOLD`, `EMBEDDING_ERROR`,
 `NO_TIER_RETURNED` and `LLM_ERROR`. On a below-threshold hand-over the route
 scores ride along as `evidence`, so "the best route only reached 0.41 against a
-0.60 bar" stays visible — the quantity batch 3 calibrates.
+0.25 bar" stays visible — the quantity batch 3 calibrates.
 
 ### Embedding routes (default) — `EmbeddingComplexityClassifier`
 
@@ -86,15 +86,14 @@ Properties of this approach:
   are English (within the embedding model's multilingual ability;
   the model shipped since v3 lot A is multilingual EN/FR, so keep bilingual
   examples per route or swap in a wider model for more languages).
-  **Measured since v2 batch 5, and not in the expected direction**: with the
-  default routes, English prompts reach a mean best-route similarity of 0.538
-  against 0.647 for French, so **82 % of English prompts fall below the 0.60
-  threshold** (French: 14 %) and are decided by the heuristic instead. Routing
-  accuracy follows: 45 % English against 80 % French. The limiting factor is the
-  fixed threshold, not language coverage — see [`evaluation.md`](evaluation.md).
-  **Fixed in v2 batch 3**: a threshold calibrated on labelled prompts (0.4588 at
-  α = 0.10) cuts hand-overs from 47 to 5 per 100 requests and lifts overall
-  accuracy from 62 % to 83 %, English from 45 % to 90 %. See
+  **Measured, and the lesson generalised twice**: on the v2 model
+  (`nomic-embed-text`) 82 % of English prompts fell below the then-shipped 0.60
+  threshold and were decided by the heuristic — a *threshold* problem, not a
+  language-coverage one. Calibration fixed it (0.4588, accuracy 62 % → 83 %). The
+  v3 in-process model has a different similarity scale, where 0.60 hands over 88
+  of 100 prompts, so the shipped fallback moved to **0.25** (v3 batch A.4). On
+  the current model the split is 78.4 % English / 83.7 % French at the fixed
+  threshold, 80.4 % / 83.7 % calibrated. See [`evaluation.md`](evaluation.md) and
   [`conformal-calibration.md`](conformal-calibration.md).
 - **N routes, any tier**: unlike premium keywords (which could only force
   premium), routes target any tier and any number of routes is allowed.
@@ -314,7 +313,8 @@ Ollama instances pull their registry models at startup per
 `cascade-margin-band` (0..1, default 0.02), `client-pinning` (default true),
 `model-id` (blank → entry model), `temperature`, `fallback-to-heuristic`,
 `entry-length-threshold`, `premium-length-threshold`, `premium-keywords`,
-`route-similarity-threshold` (0..1, default 0.60),
+`route-similarity-threshold` (0..1, default 0.25 since v3 batch A.4 — it is the
+embedding model's scale, not a universal constant),
 `routes[n].name` / `routes[n].tier` / `routes[n].examples[m]` (defaults with
 bilingual EN/FR examples are defined in `ClassifierProperties`).
 `gatewai.providers.<name>.*`: `type` (`anthropic`|`openai`|`openai-compatible`|`ollama`),

@@ -64,16 +64,20 @@ particular:
   TTL for such workloads.
 - Cache quality is bounded by the embedding model — since v3 lot A an
   in-process ONNX model (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim, EN/FR).
-- **Measured (v2 batch 5)**: on 300 hand-labelled `(query, cached entry)` pairs,
-  the shipped 0.92 threshold wrongly serves **16 %** of the answers it should
-  have refused and wrongly refuses **46 %** of those it could have served. No
+- **Measured (v3 batch A.4)**: on 300 hand-labelled `(query, cached entry)`
+  pairs, the shipped 0.92 threshold wrongly serves **14 %** of the answers it
+  should have refused and wrongly refuses **61 %** of those it could have served.
+  (On the previous embedding model the same constant gave 16 % / 46 % — the
+  threshold did not move, the similarity scale under it did.) No
   single threshold makes both small — the two distributions overlap. A residual
   ~4 % of false positives is irreducible by **any** threshold: they are questions
   whose answer changed since it was cached, a freshness problem a TTL fixes and
   similarity cannot.
-- **Calibrated (v2 batch 3)**, the threshold is fitted rather than guessed and
-  the wrong-answer rate drops to **12.5 %** — but the hit rate drops with it
-  (33 % → 22 %), so fewer wrong answers is bought with more model calls. The
+- **Calibrated (v2 batch 3, re-fitted in v3 A.4)**, the threshold is fitted
+  rather than guessed: **0.9526** at α = 0.10. On the current model it holds the
+  wrong-answer rate at 14 % while the hit rate falls from 25 % to **13 %**, so
+  fewer wrong answers is bought with more model calls — and on this model the
+  bill is higher than it was. The
   guarantee is **marginal, not per-request**: "at most α of non-servable pairs
   are served" describes the population, never your request. It also assumes the
   calibration cases are exchangeable with production traffic; the shipped labels
@@ -100,18 +104,21 @@ particular:
   still be wrong.
 - The router optimizes for cost tier, not for guaranteed answer quality on every
   request.
-- **Measured (v2 batch 5)**, on 300 hand-labelled prompts: at the guessed 0.60
-  threshold the default embedding strategy picks the labelled tier **62 %** of
-  the time (the heuristic alone: 34 %). Its errors were overwhelmingly
-  *under*-routing, because prompts scoring below the threshold fell back to the
-  heuristic, which sends short text to `LOCAL`.
-- **Calibrated (v2 batch 3)**, the threshold is fitted on labelled data and
-  accuracy reaches **83 %**, with under-routing down from 34 to 8 cases in 100.
-  The reported carbon saving *fell* as a result (55 % → 40 %): the earlier figure
-  was partly answer quality given away rather than efficiency gained, which is
-  why savings and under-routing are printed together. Two caveats remain: the
-  guarantee is marginal rather than per-request, and French accuracy dips
-  slightly (80 % → 76 %) as the lower bar admits more near-misses. See
+- **Measured (v3 batch A.4)**, on 300 hand-labelled prompts: the default
+  embedding strategy picks the labelled tier **81 %** of the time at the shipped
+  0.25 threshold and **82 %** calibrated, against the heuristic's **34 %** on the
+  same set. Errors split 12 over-routed / 7 under-routed per 100.
+- **The threshold belongs to the embedding model — shipping the wrong one is
+  expensive.** On the previous model (`nomic-embed-text`) the shipped 0.60 gave
+  62 %, mostly by *under*-routing: prompts below the bar fall back to the
+  heuristic, which sends short text to `LOCAL`. Calibration lifted that to 83 %.
+  The in-process model has a different scale — at 0.60 it would hand 88 of 100
+  prompts to the heuristic — which is why the default moved to 0.25.
+- **A calibrated threshold carries a stated guarantee, not a per-request
+  promise**: coverage is marginal over the distribution (measured 91 % against a
+  90 % target), so it says nothing about *your* prompt. The carbon saving moves
+  with accuracy too — 38 % here, printed next to the 7 under-routed requests per
+  100 that partly produce it. See
   [`evaluation.md`](../technical/evaluation.md) and
   [`conformal-calibration.md`](../technical/conformal-calibration.md).
 - **The cascade (v2 batch 4) is opt-in, and its benefit is not measured.** It

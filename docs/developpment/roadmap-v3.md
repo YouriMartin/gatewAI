@@ -143,7 +143,7 @@ the re-record, not after):
 - α = 0.10 now buys 14.3 % cache false positives at **88.6 %** false negatives
   (13 % hit rate), against 12.5 % / 65.9 % on the old model.
 
-## A.4 — Fixtures, baselines, calibration
+## A.4 — Fixtures, baselines, calibration — ✅ done
 
 The harness will fail the build on its own — that is the design working. Do the
 re-record deliberately, not reactively.
@@ -162,13 +162,25 @@ re-record deliberately, not reactively.
   no longer exists — which is exactly what the `embedding_model` provenance
   column and `gatewai_conformal_calibration_stale` are there to make loud.
 
-**Acceptance**
-- `./mvnw test` green, harness report regenerated.
-- The staleness path was observed in practice: on first start after the swap,
-  `GET /v1/admin/calibration` returns `STALE` for both targets and the gauge
-  reads 1, before recalibration.
-- The invariant "embedding strategy still beats the heuristic it falls back to"
-  still holds.
+**Acceptance** — all three met:
+- `./mvnw -DskipFrontend verify` **green: 556 tests, 0 failures** (Checkstyle +
+  SpotBugs included), report regenerated. First green build since A.1.
+- The staleness path was observed on a real database: a v2-era calibration row
+  (`embedding_model = nomic-embed-text`) makes the new build log
+  `CACHE/ROUTING calibration is STALE — falling back to the fixed threshold`,
+  `GET /v1/admin/calibration` return `STALE` for both targets with
+  `applied=false`, and `gatewai_conformal_calibration_stale{target=…}` read
+  **1.0**. After `POST /v1/admin/calibration`: both `VALID`, gauge **0.0**,
+  `gatewai_conformal_threshold` publishing 0.9526 and 0.2221.
+- The live fit matches the hermetic harness to four decimals (cache q̂ 0.952568
+  vs 0.9526; routing 0.777884 → threshold 0.222116 vs 0.2221), which is the two
+  paths agreeing rather than one being trusted.
+- **Embedding still beats the heuristic it falls back to**: 81 % against 34 % on
+  the same test set.
+- Found and fixed while doing it: `SpringAiTextEmbedder` stamped `"unknown"` as
+  the calibration's embedding model (it read a property A.1 deleted), which would
+  have made every future calibration look current forever. See
+  [`../decisions.md`](../decisions.md).
 
 ## A.5 — Native image, docs, ADR
 

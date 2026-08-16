@@ -19,7 +19,7 @@ Architecture rules are themselves a test (ArchUnit).
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 | embedding | the real ONNX model, in-process | `InProcessEmbeddingModelTest` |
 
-**554 tests** run in the default build (v3 lot A). Per the project convention,
+**556 tests** run in the default build (v3 lot A). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 

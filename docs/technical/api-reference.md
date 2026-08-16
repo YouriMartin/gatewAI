@@ -140,7 +140,7 @@ Returns `RoutingConfigView`:
 {"strategy": "embedding", "entry_length_threshold": 100,
  "premium_length_threshold": 500,
  "premium_keywords": ["refactor", "architecture", "security"],
- "route_similarity_threshold": 0.6,
+ "route_similarity_threshold": 0.25,
  "cascade_margin_band": 0.02,
  "routes": [
    {"name": "casual-chat", "tier": "local",
@@ -172,9 +172,9 @@ What governs each decision right now. One entry per target (`CACHE`, `ROUTING`):
 
 ```json
 [{"target": "CACHE", "status": "VALID", "applied": true,
-  "effectiveThreshold": 0.9423, "fixedFallback": 0.92,
-  "guarantee": "WRONG_ANSWER_RATE", "alpha": 0.10, "qhat": 0.9423,
-  "sampleSize": 93, "embeddingModel": "nomic-embed-text",
+  "effectiveThreshold": 0.9526, "fixedFallback": 0.92,
+  "guarantee": "WRONG_ANSWER_RATE", "alpha": 0.10, "qhat": 0.9526,
+  "sampleSize": 93, "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
   "routingConfigVersion": null, "calibratedAt": "2026-08-11T18:34:50Z"}]
 ```
 
@@ -186,8 +186,8 @@ Fits both calibrations from the labelled set and stores them. Body optional:
 `{"routingAlpha": 0.10, "cacheAlpha": 0.10}`; omitted values use the configured
 defaults. Returns the same shape as `GET`.
 
-Takes ~15 s on a local stack — it embeds every labelled pair and scores every
-labelled prompt. `409 calibration_failed` when the labelled set cannot support
+Takes ~2 s on a local stack since v3 lot A — it embeds every labelled pair and
+scores every labelled prompt, now in-process (it was ~15 s over HTTP). `409 calibration_failed` when the labelled set cannot support
 the α asked for (the message says how many cases it would need); `400
 invalid_alpha` when α is outside `(0,1)`. See
 [`conformal-calibration.md`](conformal-calibration.md).
@@ -209,18 +209,19 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
 ```json
 {"correlationId": "b3f1…", "at": "2026-08-14T09:12:11Z",
  "cache": {"outcome": "MISS", "similarityScore": 0.71, "runnerUpScore": 0.42,
-           "threshold": 0.9423, "conformalStatus": "EMPTY_SET",
+           "threshold": 0.9526, "conformalStatus": "EMPTY_SET",
            "matchedEntryId": null, "matchedEntryAgeSeconds": null,
-           "originCorrelationId": null, "embeddingModel": "nomic-embed-text"},
- "routing": {"chosenTier": "CLOUD_PREMIUM", "chosenModelId": "qwen3:14b",
+           "originCorrelationId": null,
+           "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2"},
+ "routing": {"chosenTier": "CLOUD_PREMIUM", "chosenModelId": "qwen2.5:3b",
              "decisionReason": "MATCH", "strategy": "EMBEDDING",
              "effectiveStrategy": "EMBEDDING", "escalatedTo": null,
              "routingLatencyMs": 12, "justification": { },
              "confidence": {"topScore": 0.81, "margin": 0.12,
-                            "threshold": 0.60,
+                            "threshold": 0.25,
                             "conformalSet": ["CLOUD_PREMIUM"], "alpha": 0.05},
              "promptHash": "…", "promptLength": 42,
-             "embeddingModel": "nomic-embed-text",
+             "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
              "routingConfigVersion": "c1bb83ddd18f7771"}}
 ```
 
@@ -247,7 +248,7 @@ explaining a prompt costs one local embedding call per segment plus one.
                      "nearestUtterance": "…", "similarity": 0.77,
                      "delta": 0.04, "rank": 1}]},
  "carbon": {"correlationId": "b3f1…"},
- "provenance": {"embeddingModelVersion": "nomic-embed-text",
+ "provenance": {"embeddingModelVersion": "paraphrase-multilingual-MiniLM-L12-v2",
                 "routingConfigVersion": "c1bb83ddd18f7771",
                 "calibrationDate": "2026-08-11T18:34:50Z", "status": "VALID"}}
 ```

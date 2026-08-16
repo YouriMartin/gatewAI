@@ -2,6 +2,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,23 @@ class InProcessEmbeddingModelTest {
     runner().run(context ->
         assertTrue(context.getBean(EmbeddingModel.class) instanceof MemoizingEmbeddingModel,
             "ADR 0007's memo must still wrap whatever computes the vectors"));
+  }
+
+  @Test
+  @DisplayName("the calibration's provenance names the model that produced the vectors")
+  void embedderReportsTheShippedModelId() {
+    String shippedId = shipped.getProperty("gatewai.embedding.model-id");
+
+    runner().withUserConfiguration(SpringAiTextEmbedder.class).run(context -> {
+      String reported = context.getBean(SpringAiTextEmbedder.class).modelId();
+
+      // Stamped on every stored calibration. If this ever reads a property that
+      // no longer exists it silently becomes "unknown" on *both* sides of the
+      // staleness comparison, and a calibration fitted on another model looks
+      // current forever. That is precisely what v3 batch A.1 broke.
+      assertEquals(shippedId, reported);
+      assertNotEquals("unknown", reported);
+    });
   }
 
   @Test

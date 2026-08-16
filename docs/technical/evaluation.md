@@ -213,68 +213,64 @@ holds that worst case at no more than 8 points (`cascadeWorstCaseAccuracyLossMax
 
 ## Results at the time of writing
 
-> **Stale since v3 lot A.** Every number in this section was measured on
-> `nomic-embed-text` (768 dim, over HTTP). The embedding model is now in-process
-> at 384 dimensions, which invalidates the fixtures these numbers come from —
-> the harness says so and fails the build until v3 batch A.4 re-records them.
-> Until then, read this as the v2 baseline, not as current behaviour.
-
-Embedding strategy, threshold 0.60, cache threshold 0.92, `nomic-embed-text`,
-default routes.
+Embedding strategy, `paraphrase-multilingual-MiniLM-L12-v2` in-process (384 dim),
+route threshold **0.25**, cache threshold 0.92, default routes — re-recorded in
+v3 batch A.4.
 
 | | Calibration | Test |
 |---|---|---|
-| Routing accuracy | 66.0 % | 62.0 % |
+| Routing accuracy | 76.0 % | **81.0 %** |
 | — heuristic baseline (same test set) | — | 34.0 % |
-| Over-routed / under-routed | 12 / 56 | 4 / 34 |
-| Cache false positives | 19.4 % | 16.1 % |
-| Cache false negatives | 54.2 % | 45.5 % |
-| CO2 saved vs all-premium | — | 55.4 % |
-| Decision latency p50 / p95 | — | 34 ms / 44 ms |
+| — English / French | 71.3 % / 80.8 % | 78.4 % / 83.7 % |
+| — calibrated (α = 0.10) | — | **82.0 %** |
+| Over-routed / under-routed | 32 / 16 | 12 / 7 |
+| Below-threshold hand-overs | 14 of 200 | 7 of 100 |
+| Cache false positives | 12.9 % | 14.3 % |
+| Cache false negatives | 63.6 % | 61.4 % |
+| CO2 saved vs all-premium | — | 38.4 % |
+| Decision latency p50 / p95 | — | **3.2 ms / 8.2 ms** |
 
-Four findings, none of which were visible before this batch existed.
+**Semantic routing earns its keep**: 81 % against the heuristic's 34 % on the same
+set, and the heuristic still scores 0 % on `keyword-trap`, `length-trap` and
+`ambiguous` — the traps it was designed to fall into. That gap is the invariant
+this harness exists to defend, and it survived the model swap.
 
-**1. English routes far worse than French — the opposite of the documented
-risk.** 45.1 % accuracy on English against 79.6 % on French. The cause is not the
-classifier but the threshold: the mean best-route similarity is **0.538 for
-English prompts against 0.647 for French**, so **82 % of English prompts fall
-below the 0.60 threshold** (French: 14 %), hand over to the heuristic, and the
-heuristic's default rule sends short prompts to `LOCAL`. Twenty-seven of the 38
-test misses are exactly that path. [`routing.md`](routing.md) warned that
-`nomic-embed-text` is English-centric and that French was therefore the risk; on
-this data the risk is the other way round, and it is a **threshold** problem, not
-a language-coverage problem. That is a strong argument for batch 3 calibrating
-`route-similarity-threshold` on data rather than shipping 0.60 as a guess.
+Three things the v3 run changed, and one it did not:
 
-**2. The 55 % carbon saving is partly under-routing, not efficiency.** 34 of 100
-test requests went to a cheaper tier than their label. The number is real and so
-is the caveat; they belong in the same sentence.
+- **Decision latency fell by an order of magnitude**, 34 ms → 3.2 ms p50. The old
+  figure was an HTTP round trip to Ollama; this one is an ONNX session in the
+  same JVM.
+- **The threshold moved with the model** (0.60 → 0.25) because a similarity
+  threshold belongs to an embedding model's scale. Kept at 0.60 the same model
+  scores 40 %, handing 88 of 100 prompts to the heuristic. See
+  [the candidate comparison](#choosing-the-in-process-embedding-model-v3-batch-a3).
+- **The cache trades differently at the same 0.92**: fewer wrong answers
+  (16.1 % → 14.3 %) for more refusals (45.5 % → 61.4 %). The constant was kept
+  because correctness is the side this cache errs on, and the baselines record
+  both halves of that trade.
+- **The savings caveat is unchanged in kind**: 38.4 % CO2 saved comes with 7
+  under-routed requests out of 100. The number is real and so is the caveat; they
+  belong in the same sentence.
 
-**3. The cache refuses about half of what it could serve.** At 0.92, false
-negatives are 45.5 % on the test set — every one a model call that did not need
-to happen — while false positives are still 16.1 %. The sweep shows the shape of
-the trade-off:
+### What the v2 run found, and why it still matters
 
-| Threshold | FP (calibration) | FN (calibration) | Hit rate |
-|---|---|---|---|
-| 0.85 | 49.5 % | 18.7 % | 66.5 % |
-| 0.90 | 26.9 % | 43.0 % | 43.0 % |
-| **0.92** (shipped) | **19.4 %** | **54.2 %** | **33.5 %** |
-| 0.95 | 8.6 % | 75.7 % | 17.0 % |
+The v2 baseline (`nomic-embed-text`, 768 dim, over HTTP) scored **62 %** routing
+accuracy at the fixed 0.60 and **83 %** calibrated, with cache FP 16.1 % / FN
+45.5 % and 34 ms p50 decisions. Two of its findings are the reason later batches
+exist and are worth keeping:
 
-There is no threshold that makes both small — the distributions overlap
-(servable pairs: median 0.910; non-servable: median 0.850). This is the batch 3
-argument in one table: a single global threshold is the wrong instrument, and α
-should be asymmetric because a false positive returns another question's answer
-to a user while a false negative costs one local inference.
+**1. English routed far worse than French — the opposite of the documented
+risk.** 45.1 % against 79.6 %, because the mean best-route similarity was 0.538
+for English against 0.647 for French, so 82 % of English prompts fell below the
+0.60 bar and were decided by the heuristic. It was a **threshold** problem, not a
+language-coverage problem — the argument that produced batch 3. The v3 model
+shows the same lesson from the other side: the number 0.60 was never portable.
 
-**4. Some false positives are irreducible.** At threshold 1.00 the false-positive
-rate is still 4.3 %: the `volatile` pairs, where the same question has a different
-answer today. No calibration reaches them; only a TTL or a freshness policy does.
-
-**Semantic routing does earn its keep**: 62 % against the heuristic's 34 % on the
-same set, and the heuristic scores 0 % on `keyword-trap`, `length-trap` and
-`ambiguous` — the traps it was designed to fall into.
+**2. Some false positives are irreducible.** At threshold 1.00 the cache
+false-positive rate was still 4.3 %: the `volatile` pairs, where the same question
+has a different answer today. No calibration reaches them; only a TTL or a
+freshness policy does. That is a property of the labelled data, not of the model,
+and it still holds.
 
 ---
 

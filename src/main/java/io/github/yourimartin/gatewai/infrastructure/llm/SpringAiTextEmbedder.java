@@ -15,6 +15,14 @@ import org.springframework.stereotype.Component;
  * a calibration run embeds each distinct text once anyway, and using the same
  * bean as the request path guarantees the vectors a threshold is fitted on are
  * the vectors it will be applied to.
+ *
+ * <p>{@code modelId} must name the model that produced those vectors: it is
+ * stamped on every stored calibration and is what makes one **detectably stale**
+ * when the model changes. It therefore reads the same
+ * {@code gatewai.embedding.model-id} as {@link EmbeddingConfiguration} — v3
+ * batch A.1 left it pointing at a deleted Ollama property, which stamped
+ * {@code "unknown"} on both sides of the comparison and quietly made every
+ * calibration look current forever.
  */
 @Component
 class SpringAiTextEmbedder implements TextEmbedder {
@@ -24,7 +32,7 @@ class SpringAiTextEmbedder implements TextEmbedder {
 
   SpringAiTextEmbedder(
       EmbeddingModel embeddingModel,
-      @Value("${spring.ai.ollama.embedding.options.model:unknown}") String modelId) {
+      @Value("${gatewai.embedding.model-id:unknown}") String modelId) {
     this.embeddingModel = embeddingModel;
     this.modelId = modelId;
   }

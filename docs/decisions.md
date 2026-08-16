@@ -7,6 +7,41 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot A — A.4 (fixtures, baselines, calibration)
+
+- **A latent bug from A.1, found by running the acceptance rather than assuming
+  it.** `SpringAiTextEmbedder` still read `${spring.ai.ollama.embedding.options.model}`
+  — a property A.1 deleted — so it resolved to `"unknown"` and stamped that on
+  every calibration it fitted. The damage is subtle and exactly the kind this
+  project cares about: staleness compares the stored model id to the current one,
+  and `"unknown" == "unknown"` means **a calibration fitted on another model would
+  have looked current forever**. Fixed to read `gatewai.embedding.model-id`, with
+  a test (`InProcessEmbeddingModelTest.embedderReportsTheShippedModelId`) that
+  fails if the provenance ever degrades to the default again.
+- **`route-similarity-threshold` 0.60 → 0.25, chosen from a sweep, not from the
+  calibrated value.** The sweep plateaus at 80–82 % between 0.15 and 0.30 and
+  collapses above 0.35; the conformal fit lands independently at 0.2221, which
+  corroborates the plateau. 0.25 sits **mid-plateau rather than at the argmax**
+  (0.22 and 0.30 both score 82.0 %): this constant is the *fallback* used when no
+  calibration is in force, and tuning a fallback to the peak of one labelled set
+  is the mistake calibration exists to correct. It also keeps a few hand-overs
+  (7 per 100) rather than routing everything by embedding, which preserves the
+  designed escape hatch for prompts unlike any route.
+- **The cache threshold stayed at 0.92 while the routing one moved.** Both are
+  model-scale constants, but they are not the same kind of choice: the cache errs
+  toward refusing, and on the new model 0.92 refuses *more* (FN 45.5 % → 61.4 %)
+  while serving *fewer* wrong answers (FP 16.1 % → 14.3 %). Moving it would have
+  bought hit rate with wrong answers, which is the trade this cache is documented
+  not to make. The cost is recorded rather than hidden: 13 % hit rate calibrated,
+  against 22 % on the old model.
+- **Two baselines were loosened, which the plan says needs a justification.**
+  `cacheFalseNegativeRateCalibrationMax` 0.57 → 0.66 and
+  `cacheFalseNegativeRateTestMax` 0.48 → 0.64, because the same fixed threshold
+  refuses more on the new model. The false-positive ceilings **tightened** in the
+  same commit (0.21 → 0.15 and 0.18 → 0.16), which is the other half of that
+  trade; the note is in `baselines.json` itself so the next reader finds it where
+  the numbers are.
+
 ## v3 lot A — A.3 (model selection)
 
 - **No `optimum-cli` export.** The plan says to export the candidates with
