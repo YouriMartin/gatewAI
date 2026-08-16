@@ -7,6 +7,39 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot A — A.3 (model selection)
+
+- **No `optimum-cli` export.** The plan says to export the candidates with
+  `optimum-cli`; the measurement used the **pre-exported int8 ONNX** from the
+  `Xenova/*` HuggingFace repos instead. It is the same artifact — an int8 export
+  of the same checkpoint — without adding a Python/torch toolchain to a Java
+  build, and it made the three candidates comparable within one session. If a
+  future candidate has no published ONNX export, the toolchain comes back.
+- **`multilingual-e5-small` was scored without its `query:` / `passage:`
+  prefixes**, because that is how this gateway would run it: nothing in the
+  cache advisor or the classifier prefixes text, and adding asymmetric prefixes
+  would break ADR 0007's shared-vector assumption. The measurement is therefore
+  of *the configuration we could ship*, not of the model's published ceiling.
+  Stated in [`technical/evaluation.md`](technical/evaluation.md) so the number is
+  not mistaken for a benchmark score.
+- **The provisional model won, so nothing was re-recorded twice.**
+  `paraphrase-multilingual-MiniLM-L12-v2` is confirmed on the numbers, not kept
+  by inertia: 82.0 % calibrated routing against 73.0 % (EN-only MiniLM) and
+  81.0 % (e5). The losing models were deleted from the tree after scoring.
+- **The measurement runs left the tree on the committed v2 fixtures, on
+  purpose.** Scoring a candidate means re-recording fixtures; after the last run
+  the working copy was restored with `git checkout -- src/test/resources/eval/fixtures`
+  so the re-record stays a **deliberate act in A.4**, as the plan asks. The
+  harness is therefore still red on the model-mismatch assertion at the end of
+  A.3, exactly as it was at the end of A.1.
+- **Two findings handed to A.4 rather than fixed here.** The shipped
+  `route-similarity-threshold=0.60` belongs to `nomic-embed-text`'s scale and
+  hands 88 of 100 prompts to the heuristic on the new model (calibrated
+  threshold: 0.2221); and α = 0.10 now costs 88.6 % cache false negatives. Both
+  are configuration defaults that change `routing_config_version`, so they must
+  move **before** the fixtures are recorded, not after — which is A.4's first
+  step, not A.3's last.
+
 ## v3 lot A — A.2 (dimensions and vector schema)
 
 - **`schema-validation=true` was tested as a default and rejected.** It looks

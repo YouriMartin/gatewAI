@@ -278,6 +278,73 @@ same set, and the heuristic scores 0 % on `keyword-trap`, `length-trap` and
 
 ---
 
+## Choosing the in-process embedding model (v3 batch A.3)
+
+Lot A moved the embedding model into the JVM, which made the model a **choice**
+rather than a given. Three ONNX candidates were scored by re-recording the
+fixtures with each and running this harness unchanged — same datasets, same
+routes, same code, only the vectors differ. All three are int8, 384-dim.
+
+**Routing**, test half (100 prompts), at the shipped fixed threshold and at the
+threshold each model's own calibration produces:
+
+| Candidate | Fixed 0.60 | **Calibrated** | EN | FR | Hand-overs | Mean margin | p50 / p95 |
+|---|---|---|---|---|---|---|---|
+| `paraphrase-multilingual-MiniLM-L12-v2` | 40.0 % | **82.0 %** | 80.4 % | **83.7 %** | 4 | **0.158** | 3.05 / 6.35 ms |
+| `all-MiniLM-L6-v2` (EN-only) | 37.0 % | 73.0 % | 82.4 % | 63.3 % | 5 | 0.109 | 1.79 / 6.74 ms |
+| `multilingual-e5-small` (no prefixes) | **79.0 %** | 81.0 % | 82.4 % | 79.6 % | 5 | 0.023 | 2.87 / 5.22 ms |
+
+**Cache**, test half, at the shipped `0.92` and at each model's calibrated
+threshold (α = 0.10):
+
+| Candidate | Fixed: FP / FN / hit | Calibrated q̂ | Calibrated: FP / FN / hit |
+|---|---|---|---|
+| `paraphrase-multilingual-MiniLM-L12-v2` | **14.3 %** / 61.4 % / 25 % | 0.9526 | 14.3 % / 88.6 % / 13 % |
+| `all-MiniLM-L6-v2` | 17.9 % / 68.2 % / 24 % | 0.9315 | 14.3 % / **75.0 %** / **19 %** |
+| `multilingual-e5-small` | **76.8 %** / 9.1 % / 83 % | 0.9775 | **7.1 %** / 88.6 % / 9 % |
+
+### The choice, and why the fastest and the sharpest both lost
+
+**`paraphrase-multilingual-MiniLM-L12-v2` ships.** It is the most accurate
+calibrated router of the three (82.0 %), the only one that does not collapse on
+one language, and the only one whose confidence signal still means something.
+
+- **`all-MiniLM-L6-v2` is out on French**, at 63.3 % against 83.7 %. It is the
+  cheapest by far (23 MB against 118 MB) and the fastest at p50, and on English
+  it is the equal of the winner — but the default routes are bilingual and the
+  project has been measuring the language split since v2 batch 5. Twenty points
+  is not a rounding error.
+- **`multilingual-e5-small` is the interesting failure.** It wins outright at the
+  *fixed* threshold — 79 % against 40 % — because its similarities all sit high,
+  so almost nothing falls below 0.60. That same compression is what disqualifies
+  it: at the shipped `0.92` cache threshold it **serves 76.8 % of the pairs a
+  human labelled non-servable**, and its mean routing margin is **0.023**, which
+  is the cascade's shipped ambiguity band. A model whose top-1 and top-2 routes
+  are always within the band escalates **56 %** of requests (against 10 % for the
+  winner) — the confidence signal that batches 3, 4 and 8 are built on stops
+  discriminating. It was measured *without* the `query:` / `passage:` prefixes it
+  expects, which is how the gateway would actually run it; adding them would also
+  break the shared-vector assumption of
+  [ADR 0007](adr/0007-memoized-embedding-model.md).
+
+Two things this measurement forces into the open, both for batch A.4:
+
+1. **The shipped `route-similarity-threshold=0.60` is wrong for the new model.**
+   It was tuned on `nomic-embed-text`'s scale; on the winner it hands **88 of 100**
+   prompts to the heuristic, which is why the fixed column reads 40 %. The
+   calibrated threshold is **0.2221**. An uncalibrated v3 gateway routes *worse*
+   than an uncalibrated v2 one, and the default has to move with the model.
+2. **The cache trade is harsher than it was.** At α = 0.10 the winner refuses
+   88.6 % of servable pairs for a 14.3 % wrong-answer rate; on `nomic-embed-text`
+   the same α gave 65.9 % / 12.5 %. The dial is `gatewai.conformal.cache-alpha`
+   and it now costs more hit rate per point of correctness.
+
+Against v2's numbers (`nomic-embed-text`, 768 dim, over HTTP): calibrated routing
+**83.0 % → 82.0 %**. One point of accuracy is what the network hop was worth —
+paid back in a gateway that starts with no model server, at 3 ms per decision.
+
+---
+
 ## Conformal calibration (v2 batch 3)
 
 The harness fits both calibrations on the **calibration** halves and scores them

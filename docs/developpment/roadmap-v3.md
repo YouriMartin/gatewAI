@@ -106,7 +106,7 @@ precisely because it preserves them.
   fail-fast guard: it names both widths on an existing table, and refuses to
   start on a fresh one. Ships commented, not enabled.
 
-## A.3 — Model selection, measured
+## A.3 — Model selection, measured — ✅ done
 
 Do not default to `all-MiniLM-L6-v2`. It is English-centric, and batch 5 measured
 that **English was already the weak side** (45.1 % vs 79.6 % FR at the fixed
@@ -121,13 +121,27 @@ threshold). Evaluate at least:
 Export with `optimum-cli`. Score each with the harness (A.4) on both the fixed
 and the calibrated threshold, per language, and pick on the numbers.
 
-**Acceptance**
-- `docs/technical/evaluation.md` gains a table comparing the candidates on
-  routing accuracy overall / EN / FR, cache FP/FN, and decision latency.
-- The choice is justified in one paragraph, not asserted.
-- If an e5-style model wins, ADR 0007 is amended: asymmetric query/document
-  prefixes invalidate the "reuse a query vector as a document vector" assumption
-  in case 3, and the memo must stop serving the store path.
+**Acceptance** — met, all three scored on the harness:
+- [`../technical/evaluation.md`](../technical/evaluation.md) carries the
+  comparison (routing fixed/calibrated, EN, FR, hand-overs, mean margin, cache
+  FP/FN/hit at both thresholds, decision latency p50/p95).
+- **`paraphrase-multilingual-MiniLM-L12-v2` ships**, confirmed rather than
+  assumed: 82.0 % calibrated routing against 73.0 % (`all-MiniLM-L6-v2`, which
+  drops to 63.3 % on French) and 81.0 % (`multilingual-e5-small`). e5 wins at the
+  *fixed* threshold and loses on what the rest of the system needs: 76.8 % cache
+  false positives at the shipped 0.92, and a mean routing margin of 0.023 — the
+  cascade band itself — which escalates 56 % of requests.
+- ADR 0007 needs no amendment: the e5-style model did not win, and it was scored
+  **without** prefixes because that is how the gateway would run it.
+- Deviation: the candidates came from the published `Xenova/*` int8 ONNX exports
+  rather than a local `optimum-cli` run — see [`../decisions.md`](../decisions.md).
+
+**Handed to A.4** (both change `routing_config_version`, so they belong before
+the re-record, not after):
+- `route-similarity-threshold=0.60` is `nomic-embed-text`'s scale — on the new
+  model it hands **88 of 100** prompts to the heuristic. Calibrated: **0.2221**.
+- α = 0.10 now buys 14.3 % cache false positives at **88.6 %** false negatives
+  (13 % hit rate), against 12.5 % / 65.9 % on the old model.
 
 ## A.4 — Fixtures, baselines, calibration
 
