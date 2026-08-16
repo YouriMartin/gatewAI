@@ -141,6 +141,7 @@ Returns `RoutingConfigView`:
  "premium_length_threshold": 500,
  "premium_keywords": ["refactor", "architecture", "security"],
  "route_similarity_threshold": 0.6,
+ "cascade_margin_band": 0.02,
  "routes": [
    {"name": "casual-chat", "tier": "local",
     "examples": ["Hello, how are you today?", "Bonjour, comment ça va ?"]},
@@ -151,13 +152,18 @@ Returns `RoutingConfigView`:
 
 `strategy` ∈ `embedding` | `heuristic` | `llm` | `cascade`; `tier` ∈ `local` |
 `cloud_entry` | `cloud_premium`. `embedding` and `cascade` require at least one
-route. The cascade's ambiguity band is configuration, not part of this payload
-(`gatewai.classifier.cascade-margin-band`, see
-[`routing.md`](routing.md)).
+route.
+
+`cascade_margin_band` (0..1, default 0.02) **rides on this payload without being
+part of the routing config** (v2 batch 9). It is applied through its own port
+method, so editing it alone leaves `routing_config_version` — and therefore the
+conformal calibration fitted under that version — untouched. Everything else in
+the body changes the version. See [`routing.md`](routing.md).
 
 ### `PUT /v1/admin/routing`
 Body: a `RoutingConfigView`. Applies at runtime (next request); invalid config →
-`400`. Returns the updated config.
+`400` (unknown strategy, `embedding`/`cascade` with no route, a band outside
+`[0, 1]`). Returns the updated config.
 
 ## Admin — calibration (`ROLE_ADMIN`)
 

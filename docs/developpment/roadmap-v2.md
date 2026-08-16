@@ -923,7 +923,7 @@ comparable, and that is where a reader sees it.
 
 ---
 
-## Batch 10 — Documentation (continuous)
+## Batch 10 — Documentation (continuous) — ✅ done
 
 **Create**: ~~`docs/technical/decision-tracing.md`~~ ✅ shipped with batch 9
 (decision model, versioning, what replays and what does not) · ~~`docs/technical/conformal-calibration.md`~~ ✅ shipped with batch 3
@@ -932,22 +932,24 @@ comparable, and that is where a reader sees it.
 fixtures, metrics, findings) · ~~`docs/technical/attribution.md`~~ ✅ shipped
 with batch 7 (occlusion method, segmentation, cost, limits).
 
-**Update**: `routing.md` — "Future work: cascade routing" becomes implemented ·
-`semantic-cache.md` — calibrated threshold, traced decision, top-k change ·
-`data-model.md` — the two new tables and the `request_log.correlation_id` column ·
-`observability.md` — new meters and the cache-counter deprecation ·
+**Update**: ~~`routing.md`~~ ✅ batch 4 (cascade implemented, measured, and its
+band explained) · ~~`semantic-cache.md`~~ ✅ batches 2–3 (calibrated threshold,
+traced decision, top-k change) · ~~`data-model.md`~~ ✅ batches 2–4 (the new
+tables, the migrations, `request_log.correlation_id`) · ~~`observability.md`~~ ✅
+batch 6 (new meters, the cache-counter deprecation and its migration query) ·
 `testing-and-quality.md` — Flyway, Testcontainers, the evaluation task ·
 ~~`limitations.md`~~ ✅ marginal (not individual) coverage (batch 3), approximate
-additivity of occlusion (batch 7), dependence on calibration-set exchangeability · `api-reference.md` —
-the two new endpoints · `roadmap-post-v1.md` — mark done: cascade routing, shared
-embedding, versioned migrations, threshold feedback loop; and fix the stale
-streaming bullet (D10).
+additivity of occlusion (batch 7), dependence on calibration-set exchangeability ·
+`api-reference.md` — the two new endpoints · `roadmap-post-v1.md` — mark done:
+cascade routing, shared embedding, versioned migrations, threshold feedback loop;
+and fix the stale streaming bullet (D10).
 
 **ADRs**: (1) conformal prediction over a fixed threshold or Platt scaling ·
 (2) occlusion over gradients — JVM constraint, no access to embedding-model
 internals · (3) tracing cache decisions at the same level as routing, justified by
-error-cost asymmetry · (4) memoizing `EmbeddingModel` decorator rather than a
-vector-accepting cache port, preserving ADR 0005 (D1).
+error-cost asymmetry · ~~(4) memoizing `EmbeddingModel` decorator rather than a
+vector-accepting cache port, preserving ADR 0005 (D1)~~ ✅ shipped with batch 0.2
+as [ADR 0007](../technical/adr/0007-memoized-embedding-model.md).
 
 **Compliance note**: a short section on what is logged, what is replayable, and
 why traceability is architectural rather than bolted on. The AI Act transparency
@@ -955,6 +957,58 @@ angle (art. 50) should be **stated with a dated source link**, not asserted from
 memory, and must not claim certified compliance — gatewAI is an infrastructure
 component. The existing CSRD register sets the tone: useful, sourced, no
 overpromise.
+
+### What batch 10 actually had to do — ✅ done
+
+Ten of the fourteen documentation items above were already ticked when the batch
+opened, each folded into the batch that changed the behaviour. That was the
+intent of marking this batch *continuous*, and it worked; what it leaves is the
+residue that no single batch owned.
+
+- **D37 — the residue is the point.** Three ADRs, the compliance note, two
+  documents nobody's batch had reason to touch (`testing-and-quality.md`,
+  `roadmap-post-v1.md`) and one line that had gone false. Written down, that is a
+  small batch. Not written down, it is the part of a project that never gets
+  done.
+- **D38 — one document had drifted, and it was the API reference.**
+  `api-reference.md` still stated that the cascade band was *not* part of the
+  `PUT /v1/admin/routing` payload, which batch 9 had made false while updating
+  `routing.md` and `decision-tracing.md`. Two pages of the same documentation
+  disagreeing about a shipped field is exactly the failure continuous
+  documentation is supposed to prevent, and it survived one batch. The band is
+  now documented where it lives: on the payload, outside `routing_config_version`.
+- **D39 — Testcontainers never landed, so the note says why, and what it costs.**
+  CI service containers plus the `it` profile already give the real
+  Postgres+pgvector and Ollama; Testcontainers would add a Docker daemon per test
+  run and a second way to configure the same dependencies. The honest half is
+  named too: **no single test walks ingress → persisted decision →
+  `/v1/admin/decisions`**. Every piece of that path is covered, the composition
+  is not.
+- **D40 — "threshold feedback loop" cannot be marked done.** Batch 3 replaced two
+  guessed constants with fitted quantiles, which is the *calibration*, not the
+  *loop*: fitting is triggered by an admin call against a hand-labelled set, not
+  by observed production outcomes. `roadmap-post-v1.md` therefore marks it **half
+  done** and states what closing it would take.
+
+The three ADRs are [0008](../technical/adr/0008-conformal-prediction-over-fixed-thresholds.md)
+(conformal over tuning or Platt scaling),
+[0009](../technical/adr/0009-occlusion-over-gradient-attribution.md) (occlusion
+over gradients) and
+[0010](../technical/adr/0010-trace-cache-decisions-like-routing.md) (tracing the
+cache like the router). Each records a decision whose *alternatives* were real —
+the fourth was written back in batch 0.2, when the constraint was fresh.
+
+The compliance note lives at the end of
+[`decision-tracing.md`](../technical/decision-tracing.md): a table of what each
+store actually holds (including the row that says the vector cache **does** keep
+prompt text — it is a cache), what replays and what is recomputed, and the AI Act
+angle sourced to
+[Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj) and
+the Commission's [Article 50 FAQ](https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act)
+(last updated 24 July 2026; the obligations apply from 2 August 2026). It states
+that those obligations bind the provider or deployer of an AI system rather than
+a routing and caching component, and that what gatewAI offers is **evidence, not
+compliance**.
 
 ---
 
@@ -964,8 +1018,12 @@ overpromise.
   simulated embeddings, `RoutingConfig` hash stability (same config → same hash,
   order-insensitive where it should be)
 - **Property**: empirical conformal coverage on synthetic data
-- **Integration**: Testcontainers Postgres + pgvector, full cycle request →
-  persisted decisions → replay via the API (new capability, D7)
+- **Integration**: ~~Testcontainers Postgres + pgvector~~ — **not taken** (D39).
+  The `it` profile runs against CI service containers / `docker compose`, which
+  already boot Flyway and validate every entity against the migrated schema. The
+  full cycle request → persisted decisions → replay via the API is covered in
+  pieces (recorder, JSONB mapping, merge, HTTP contract) and **not** end to end;
+  [`testing-and-quality.md`](../technical/testing-and-quality.md) says so
 - **Hot configuration**: `PUT /v1/admin/routing` changes the version and
   invalidates the running calibration
 - **Degradation**: DB down, calibration stale, embedding down — routing continues
@@ -990,7 +1048,7 @@ Batch 6   Observability                                          ✅ done
 Batch 7   Occlusion attribution                                  ✅ done
 Batch 8   Counterfactuals                                 ✅ done
 Batch 9   API and dashboard                               ✅ done
-Batch 10  Documentation                  ← continuous
+Batch 10  Documentation (continuous)                              ✅ done
 ```
 
 Each batch ships independently, with tests and documentation. No long-lived
@@ -1029,5 +1087,14 @@ branch. `./mvnw test` green before every commit.
 - [x] The dashboard exposes "why this decision"
 - [x] Versioned migrations in place
 - [x] `limitations.md` covers the new methodological limits
-- [ ] No latency regression on the nominal path
-- [ ] ArchUnit, Checkstyle, SpotBugs and the native profile still green
+- [x] No latency regression on the nominal path — an uncached request went from
+      **3 embedding calls to 1** (measured on the local stack,
+      [ADR 0007](../technical/adr/0007-memoized-embedding-model.md)); decision
+      writes and metrics are off the request path; decision latency is recorded
+      live at fixture time (p50 34 ms / p95 44 ms). No before/after load test
+      exists — this is measured evidence, not a benchmark
+- [x] ArchUnit, Checkstyle, SpotBugs and the native profile still green —
+      `./mvnw -DskipFrontend verify` passes with **549 tests**, `ArchitectureTest`
+      among them, and `NativeRuntimeHintsTest` covers the hints added by batches 6
+      and 9. Full GraalVM compilation stays a dedicated CI job, unchanged
+      ([`native.md`](../technical/native.md))

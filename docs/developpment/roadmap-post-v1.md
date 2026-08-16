@@ -7,6 +7,10 @@ limitations
 ([`../functional/limitations.md`](../functional/limitations.md)). Nothing here is
 committed; it is a backlog of credible directions, roughly grouped by theme.
 
+Struck-through items have since shipped. Most of them came from
+[`roadmap-v2.md`](roadmap-v2.md) — the v2 line of work on explainable, calibrated
+decisions — and each says which batch delivered it.
+
 ## Correctness & trustworthy numbers
 
 - **Measured carbon calibration.** Replace the placeholder per-model
@@ -52,11 +56,13 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
 
 ## Routing intelligence
 
-- **Cascade routing (planned next).** Chain the existing classifiers by
-  increasing cost with confidence gates: deterministic signals → embedding
-  routes → LLM classifier only when the best route similarity is ambiguous.
-  `DelegatingComplexityClassifier` is the seam; see the "Future work" section
-  of [`../technical/routing.md`](../technical/routing.md).
+- ~~**Cascade routing.**~~ — **done** (v2 batch 4): deterministic signals →
+  embedding routes → LLM classifier, gated on the conformal prediction set
+  **and** the `top1 − top2` margin band, `escalated_to` traced and the escalation
+  rate metered. Opt-in (`gatewai.classifier.strategy=cascade`); `embedding`
+  remains the default, and
+  [`../technical/routing.md`](../technical/routing.md) publishes the measured
+  cost of the escalation.
 - ~~**Shared request embedding.**~~ — **done** (v2 batch 0.2): a memoizing
   `EmbeddingModel` decorator brings an uncached request from three embedding
   calls to one, without reaching around `VectorStore`
@@ -65,8 +71,17 @@ committed; it is a backlog of credible directions, roughly grouped by theme.
   with a small fine-tuned model for better tier accuracy (cf. vLLM Semantic
   Router in
   [`../functional/vllm-semantic-router-comparison.md`](../functional/vllm-semantic-router-comparison.md)).
-- **Feedback loop.** Use observed outcomes (cost, latency, escalations) to tune
-  thresholds automatically.
+- **Feedback loop** — **half done** (v2 batch 3). Both thresholds are now fitted
+  rather than guessed: a conformal quantile on labelled cases, with a stated
+  guarantee, automatic staleness on a config or embedding-model change, and a
+  fall back to the fixed constants
+  ([`../technical/conformal-calibration.md`](../technical/conformal-calibration.md)).
+  What is *not* automatic is the loop: fitting is triggered by
+  `POST /v1/admin/calibration` against a **hand-labelled** set, not by observed
+  production outcomes. Closing it means labelling from traffic — the decision
+  rows now carry what that would need (similarity, runner-up, margin, outcome)
+  — and it runs into the same exchangeability assumption the calibration rests
+  on.
 
 ## Security & guardrails
 

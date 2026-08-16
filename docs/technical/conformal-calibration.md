@@ -10,6 +10,9 @@ It ships **after** the evaluation harness ([`evaluation.md`](evaluation.md)) on
 purpose: calibrating without a way to measure the result is how you replace a
 guess with a more confident guess.
 
+Why conformal prediction rather than a tuned constant or Platt scaling:
+[ADR 0008](adr/0008-conformal-prediction-over-fixed-thresholds.md).
+
 ---
 
 ## The method: split conformal prediction

@@ -152,8 +152,10 @@ Managed by the Spring AI pgvector `VectorStore`. Each cached answer is a
 
 Config (`application.properties`): `initialize-schema=true`, `dimensions=768`,
 `index-type=hnsw`, `distance-type=cosine_distance`. The `vector` extension is
-created by `docker/postgres/init.sql`. The HNSW + cosine index must match the
-`0.92` similarity threshold; without an index the search scans the whole table.
+created by `docker/postgres/init.sql`. The index's distance must be the one the
+advisor compares with — cosine, whether the threshold in force is the fixed
+`0.92` or a calibrated quantile; without an index the search scans the whole
+table.
 
 ## Schema management
 

@@ -169,15 +169,22 @@ request in full, but its attribution and counterfactuals come back as
 `PROMPT_UNAVAILABLE`
 ([`decision-tracing.md`](../technical/decision-tracing.md)).
 
-- **No plaintext prompt is stored**, only a SHA-256 hash, and both analyses have
-  to re-embed the text. Paste the prompt to analyse it against the current
-  rules — which is a different question, and the response says so.
+- **The decision trace stores no plaintext prompt**, only a SHA-256 hash, and
+  both analyses have to re-embed the text. Paste the prompt to analyse it against
+  the current rules — which is a different question, and the response says so.
+- **The semantic cache is the exception**, and it is one worth knowing: it stores
+  the question and the answer, because that is what it replays. It is namespaced
+  per client and can be given a TTL; a deployment that must retain no prompt text
+  turns the cache off, not the tracing (see the compliance note in
+  [`decision-tracing.md`](../technical/decision-tracing.md)).
 - **The trace is not an audit log.** Rows are purged on a retention timer
   (`gatewai.decisions.retention-days`, 90 days) and carry no actor. A 404 on a
   request you know happened usually means retention passed, or recording is off.
 - **Traceability is not certification.** The trace supports the transparency
   angle of the EU AI Act for a component that routes and caches; gatewAI is
-  infrastructure and claims no compliance of its own.
+  infrastructure and claims no compliance of its own. Article 50's obligations
+  apply from 2 August 2026 and bind the **provider or deployer of the AI
+  system** — sources and scope in the compliance note.
 
 ## Single-instance assumptions (not cluster-ready)
 

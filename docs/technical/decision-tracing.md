@@ -18,7 +18,8 @@ The cache is traced at the same level as routing, which the plan for v2 argued
 about and then settled on cost asymmetry: a routing mistake sends a request to a
 model that is too expensive or too weak, and costs money; a cache false positive
 answers a **different question**, and costs trust. The decision that can be
-wrong in the worse way must not be the one nobody can inspect.
+wrong in the worse way must not be the one nobody can inspect
+([ADR 0010](adr/0010-trace-cache-decisions-like-routing.md)).
 
 Writing never blocks and never throws (`AsyncDecisionRecorder`): a trace exists
 to explain requests, never to fail them. Failures are counted as
@@ -101,7 +102,72 @@ two: recording off, or retention passed. The 404 says so.
   actor, only a client id on the carbon record.
 - **Not a certification.** The trace supports the transparency angle of the EU
   AI Act for a component that routes and caches; gatewAI is infrastructure and
-  claims no compliance of its own.
+  claims no compliance of its own. See the note below.
 - **Not the carbon record.** The explanation *references* it by correlation id;
   the figures live in `request_log` and in the green report, and duplicating
   them is how two sources of truth start disagreeing.
+
+## Compliance note (v2 batch 10)
+
+### What is logged
+
+| Store | Holds | Prompt text? |
+|---|---|---|
+| `request_log` | correlation id, model, `prompt_hash`, token counts, latency, client id, cost/energy/CO2 | no — SHA-256 only |
+| `routing_decision` | tier, model, strategy, justification, confidence, config version, `prompt_hash` + `prompt_length` | no |
+| `cache_decision` | outcome, similarity, runner-up, threshold, matched entry, conformal status | no |
+| Vector cache (`vector_store`) | the **question text and the answer text**, per client, with the embedding | **yes** — similarity search needs it |
+| Metrics (Micrometer) | counters and summaries with enum-valued tags only | no |
+
+That fourth row is the one to read twice. The decision trace is hash-only by
+design, but the semantic cache is a cache: it stores what it will replay. It is
+namespaced per client (`client-namespacing=true` by default) and can be given a
+TTL; a deployment that must not retain prompt text turns the cache off, not the
+tracing.
+
+### What is replayable
+
+A decision replays **exactly** — it is read back from its row, with the
+`routing_config_version`, `embedding_model` and `alpha` it was taken under, so it
+is never re-explained by today's rules. Its *analysis* (attribution,
+counterfactuals) cannot be replayed from a hash and is recomputed only when a
+prompt is supplied again; `provenance` on every explanation says which of the two
+the reader is looking at. Nothing here reconstructs a decision after the fact
+from log lines: the row is written from the same object the router decided with,
+and the metrics from that same object again.
+
+That is what "architectural rather than bolted on" means here. Explainability was
+not added as a logging layer over an opaque decision — the decision itself
+returns its justification (`ClassificationOutcome`, v2 batch 1), the sealed
+hierarchy makes a strategy unable to ship without saying how it decided, and the
+recorder is a port the domain does not depend on. Switching recording off
+(`gatewai.decisions.enabled=false`) removes the rows, not the justification and
+not the metrics.
+
+### The regulatory angle, stated carefully
+
+The EU AI Act — [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj)
+of 13 June 2024, published in the Official Journal on 12 July 2024 — sets
+transparency obligations in **Article 50** for providers and deployers of certain
+AI systems: notably, that people interacting directly with an AI system are told
+so, and that generative output is machine-readably marked. Per the European
+Commission's own FAQ ([Transparency obligations under Article 50 of the AI Act](https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act),
+last updated 24 July 2026), those obligations **apply from 2 August 2026**, with
+a limited extension to 2 December 2026 for marking systems already on the market.
+
+Two things follow, and neither is a compliance claim.
+
+- **The obligations land on the provider or deployer of the AI system**, not on a
+  routing and caching component sitting between them and a model. gatewAI is
+  infrastructure; it is not certified, not assessed, and asserting otherwise
+  would be exactly the overpromise this documentation avoids elsewhere (see the
+  CSRD framing in [`green-accounting.md`](green-accounting.md)).
+- **What it does offer is evidence.** An operator answering "which model served
+  this request, under which rules, and why" has it per request and per decision,
+  versioned, for as long as retention holds — which is the kind of record such an
+  obligation is discharged with, produced by the system rather than reconstructed
+  around it.
+
+Anything beyond that — an actor-attributed audit trail, immutable retention,
+prompt-level retention policy — is not built. [`limitations.md`](../functional/limitations.md)
+lists it as absent rather than implied.

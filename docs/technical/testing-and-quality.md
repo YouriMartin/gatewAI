@@ -15,10 +15,23 @@ Architecture rules are themselves a test (ArchUnit).
 | context / arch | boot + ArchUnit | `GatewaiApplicationTests`, `ArchitectureTest` |
 | `eval` | decision-quality harness on labelled data | `EvaluationHarnessTest`, `VectorFixtureTest` |
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
+| decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
+| explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 
-Roughly 400+ tests run in the default build. Per the project convention, **REST
-controllers are integration-tested** (MockMvc) and **trivial mappers are not unit
-tested**; everything else has unit coverage.
+**549 tests** run in the default build (v2 batch 10). Per the project convention,
+**REST controllers are integration-tested** (MockMvc) and **trivial mappers are
+not unit tested**; everything else has unit coverage.
+
+Two conventions the v2 decision work added, both of them deliberate:
+
+- **Explanation services are tested against a bag-of-words embedder**, not a
+  mock returning canned vectors. Similarities are then computable by hand, so
+  every assertion is a subtraction a reviewer can check rather than a number
+  copied from a run.
+- **Sensitive-by-construction outputs get a named test.** The counterfactual
+  suite asserts that every returned utterance is a *configured route example* and
+  none is any part of the request — an explanation quoting one client's prompt
+  back to another would be a data leak wearing the costume of a feature.
 
 ## Unit vs integration split
 
@@ -67,6 +80,25 @@ Since v2 batch 0.1 the integration job is also the **migration guard**: booting
 the context runs Flyway and then validates every JPA entity against the migrated
 schema (`ddl-auto=validate`). An entity changed without its migration fails the
 build there — it can no longer be papered over by `ddl-auto=update`.
+
+### Why not Testcontainers
+
+The v2 plan expected a Testcontainers-backed Postgres for the migration and
+replay tests. The project has none, and this is a decision rather than an
+omission: **CI service containers already provide the real Postgres+pgvector and
+Ollama**, the `it` profile points at them by configuration, and the same command
+runs locally against `docker compose`. Adding Testcontainers would buy container
+lifecycle management the build does not need, at the cost of a Docker daemon
+inside every test run and a second way to configure the same two dependencies.
+
+What that leaves uncovered is worth naming: there is **no single test that walks
+a request from ingress to a persisted decision and back out through
+`/v1/admin/decisions`**. The path is covered in pieces — recorder
+(`AsyncDecisionRecorderTest`), JSONB mapping (`JustificationJsonTest`), merge
+(`JpaDecisionHistoryTest`), HTTP contract and admin-only access
+(`AdminDecisionControllerTest`) — with `ContextLoadsTest` proving the pieces wire
+together against real infrastructure. The seam nobody tests end to end is
+therefore the *composition*, and that is the honest statement of the gap.
 
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 

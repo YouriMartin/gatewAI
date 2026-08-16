@@ -44,7 +44,8 @@ positive contributions only), but it keeps its sign in the report.
 
 Gradient-based attribution would be sharper and is not available: the gateway
 reaches the embedding model through an HTTP port, with no access to its
-internals from the JVM. Occlusion needs nothing but the port already in use.
+internals from the JVM. Occlusion needs nothing but the port already in use
+([ADR 0009](adr/0009-occlusion-over-gradient-attribution.md)).
 
 ### Segmentation
 
