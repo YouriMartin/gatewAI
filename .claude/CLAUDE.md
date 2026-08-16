@@ -8,7 +8,7 @@ A Java/Spring portfolio project, built solo.
 - **Java 25 LTS** (Virtual Threads + Scoped Values)
 - **Spring Boot 4.0**, **Spring AI 2.0**
 - **PostgreSQL + pgvector** — single database: vector cache **AND** relational metrics
-- **In-process embeddings** — ONNX (DJL + ONNX Runtime) bundled in the jar, 384 dim, Git LFS-tracked (v3 lot A)
+- **In-process embeddings** — ONNX (DJL + ONNX Runtime), 384 dim, fetched at build time into the jar (v3 lot A)
 - **Ollama** — local chat egress only (no longer on the decision path)
 - **Docker Compose** for local infra
 - Build: **Maven** (wrapper `./mvnw`)
@@ -40,7 +40,7 @@ Non-negotiable principles:
 - Tests: `./mvnw test`
 - Run the app: `./mvnw spring-boot:run` (Boot starts Postgres via `compose.yaml`; local chat egress is opt-in: `docker compose --profile inference up -d`)
 - Infra only: `docker compose up -d`
-- Clone requirement: `git lfs install && git lfs pull` — the embedding model is an LFS-tracked jar resource
+- The embedding model is **not in git**: `download-maven-plugin` fetches it at `generate-resources` (pinned SHA-256, cached in `~/.m2`)
 - **Always run `./mvnw test` before committing.**
 
 ## Hexagonal architecture (packages)
@@ -123,7 +123,7 @@ Progress: _(to be kept up to date)_
 - [x] v2 batch 9 — decision API + dashboard: `DecisionHistory` out port + `JpaDecisionHistory` (merged across both decision tables), `DecisionExplanationUseCase`, `GET /v1/admin/decisions[?limit]`, `GET /v1/admin/decisions/{correlationId}` (stored rows, no recomputation), `POST /v1/admin/decisions/explain` (correlationId **or** prompt; a past decision answers `PROMPT_UNAVAILABLE` since only hashes are stored), rate-limited + admin-only + native hints; "why this decision" dashboard panel; cascade margin band now editable via `/v1/admin/routing` while staying out of `routing_config_version` (`docs/technical/decision-tracing.md`)
 - [x] v2 batch 10 — documentation (closes v2): ADRs 0008 (conformal over tuning/Platt), 0009 (occlusion over gradients), 0010 (tracing cache decisions like routing); compliance note in `decision-tracing.md` (what each store holds — the vector cache **does** keep prompt text — what replays, AI Act art. 50 sourced to Reg. (EU) 2024/1689 + the Commission FAQ, evidence not compliance); `testing-and-quality.md` (549 tests, why no Testcontainers, the untested composition seam); `api-reference.md` cascade-band drift fixed; `roadmap-post-v1.md` cascade done / feedback loop half done
 
-- [ ] v3 — in progress (`docs/developpment/roadmap-v3.md`): **A.1 ✅** bean swap (in-process ONNX, provisional `paraphrase-multilingual-MiniLM-L12-v2` int8 384d via Git LFS, PyTorch engine excluded, jar 161→349 MiB), **A.2 ✅** dimensions 768→384 + verified upgrade path (`DROP TABLE vector_store`; skipping it starts fine and silently kills the cache, traced `outcome=ERROR`). **A.3 ✅** model selection measured (winner `paraphrase-multilingual-MiniLM-L12-v2` 82.0 % calibrated routing; `all-MiniLM-L6-v2` 73.0 %/FR 63.3 %; `multilingual-e5-small` 81.0 % but 76.8 % cache FP at 0.92 and margin 0.023 → 56 % cascade escalation). **A.4 ✅** re-recorded fixtures + baselines + calibration: `route-similarity-threshold` 0.60→**0.25** (swept), cache 0.92 kept, new q̂ 0.9526 (cache) / 0.2221 (routing), routing 81 % fixed / 82 % calibrated vs heuristic 34 %, decision latency 34→**3.2 ms** p50; fixed a provenance bug where calibrations were stamped `"unknown"`. Build green again (556 tests). **A.5 ✅** native hints for the ONNX model + both JNI libraries (`EmbeddingNativeRuntimeHints`, tested; native stays "ready, not validated"), [ADR 0011](docs/technical/adr/0011-in-process-onnx-embedding.md), and the three known doc drifts fixed (routing.md registry table, ADR 0003 Anthropic default, ADR 0002 streaming). **Lot A complete** — next: lot B (multi-instance) (the harness is red until then, by design), A.5 native hints + ADR 0011. Overall: **lot A** in-process ONNX embedding (Ollama leaves the *decision* path, stays the default egress; 768 → 384 dim, fixtures/baselines/calibrations re-recorded, ADR 0011), then **lot B** multi-instance readiness (persisted+propagated routing config, persisted deferred jobs, Postgres-backed rate limiting, leader-gated schedulers — no Redis). Merge A entirely before starting B.
+- [ ] v3 (`docs/developpment/roadmap-v3.md`) — **lot A complete**: in-process ONNX embedding (`paraphrase-multilingual-MiniLM-L12-v2`, int8, 384d, fetched at build time; PyTorch engine excluded; jar 161→349 MiB; boots in 7.9 s with no model server), vector schema 768→384 (upgrade = `DROP TABLE vector_store`; skipping it silently kills the cache, traced `outcome=ERROR`), model chosen on measurements (82.0 % calibrated routing vs 73.0 % EN-only and 81.0 % e5), fixtures/baselines/calibrations redone (`route-similarity-threshold` 0.60→**0.25**, q̂ 0.9526 cache / 0.2221 routing, decisions 34→**3.2 ms** p50), native hints + [ADR 0011](docs/technical/adr/0011-in-process-onnx-embedding.md). Next: **lot B** — multi-instance readiness (persisted+propagated routing config, persisted deferred jobs, Postgres-backed rate limiting, leader-gated schedulers; no Redis).
 
 ## Frontend build (mono-repo)
 - Svelte+Vite app in `src/main/frontend`, built into `target/classes/static` (bundled in the jar).

@@ -44,9 +44,9 @@ Since v3 lot A the **embedding tests are not among them**. `EmbeddingModelSmokeT
 needed Ollama and is replaced by `InProcessEmbeddingModelTest`, an ordinary unit
 test that loads the shipped ONNX model, embeds text and checks the vector width —
 with nothing listening on any port. It also asserts the committed model is
-megabytes rather than a **Git LFS pointer**, which is the way this setup fails
-when someone clones without `git-lfs` (it is how `spring-ai-transformers` ships
-its own bundled model). Model load costs ~1 s; the five tests run in ~5 s.
+megabytes rather than a placeholder, which is how a failed or truncated
+**build-time fetch** shows up — and how `spring-ai-transformers` ships its own
+bundled model (a 133-byte pointer). Model load costs ~1 s; the tests run in ~5 s.
 
 - Default (`./mvnw test` / `verify`) **excludes** the `integration` group
   (`maven-surefire-plugin` `<excludedGroups>integration</excludedGroups>`), so the
@@ -75,9 +75,9 @@ when no key is set.
   fast and infra-free.
 - **integration** — `./mvnw -Pit test` against **Postgres (pgvector) + Ollama**
   service containers. Since v3 lot A no embedding model is pulled: Ollama is only
-  the chat egress the context wires and never calls. Both checkouts set
-  `lfs: true` — without it the runner gets pointer files instead of the model.
-  This
+  the chat egress the context wires and never calls. The embedding model is
+  fetched by Maven and cached with `~/.m2`, so it costs one download per cache
+  generation. This
   is the wiring-regression guard: a context that fails to refresh fails the build.
   `ANTHROPIC_API_KEY` is intentionally unset, so the Claude-calling smoke test is
   skipped — the context still loads (the Anthropic model bean is created without

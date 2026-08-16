@@ -66,9 +66,13 @@ offline.
   session in the same heap.
 - **The artifact got much bigger**: the jar goes from **161 MiB to 349 MiB**
   (model 113 MiB, `onnxruntime` 89 MiB of multi-platform natives, tokenizer
-  16 MiB, DJL tokenizers 18 MiB). The source tree carries the model too, which
-  needs **Git LFS** — `model.onnx` is over GitHub's 100 MB per-file limit — so
-  cloning the repository now requires `git-lfs` installed.
+  16 MiB, DJL tokenizers 18 MiB).
+- **The model is a build-time dependency, not source.** It is over GitHub's
+  100 MB per-file limit, and Git LFS would spend an account-wide 1 GB/month
+  bandwidth quota on every clone and CI checkout, so it is fetched by
+  `download-maven-plugin` against a pinned SHA-256 and cached in `~/.m2`. The
+  repository stays small; a cold clean build needs network for the model exactly
+  as it already does for Maven Central.
 - **From a jar the model cannot be memory-mapped**, so Spring AI copies it to
   `spring.ai.embedding.transformer.cache.directory` at first start: **130 MB** of
   disk, once, per container. Running from an exploded classpath copies nothing.

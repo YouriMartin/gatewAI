@@ -13,28 +13,38 @@ How the project is built (back end + bundled dashboard) and shipped (Docker, plu
   **SpotBugs** (verify phase). See [`testing-and-quality.md`](testing-and-quality.md).
 - `./mvnw package` — also builds the frontend and bundles it in the jar.
 
-## Git LFS: the embedding model is part of the source tree (v3 lot A)
+## The embedding model is fetched, not committed (v3 lot A)
 
-The in-process embedding model ships as a classpath resource under
-`src/main/resources/onnx/<model>/` — `model.onnx` (118 MB, int8) and
-`tokenizer.json` (17 MB). Both are tracked with **Git LFS** (`.gitattributes`):
-they are binary, never diffed, replaced whole when the model changes, and
-`model.onnx` is over GitHub's 100 MB per-file hard limit.
+The in-process embedding model — `model.onnx` (118 MB, int8) and
+`tokenizer.json` (17 MB) — is **not in git**. `download-maven-plugin` fetches it
+at `generate-resources` straight into `target/classes/onnx/<model>/`, verified by
+a pinned **SHA-256**, so the packaged jar still carries it and the shipped
+artifact is unchanged.
 
 ```bash
-dnf install git-lfs   # or apt install git-lfs / brew install git-lfs
-git lfs install       # once per machine
-git lfs pull          # if you cloned before installing it
+./mvnw generate-resources    # or any build: test, package, verify
 ```
 
-Without git-lfs the checkout holds ~130-byte **pointer files**, and the
-application fails at startup on an unreadable model. `InProcessEmbeddingModelTest`
-catches that case by name — it asserts the resources are megabytes, not pointers,
-which is the same failure that ships inside `spring-ai-transformers`'s own
-bundled `all-MiniLM-L6-v2`.
+Two reasons it is not a committed blob, and one it is not Git LFS:
 
-The Docker build copies `src`, so the **build context must hold the real files**:
-build from a checkout where `git lfs pull` has run, or the image gets pointers.
+- `model.onnx` is **over GitHub's 100 MB per-file hard limit** — a plain commit
+  cannot be pushed at all.
+- Git LFS clears that limit but spends an **account-wide 1 GB/month bandwidth
+  quota** on every clone and every CI checkout. At 135 MB a fetch, two CI jobs
+  per push, the free quota is gone in three or four pushes.
+- A binary that is replaced whole and never diffed is a *dependency*, not source.
+  A cold build already downloads far more than this from Maven Central.
+
+Cached under `~/.m2/repository/.cache/download-maven-plugin` (130 MB), which is
+inside the directory CI already caches — so the download happens once per cache
+generation, and `./mvnw -o` works offline afterwards. Swapping the model means
+changing two URLs, two checksums and the two
+`spring.ai.embedding.transformer.*` properties.
+
+`InProcessEmbeddingModelTest` asserts the resources exist and are megabytes, so a
+failed or truncated fetch fails a test rather than the application at startup.
+The Docker build runs Maven inside the image, so it fetches there too — the build
+stage already needs network for dependencies.
 
 **In the container, the model is copied out of the jar at startup.** A resource
 inside a jar cannot be memory-mapped, so Spring AI's `ResourceCacheService`

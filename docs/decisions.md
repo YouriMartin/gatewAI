@@ -146,13 +146,22 @@ this file is for the smaller "the plan said X, the code does Y" record.
   first start. That is what forced shipping our own resource, and it is why
   `InProcessEmbeddingModelTest` asserts the committed files are megabytes rather
   than pointers.
-- **The provisional model is multilingual, and tracked with Git LFS.** The plan
-  said not to default to `all-MiniLM-L6-v2`; measured int8 exports are 22.9 MB
-  (MiniLM, EN-only) against 118.3 MB for both multilingual candidates, which is
-  over GitHub's 100 MB per-file limit. Shipping EN/FR from the first batch was
-  chosen over deferring the storage question, so `.gitattributes` tracks
-  `*.onnx` and the bundled `tokenizer.json`, and both CI checkouts set
-  `lfs: true`. **Cloning now requires git-lfs.**
+- **The provisional model is multilingual, and it is fetched rather than
+  committed.** The plan said not to default to `all-MiniLM-L6-v2`; measured int8
+  exports are 22.9 MB (MiniLM, EN-only) against 118.3 MB for both multilingual
+  candidates, which is over GitHub's 100 MB per-file limit. EN/FR from the first
+  batch was worth more than a small repository, so the model is a **build-time
+  dependency**: `download-maven-plugin` fetches it at `generate-resources`
+  against a pinned SHA-256, into the classpath output, cached in `~/.m2`.
+
+  **This replaced an earlier decision, and the reversal is the interesting
+  part.** The batch first tracked the model with Git LFS. That is what the
+  choice looked like before anyone priced it: GitHub Free allows **1 GB of LFS
+  bandwidth per month, account-wide**, and at 135 MB per fetch with two CI jobs
+  per push, the quota is gone after three or four pushes. The push that failed
+  (a 112.8 MB blob committed before `git-lfs` was installed) forced the question
+  early enough to answer it properly. The five lot-A commits were rewritten so
+  the blob never entered the pushed history.
 - **`EvalFixtureRecorderTest` lost its `integration` tag.** It needed Ollama;
   it now builds the same in-process model the application ships, from the same
   properties, so it needs no infrastructure at all. What kept an automated run

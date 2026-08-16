@@ -237,7 +237,8 @@ re-record deliberately, not reactively.
 What lot A actually bought: the **decision path** (cache, routing, attribution,
 counterfactuals) needs **Postgres alone**, decisions got ~10× faster (34 → 3.2 ms
 p50), and calibrated routing accuracy moved 83.0 % → 82.0 %. What it cost: a
-349 MiB jar, a Git LFS dependency for clones, and a mandatory
+349 MiB jar, a build-time model download (pinned by checksum, cached in
+`~/.m2`), and a mandatory
 `DROP TABLE vector_store` on upgrade.
 
 ---

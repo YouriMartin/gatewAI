@@ -60,9 +60,10 @@ on the same Spring Boot 4 baseline.
   Provisional model: `paraphrase-multilingual-MiniLM-L12-v2`, int8-quantised,
   **384 dimensions**, EN/FR. v3 batch A.3 measures the candidates and confirms
   or replaces it.
-- The model (118 MB) and its tokenizer (17 MB) are **classpath resources** in the
-  jar, tracked with Git LFS. A cold start downloads nothing and reaches no
-  model server: embeddings — the one step that sees raw prompt text for the
+- The model (118 MB) and its tokenizer (17 MB) are **fetched at build time**
+  (`download-maven-plugin`, pinned SHA-256, cached in `~/.m2`) into the jar's
+  classpath, so they are in the artifact but not in git. A cold *start* downloads
+  nothing and reaches no model server: embeddings — the one step that sees raw prompt text for the
   cache — never leave the process, which is the privacy pillar taken one step
   further than before.
 - DJL's PyTorch engine is **excluded** in `pom.xml`: inference is ONNX Runtime
