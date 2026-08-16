@@ -47,7 +47,8 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 ## Development ([`developpment/`](developpment/))
 
 - [`contributing.md`](developpment/contributing.md) — build, test, conventions, how to make common changes
-- [`roadmap-v2.md`](developpment/roadmap-v2.md) — v2 action plan: explainable, calibrated decisions
+- [`roadmap-v2.md`](developpment/roadmap-v2.md) — v2 action plan: explainable, calibrated decisions (done)
+- [`roadmap-v3.md`](developpment/roadmap-v3.md) — v3 action plan: in-process ONNX embedding, then multi-instance readiness
 - [`roadmap-post-v1.md`](developpment/roadmap-post-v1.md) — directional backlog after v1
 - [`plan-action-green-ai-proxy.md`](developpment/plan-action-green-ai-proxy.md) — product action plan (phases 0–6)
 - [`plan-action-documentation.md`](developpment/plan-action-documentation.md) — this documentation effort's action plan

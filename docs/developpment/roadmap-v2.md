@@ -1098,3 +1098,13 @@ branch. `./mvnw test` green before every commit.
       among them, and `NativeRuntimeHintsTest` covers the hints added by batches 6
       and 9. Full GraalVM compilation stays a dedicated CI job, unchanged
       ([`native.md`](../technical/native.md))
+
+---
+
+## What comes next
+
+v2 is complete. The follow-on plan is [`roadmap-v3.md`](roadmap-v3.md): lot A
+moves the embedding model in-process (Ollama leaves the decision path and stays
+the default egress), lot B removes the single-instance assumptions. Two of v2's
+open decisions carry over — opt-in plaintext prompt storage (#2) and the tracing
+dependency (#3) — and neither is settled by v3 as written.
