@@ -185,3 +185,51 @@ Upgrading an existing deployment needs no manual step. Flyway is configured with
 `baseline-on-migrate=true` and `baseline-version=0`, and `V1` is written with
 `CREATE TABLE IF NOT EXISTS`, so a database created by the old `ddl-auto=update`
 is baselined and replays `V1` as a no-op, keeping its rows.
+
+### Upgrading to v3: the vector cache must be dropped (v3 lot A)
+
+The embedding model changed width, 768 → 384. `vector_store` is **not** a Flyway
+table, so no migration can widen it and none should: the cache is a cache. The
+whole procedure is one statement, run **before** starting the new version:
+
+```sql
+DROP TABLE IF EXISTS vector_store;   -- Spring AI recreates it at 384 on boot
+```
+
+Nothing else is lost. `request_log`, the decision tables, `conformal_calibration`
+and `api_client` are Flyway-owned and untouched — the history, the metrics and
+the traces all survive. Only the cached answers go, and they refill.
+
+**What it looks like if you skip it** (verified, not assumed):
+
+- Startup **succeeds**. Spring AI issues `CREATE TABLE IF NOT EXISTS`, so the
+  old 768-wide table stays exactly as it is and nothing complains.
+- Every request still returns `200`, but the cache is **dead**: each lookup
+  raises `ERROR: different vector dimensions 768 and 384`, `SemanticCacheAdvisor`
+  catches it, logs a `WARN` and treats it as a miss. On that path the advisor
+  returns before `cacheStore`, so nothing is written either — the table does not
+  even grow.
+- The symptom is visible where v2 batch 2 put it: the decision is traced with
+  `outcome = ERROR`, so `gatewai_cache_decisions_total{outcome="error"}` climbs
+  and the hit rate sits at zero. That is the difference between a silent failure
+  and a quiet one.
+
+**A one-shot diagnostic, not a setting to leave on.**
+`spring.ai.vectorstore.pgvector.schema-validation=true` turns the mismatch into a
+startup failure naming both widths:
+
+```
+IllegalStateException: Actual vector dimensions is 768, required vector dimensions is 384
+```
+
+It is genuinely useful for a *pre-flight* check on an existing database. It
+cannot be the default: validation runs **instead of** creation, so on a fresh
+database — or right after the `DROP` above — the same flag fails startup with
+`Table vector_store does not exist in schema public`. Turn it on to check, turn
+it off to run.
+
+The calibrations stale themselves on the same change (`embedding_model` on
+`conformal_calibration`) and the evaluation fixtures refuse to replay, which is
+[`conformal-calibration.md`](conformal-calibration.md) and
+[`evaluation.md`](evaluation.md) doing their jobs rather than three separate
+problems.

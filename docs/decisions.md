@@ -7,6 +7,31 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot A — A.2 (dimensions and vector schema)
+
+- **`schema-validation=true` was tested as a default and rejected.** It looks
+  like the fail-fast guard this project favours, and on an existing 768-wide
+  table it is: startup dies with `Actual vector dimensions is 768, required
+  vector dimensions is 384`. But Spring AI validates **instead of** creating, so
+  the same flag fails a *fresh* install with `Table vector_store does not exist`.
+  It ships commented in `application.properties` as a pre-flight check, and the
+  default stays `initialize-schema=true` with no validation.
+- **The silent-degradation path is now documented because it was reproduced.**
+  Booting at 384 against a 768 table starts cleanly and answers every request;
+  the cache simply never works again. Worth writing down precisely: the advisor
+  catches the lookup error, traces `outcome = ERROR`, and returns before
+  `cacheStore`, so the table does not grow either. The trace is what makes this
+  detectable, which is a v2 batch 2 feature paying off in a v3 upgrade.
+- **The full-stack acceptance run skipped the Ollama container.** The criterion
+  says `docker compose -f docker-compose.yml up --build`; the image was built
+  from that file, but the stack was started as pgvector + gateway with
+  `--no-deps` and the `mock` profile. What A.2 is about is the **cache at 384
+  from a jar-packaged model**, and starting Ollama would have added a ~3 GB
+  chat-model pull that tests nothing here. Verified in that run: `vector(384)`,
+  the HNSW cosine index, MISS→HIT, and the jar→`/tmp` model copy on a non-root
+  user. Chat egress through the containerized Ollama is unchanged from v1 and
+  covered by the plug & play stack.
+
 ## v3 lot A — A.1 (in-process ONNX embedding)
 
 - **`dimensions=384` landed in A.1, not A.2.** A.1's own acceptance criterion is

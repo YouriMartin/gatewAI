@@ -52,7 +52,7 @@ similarity. A sequence-classification model would return a label and delete
 three features. Contrastive fine-tuning of the embedding stays open (post-v3)
 precisely because it preserves them.
 
-## A.1 — Bean swap, model bundled
+## A.1 — Bean swap, model bundled — ✅ done
 
 - Add `spring-ai-starter-model-transformers` to `pom.xml`.
 - In `infrastructure/llm/EmbeddingConfiguration`, build a
@@ -78,7 +78,7 @@ precisely because it preserves them.
   none now.
 - Jar size is recorded in the commit message.
 
-## A.2 — Dimensions and vector schema
+## A.2 — Dimensions and vector schema — ✅ done
 
 - `spring.ai.vectorstore.pgvector.dimensions=768` → `384`.
 - The `vector_store` table is Spring AI-managed, **not** Flyway-managed
@@ -88,11 +88,23 @@ precisely because it preserves them.
 - Verify the HNSW + cosine index is rebuilt at the new dimension.
 - `docker/postgres/init.sql` unchanged (extension only).
 
-**Acceptance**
-- A fresh `docker compose -f docker-compose.yml up --build` produces a working
-  cache at 384 dim.
-- An upgrade path is documented and manually verified once on a database that
-  holds 768-dim rows.
+**Acceptance** — both met, on real databases:
+- Fresh stack (image built from `docker-compose.yml`; started as pgvector +
+  gateway, `mock` profile, Ollama skipped — see
+  [`../decisions.md`](../decisions.md)): `vector_store.embedding` is
+  `vector(384)`, `spring_ai_vector_index` is `hnsw (embedding
+  vector_cosine_ops)`, and two identical requests give MISS then HIT. Cold start
+  8.0 s; the jar→`/tmp/gatewai-onnx` model copy is 130 MB, once.
+- Upgrade path verified on a database holding a 768-dim row: booting at 384
+  **starts fine and kills the cache silently** (`different vector dimensions 768
+  and 384` per lookup, traced `outcome = ERROR`, nothing stored);
+  `DROP TABLE vector_store` + restart recreates it at 384 with the HNSW cosine
+  index and the cache works, with `request_log`, the decision tables and
+  `conformal_calibration` untouched. Written up in
+  [`../technical/data-model.md`](../technical/data-model.md).
+- `spring.ai.vectorstore.pgvector.schema-validation=true` was measured as a
+  fail-fast guard: it names both widths on an existing table, and refuses to
+  start on a fresh one. Ships commented, not enabled.
 
 ## A.3 — Model selection, measured
 

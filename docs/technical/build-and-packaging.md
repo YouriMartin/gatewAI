@@ -36,6 +36,16 @@ bundled `all-MiniLM-L6-v2`.
 The Docker build copies `src`, so the **build context must hold the real files**:
 build from a checkout where `git lfs pull` has run, or the image gets pointers.
 
+**In the container, the model is copied out of the jar at startup.** A resource
+inside a jar cannot be memory-mapped, so Spring AI's `ResourceCacheService`
+writes it to `spring.ai.embedding.transformer.cache.directory`
+(`${java.io.tmpdir}/gatewai-onnx`, overridable with `GATEWAI_ONNX_CACHE`):
+**130 MB, measured**, on first start only. Running from an exploded classpath
+(`./mvnw spring-boot:run`, tests) copies nothing — the log says which it did.
+Budget the disk, and mount a volume there if the container's `/tmp` is small or
+read-only. Measured cold start of the packaged image: **8.0 s**, with no model
+server running.
+
 ## Frontend mono-repo
 
 The Svelte + Vite dashboard lives in `src/main/frontend` and is built **by Maven**
