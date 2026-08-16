@@ -33,10 +33,12 @@ import org.springframework.ai.embedding.EmbeddingResponse;
  *
  * <p>Reusing a query vector as a document vector is exact here, not an
  * approximation: nothing in this gateway sets per-call embedding options, and
- * the Ollama model applies no query/document prefix, so both paths ask the same
- * model for the same text. Multi-document calls (route-example indexing) are
- * delegated untouched — they have their own cache and would only pollute the
- * memo.
+ * the configured model is symmetric — it applies no {@code query:} /
+ * {@code passage:} prefix — so both paths ask the same model for the same text.
+ * That assumption survived the v3 move to an in-process ONNX model, and an
+ * e5-style model would break it (see ADR 0007). Multi-document calls
+ * (route-example indexing) are delegated untouched — they have their own cache
+ * and would only pollute the memo.
  */
 class MemoizingEmbeddingModel implements EmbeddingModel {
 

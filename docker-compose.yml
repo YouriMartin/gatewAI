@@ -9,10 +9,12 @@
 # MCP server:   http://localhost:8080/mcp
 # Health:       http://localhost:8080/actuator/health
 #
-# On first start the gateway pulls the embedding model (nomic-embed-text) and
-# the three default chat models (qwen2.5 0.5b/1.5b/3b, ~3 GB total) into Ollama,
-# so the very first boot takes a while. The bootstrap admin API key is printed
-# once in the gateway logs — copy it from `docker compose logs`.
+# On first start the gateway pulls the three default chat models (qwen2.5
+# 0.5b/1.5b/3b, ~3 GB total) into Ollama, so the very first boot takes a while.
+# The *embedding* model is not among them: since v3 lot A it ships inside the
+# jar and runs in-process, so the semantic cache and the router are up as soon
+# as Postgres is. The bootstrap admin API key is printed once in the gateway
+# logs — copy it from `docker compose logs`.
 #
 # Note: `compose.yaml` (infra only) is what Spring Boot auto-starts during local
 # `./mvnw spring-boot:run`; this file runs the whole stack in containers instead.

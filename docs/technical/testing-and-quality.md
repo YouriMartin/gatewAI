@@ -17,8 +17,9 @@ Architecture rules are themselves a test (ArchUnit).
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
 | decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
+| embedding | the real ONNX model, in-process | `InProcessEmbeddingModelTest` |
 
-**549 tests** run in the default build (v2 batch 10). Per the project convention,
+**554 tests** run in the default build (v3 lot A). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -36,8 +37,16 @@ Two conventions the v2 decision work added, both of them deliberate:
 ## Unit vs integration split
 
 Tests that need **external services** (Postgres/pgvector, Ollama, a real model)
-are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `EmbeddingModelSmokeTest`,
-`ChatClientSmokeTest`, `ActuatorHealthSmokeTest`, and `ContextLoadsTest`.
+are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `ChatClientSmokeTest`,
+`ActuatorHealthSmokeTest`, and `ContextLoadsTest`.
+
+Since v3 lot A the **embedding tests are not among them**. `EmbeddingModelSmokeTest`
+needed Ollama and is replaced by `InProcessEmbeddingModelTest`, an ordinary unit
+test that loads the shipped ONNX model, embeds text and checks the vector width —
+with nothing listening on any port. It also asserts the committed model is
+megabytes rather than a **Git LFS pointer**, which is the way this setup fails
+when someone clones without `git-lfs` (it is how `spring-ai-transformers` ships
+its own bundled model). Model load costs ~1 s; the five tests run in ~5 s.
 
 - Default (`./mvnw test` / `verify`) **excludes** the `integration` group
   (`maven-surefire-plugin` `<excludedGroups>integration</excludedGroups>`), so the
@@ -65,7 +74,10 @@ when no key is set.
 - **build** — `./mvnw -DskipFrontend verify` (unit tests + Checkstyle + SpotBugs),
   fast and infra-free.
 - **integration** — `./mvnw -Pit test` against **Postgres (pgvector) + Ollama**
-  service containers (the embedding and a tiny chat model are pulled first). This
+  service containers. Since v3 lot A no embedding model is pulled: Ollama is only
+  the chat egress the context wires and never calls. Both checkouts set
+  `lfs: true` — without it the runner gets pointer files instead of the model.
+  This
   is the wiring-regression guard: a context that fails to refresh fails the build.
   `ANTHROPIC_API_KEY` is intentionally unset, so the Claude-calling smoke test is
   skipped — the context still loads (the Anthropic model bean is created without
@@ -113,9 +125,10 @@ realistically. The only thing skipped is the paid provider call.
 docker run -e SPRING_PROFILES_ACTIVE=mock … gatewai   # no ANTHROPIC_API_KEY needed
 ```
 
-Use it for demos, dashboard/UI work, and plumbing tests. It still needs the local
-embedding model (for the cache) and Postgres; it just never calls Anthropic or a
-real Ollama chat model. (`DelegatingChatModel` is `@Profile("!mock")`, so exactly
+Use it for demos, dashboard/UI work, and plumbing tests. Since v3 lot A it needs
+**Postgres alone** — the embedding model is in the jar — so the whole gateway
+runs on one container with no API key and no model server. It just never calls
+Anthropic or a real Ollama chat model. (`DelegatingChatModel` is `@Profile("!mock")`, so exactly
 one `@Primary` egress is active.)
 
 ## Decision quality is a test too (v2 batch 5)
@@ -135,8 +148,7 @@ Editing a dataset or a route example invalidates the fixtures — the harness th
 fails, naming the command that re-records them:
 
 ```bash
-docker compose up -d ollama
-./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true
+./mvnw test -Dtest=EvalFixtureRecorderTest -Deval.record=true
 ```
 
 `EvalFixtureRecorderTest` is the only part that needs infrastructure. It is tagged

@@ -19,9 +19,11 @@ Editing any `.jsonl` invalidates the fixtures; the harness then fails with the
 command to re-record:
 
 ```bash
-docker compose up -d ollama
-./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true
+./mvnw test -Dtest=EvalFixtureRecorderTest -Deval.record=true
 ```
+
+Since v3 lot A the recorder needs no infrastructure: the embedding model runs
+in-process from the jar's own resources.
 
 Two labelling rules that are choices rather than facts, repeated here because
 they bite when adding cases: a cross-lingual pair is `NO` (the cached answer

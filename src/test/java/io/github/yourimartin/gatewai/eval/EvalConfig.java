@@ -78,7 +78,17 @@ final class EvalConfig {
 
   /** The embedding model both the cache and the router run on. */
   String embeddingModelId() {
-    return string("spring.ai.ollama.embedding.options.model", "nomic-embed-text");
+    return string("gatewai.embedding.model-id", "unknown");
+  }
+
+  /** Where the shipped ONNX model lives, as a Spring resource location. */
+  String embeddingModelResource() {
+    return string("spring.ai.embedding.transformer.onnx.model-uri", "");
+  }
+
+  /** Where its tokenizer lives, as a Spring resource location. */
+  String embeddingTokenizerResource() {
+    return string("spring.ai.embedding.transformer.tokenizer.uri", "");
   }
 
   /** Similarity a candidate must reach for the cache to serve it. */

@@ -46,10 +46,11 @@ A thin gateway built on a chain of Spring AI **Advisors**. End-to-end view:
           │                               │
    ┌──────▼──────┐  ┌──────────────┐  ┌───▼──────────────────┐
    │ Any provider │  │ Ollama        │ │ PostgreSQL + pgvector │
-   │ mix: Ollama, │  │ (embeddings + │ │ vector cache +        │
-   │ vLLM, Claude,│  │  local models)│ │ relational metrics    │
+   │ mix: Ollama, │  │ (local chat   │ │ vector cache +        │
+   │ vLLM, Claude,│  │  models only) │ │ relational metrics    │
    │ OpenAI…      │  │               │ │                       │
    └──────────────┘  └──────────────┘  └──────────────────────┘
+   Embeddings run in-process (ONNX, bundled in the jar) — no model server.
 ```
 
 **Ingress** (OpenAI or MCP format) and **egress** (LLM provider) are
@@ -68,7 +69,7 @@ observability, MCP, native image).
 | Language | Java 25 (Virtual Threads + Scoped Values) |
 | Framework | Spring Boot 4, Spring AI 2.0 |
 | Database | PostgreSQL + pgvector (vector cache + metrics) |
-| Embeddings | Ollama + nomic-embed-text (768 dim, 100% on-premise) |
+| Embeddings | In-process ONNX (DJL + ONNX Runtime), 384 dim, bundled in the jar |
 | Local infra | Docker Compose |
 | Build | Maven (wrapper included) |
 
@@ -107,9 +108,11 @@ docker compose -f docker-compose.yml up --build
 - MCP server: `http://localhost:8080/mcp` (see [`docs/technical/mcp.md`](docs/technical/mcp.md))
 - Health: <http://localhost:8080/actuator/health>
 
-On the **first** start, the gateway downloads the embedding model
-(`nomic-embed-text`) and the three default chat models (`qwen2.5` 0.5b/1.5b/3b,
-~3 GB total) from Ollama — give the health check time to pass. To route a tier
+On the **first** start, the gateway downloads the three default chat models
+(`qwen2.5` 0.5b/1.5b/3b, ~3 GB total) into Ollama — give the health check time
+to pass. The embedding model is **not** among them: it ships inside the jar and
+runs in-process (v3 lot A), so the cache and the router work before any model
+server is up. To route a tier
 to a cloud model instead, see the *Egress providers* section of
 [`application.properties`](src/main/resources/application.properties).
 
@@ -137,7 +140,8 @@ scripts/dev.sh status     # status, URLs; `logs` to tail, `clean` to wipe volume
 It reads secrets from `.env`. Equivalent manual steps:
 
 ```bash
-# Boot starts Postgres + Ollama via compose.yaml; the app runs on the JVM
+# Boot starts Postgres via compose.yaml; the app runs on the JVM.
+# Local chat egress is opt-in: docker compose --profile inference up -d ollama
 ./mvnw spring-boot:run
 ```
 

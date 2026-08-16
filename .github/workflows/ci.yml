@@ -62,13 +62,14 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Wait for Ollama and pull the embedding model
+      # No embedding model is pulled since v3 lot A: embeddings run in-process
+      # from a jar resource. Ollama is only here as the chat egress the context
+      # wires (and never calls).
+      - name: Wait for Ollama
         run: |
           for i in $(seq 1 30); do
             curl -fsS http://localhost:11434/api/version && break || sleep 2
           done
-          echo "pulling nomic-embed-text"
-          curl -fsS http://localhost:11434/api/pull -d '{"name":"nomic-embed-text"}' -o /dev/null
       - name: Integration tests (full context boot)
         # GATEWAI_SMOKE_MODEL is intentionally unset → the provider-calling smoke
         # test is skipped (@EnabledIfEnvironmentVariable). The context still loads

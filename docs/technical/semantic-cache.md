@@ -142,4 +142,6 @@ the completion.
   conservative `0.92` default (or a calibrated threshold) mitigates this; correctness-critical deployments
   should raise it and/or set a TTL. See the functional
   [`limitations.md`](../functional/limitations.md).
-- **Cache quality** is bounded by the embedding model (`nomic-embed-text`).
+- **Cache quality** is bounded by the embedding model — since v3 lot A the
+  in-process ONNX model (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim), which
+  also means every stored vector is invalidated when it changes.

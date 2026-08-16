@@ -13,6 +13,29 @@ How the project is built (back end + bundled dashboard) and shipped (Docker, plu
   **SpotBugs** (verify phase). See [`testing-and-quality.md`](testing-and-quality.md).
 - `./mvnw package` — also builds the frontend and bundles it in the jar.
 
+## Git LFS: the embedding model is part of the source tree (v3 lot A)
+
+The in-process embedding model ships as a classpath resource under
+`src/main/resources/onnx/<model>/` — `model.onnx` (118 MB, int8) and
+`tokenizer.json` (17 MB). Both are tracked with **Git LFS** (`.gitattributes`):
+they are binary, never diffed, replaced whole when the model changes, and
+`model.onnx` is over GitHub's 100 MB per-file hard limit.
+
+```bash
+dnf install git-lfs   # or apt install git-lfs / brew install git-lfs
+git lfs install       # once per machine
+git lfs pull          # if you cloned before installing it
+```
+
+Without git-lfs the checkout holds ~130-byte **pointer files**, and the
+application fails at startup on an unreadable model. `InProcessEmbeddingModelTest`
+catches that case by name — it asserts the resources are megabytes, not pointers,
+which is the same failure that ships inside `spring-ai-transformers`'s own
+bundled `all-MiniLM-L6-v2`.
+
+The Docker build copies `src`, so the **build context must hold the real files**:
+build from a checkout where `git lfs pull` has run, or the image gets pointers.
+
 ## Frontend mono-repo
 
 The Svelte + Vite dashboard lives in `src/main/frontend` and is built **by Maven**
@@ -44,10 +67,13 @@ via `frontend-maven-plugin` (profile `frontend`, active unless `-DskipFrontend`)
 
 ## Compose: two files, on purpose
 
-- **`compose.yaml`** — infra only (pgvector + Ollama), with Spring Boot
-  service-connection labels. Spring Boot's Docker Compose support **auto-starts it
-  in dev** (`./mvnw spring-boot:run`) and it takes precedence for a bare
-  `docker compose` command.
+- **`compose.yaml`** — infra only, with Spring Boot service-connection labels.
+  Spring Boot's Docker Compose support **auto-starts it in dev**
+  (`./mvnw spring-boot:run`) and it takes precedence for a bare `docker compose`
+  command. Since v3 lot A it starts **pgvector alone**: embeddings are
+  in-process, so nothing else is needed to decide. Ollama is still declared,
+  under the `inference` profile — `docker compose --profile inference up -d`
+  when you want local chat egress.
 - **`docker-compose.yml`** — the **plug & play full stack**: gateway + pgvector +
   Ollama, `depends_on … service_healthy`, env-driven config, secrets via `.env`.
   Invoked explicitly: `docker compose -f docker-compose.yml up --build`.
@@ -55,7 +81,7 @@ via `frontend-maven-plugin` (profile `frontend`, active unless `-DskipFrontend`)
 They are separate so that running the app in dev (`spring-boot:run`) does not also
 try to launch a `gateway` container (port 8080 clash). The gateway container sets
 `SPRING_DOCKER_COMPOSE_ENABLED=false`, connects to `pgvector`/`ollama` by service
-name, and pulls the embedding model from Ollama on first start.
+name, and pulls its chat models from Ollama on first start.
 
 - **`docker-compose.observability.yml`** — optional Prometheus + Grafana stack (see
   [`observability.md`](observability.md)).

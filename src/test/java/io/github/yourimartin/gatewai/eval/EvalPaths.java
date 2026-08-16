@@ -20,8 +20,7 @@ final class EvalPaths {
 
   /** Printed whenever fixtures are missing or stale — the fix is one command. */
   static final String RECORD_COMMAND =
-      "docker compose up -d ollama"
-          + " && ./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true";
+      "./mvnw test -Dtest=EvalFixtureRecorderTest -Deval.record=true";
 
   private EvalPaths() {
   }

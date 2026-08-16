@@ -17,7 +17,7 @@ constant with a quantile computed on nothing.
 | | Command | Needs | Duration |
 |---|---|---|---|
 | **Score** (every build) | `./mvnw test` | nothing | ~0.15 s |
-| **Re-record fixtures** (by hand) | `docker compose up -d ollama` then `./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true` | Ollama + `nomic-embed-text` | ~30 s |
+| **Re-record fixtures** (by hand) | `./mvnw test -Dtest=EvalFixtureRecorderTest -Deval.record=true` | nothing — the model is in-process (v3 lot A) | ~30 s |
 
 `EvaluationHarnessTest` is an ordinary unit test. It runs on every commit, in CI,
 with no Ollama, no database and no network, and writes
@@ -212,6 +212,12 @@ holds that worst case at no more than 8 points (`cascadeWorstCaseAccuracyLossMax
 ---
 
 ## Results at the time of writing
+
+> **Stale since v3 lot A.** Every number in this section was measured on
+> `nomic-embed-text` (768 dim, over HTTP). The embedding model is now in-process
+> at 384 dimensions, which invalidates the fixtures these numbers come from —
+> the harness says so and fails the build until v3 batch A.4 re-records them.
+> Until then, read this as the v2 baseline, not as current behaviour.
 
 Embedding strategy, threshold 0.60, cache threshold 0.92, `nomic-embed-text`,
 default routes.

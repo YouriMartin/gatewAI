@@ -145,12 +145,13 @@ bootstrap seeding. See [`security.md`](security.md).
 ## Vector cache (pgvector)
 
 Managed by the Spring AI pgvector `VectorStore`. Each cached answer is a
-`Document(question_text, metadata)` with a 768-dim embedding
-(`nomic-embed-text`). Metadata keys (`cached_response`, `cached_model`,
+`Document(question_text, metadata)` with a **384**-dim embedding (in-process
+ONNX, `paraphrase-multilingual-MiniLM-L12-v2`, v3 lot A; 768-dim
+`nomic-embed-text` before it). Metadata keys (`cached_response`, `cached_model`,
 `cached_*_tokens`, `created_at`, `client_id`) are documented in
 [`semantic-cache.md`](semantic-cache.md).
 
-Config (`application.properties`): `initialize-schema=true`, `dimensions=768`,
+Config (`application.properties`): `initialize-schema=true`, `dimensions=384`,
 `index-type=hnsw`, `distance-type=cosine_distance`. The `vector` extension is
 created by `docker/postgres/init.sql`. The index's distance must be the one the
 advisor compares with — cosine, whether the threshold in force is the fixed

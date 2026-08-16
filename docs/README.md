@@ -9,6 +9,9 @@ for the project overview and quick start.
 | [`functional/`](functional/) | Users, integrators | Onboarding, features, limits |
 | [`developpment/`](developpment/) | Maintainer / contributors | Action plans, dev process |
 
+[`decisions.md`](decisions.md) records implementation deviations — where the
+code departs from the plan it belongs to, and why.
+
 ## Technical ([`technical/`](technical/))
 
 Start here: [`architecture.md`](technical/architecture.md) — the entry point that links the rest.

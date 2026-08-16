@@ -19,7 +19,13 @@ services:
       timeout: 5s
       retries: 5
 
+  # Chat egress only — since v3 lot A the cache and the router embed in-process,
+  # so `docker compose up` starts Postgres alone and the gateway boots without
+  # any model server. Start this one when you want local inference:
+  #   docker compose --profile inference up -d
+  # (or use SPRING_PROFILES_ACTIVE=mock, or point a tier at a cloud provider).
   ollama:
+    profiles: ['inference']
     image: 'ollama/ollama:latest'
     labels:
       - "org.springframework.boot.service-connection=ollama"

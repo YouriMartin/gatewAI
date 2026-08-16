@@ -62,7 +62,8 @@ particular:
 - The default **TTL is 0 (no expiry)**: cached answers are reused indefinitely
   until evicted, so time-sensitive or fast-changing content can go stale. Set a
   TTL for such workloads.
-- Cache quality is bounded by the embedding model (`nomic-embed-text`).
+- Cache quality is bounded by the embedding model — since v3 lot A an
+  in-process ONNX model (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim, EN/FR).
 - **Measured (v2 batch 5)**: on 300 hand-labelled `(query, cached entry)` pairs,
   the shipped 0.92 threshold wrongly serves **16 %** of the answers it should
   have refused and wrongly refuses **46 %** of those it could have served. No
@@ -86,10 +87,12 @@ particular:
 ## Complexity classifier is fallible
 
 - The default **embedding** classifier is only as good as its route examples
-  and its embedding model: `nomic-embed-text` is English-centric, so
-  non-EN/FR languages need their own examples (or a multilingual embedding
-  model) to match reliably. Requests unlike any example fall back to the
-  heuristic.
+  and its embedding model: `paraphrase-multilingual-MiniLM-L12-v2` covers
+  EN/FR, and other languages need their own examples to match reliably.
+  Requests unlike any example fall back to the heuristic. Its tokenizer
+  truncates at **128 tokens**, so a long prompt is embedded from its opening
+  — deliberate for routing (length is already a deterministic signal), a real
+  limit for caching long prompts.
 - The **heuristic** classifier uses length and a finite (bilingual EN/FR)
   keyword/code-block list. It can misroute: a short but genuinely hard question may
   go `LOCAL`, and a long but trivial one may go `CLOUD_PREMIUM`.

@@ -185,8 +185,12 @@ thresholds — the last snapshot keeps applying.
   α = 0.10 about the tightest honest promise available; the finite-sample rule
   refuses anything the sample cannot support, but a small sample still means a
   wide confidence interval around the empirical rate.
-- **One embedding model.** Every number here is conditional on
-  `nomic-embed-text`.
+- **One embedding model.** Every number here is conditional on the model that
+  produced the vectors. The v2 numbers below were fitted on
+  `nomic-embed-text`; v3 lot A replaced it with an in-process ONNX model at a
+  different width, which stales both calibrations by construction — the
+  `embedding_model` column exists for exactly this, and v3 batch A.4 re-fits
+  them.
 
 These also appear in [`../functional/limitations.md`](../functional/limitations.md),
 at the same level of honesty as the energy coefficients.

@@ -53,15 +53,35 @@ on the same Spring Boot 4 baseline.
 - Config: HNSW index, cosine distance, 768-dimension vectors (matching the
   embedding model), `initialize-schema=true`.
 
-## Ollama (local embeddings + local chat egress)
+## Embeddings: in-process ONNX (v3 lot A)
 
-- `nomic-embed-text` (768 dims) runs **locally** via Ollama. Embeddings — the one
-  step that sees raw prompt text for the cache — never leave the deployment, which
-  is core to the privacy pillar.
-- Since Phase 7.2, Ollama also serves a **local chat model** (`qwen2.5:0.5b` by
-  default) as the egress for the `LOCAL` routing tier — real on-prem, zero-cost
-  inference for simple prompts (see [`routing.md`](routing.md)).
-- Both models are pulled on first start (`pull-model-strategy=when_missing`).
+- The embedding model runs **inside the JVM** — DJL + ONNX Runtime behind Spring
+  AI's `TransformersEmbeddingModel` (`spring-ai-starter-model-transformers`).
+  Provisional model: `paraphrase-multilingual-MiniLM-L12-v2`, int8-quantised,
+  **384 dimensions**, EN/FR. v3 batch A.3 measures the candidates and confirms
+  or replaces it.
+- The model (118 MB) and its tokenizer (17 MB) are **classpath resources** in the
+  jar, tracked with Git LFS. A cold start downloads nothing and reaches no
+  model server: embeddings — the one step that sees raw prompt text for the
+  cache — never leave the process, which is the privacy pillar taken one step
+  further than before.
+- DJL's PyTorch engine is **excluded** in `pom.xml`: inference is ONNX Runtime
+  and DJL is here for the tokenizer only, so left in it would download ~250 MB
+  of libtorch on the first embedding.
+- Before v3 this was `nomic-embed-text` (768 dims) over HTTP on Ollama. The
+  change invalidates every stored vector, calibration and fixture recorded
+  against the old model — by design, see
+  [`conformal-calibration.md`](conformal-calibration.md).
+
+## Ollama (local chat egress)
+
+- Since Phase 7.2, Ollama serves the **local chat models** (`qwen2.5` 0.5b /
+  1.5b / 3b) behind the three routing tiers — real on-prem, zero-cost inference
+  (see [`routing.md`](routing.md)). It is pulled on first start
+  (`pull-model-strategy=when_missing`).
+- It is **egress only** since v3 lot A: the cache, the router and the
+  explanation services no longer touch it, so the gateway boots and decides with
+  no model server running.
 
 ## Build & tooling
 

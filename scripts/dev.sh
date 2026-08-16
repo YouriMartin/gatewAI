@@ -90,8 +90,11 @@ ensure_port_free() {
 }
 
 infra_up() {
+  # Ollama is chat egress only since v3 lot A (embeddings run in-process), so it
+  # sits behind the 'inference' compose profile. Dev starts both: the point of
+  # dev mode is sending real requests.
   info "starting infra (Postgres + Ollama)…"
-  "${COMPOSE[@]}" up -d
+  "${COMPOSE[@]}" --profile inference up -d
   local svc cid tries
   for svc in pgvector ollama; do
     cid="$("${COMPOSE[@]}" ps -q "$svc" 2>/dev/null || true)"

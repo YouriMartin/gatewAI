@@ -13,7 +13,6 @@ import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 import io.github.yourimartin.gatewai.infrastructure.llm.EvalClassifierFactory;
 
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.ai.document.Document;
@@ -21,31 +20,33 @@ import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
-import org.springframework.ai.ollama.OllamaEmbeddingModel;
-import org.springframework.ai.ollama.api.OllamaApi;
-import org.springframework.ai.ollama.api.OllamaEmbeddingOptions;
+import org.springframework.ai.transformers.TransformersEmbeddingModel;
 
 /**
  * Records the evaluation fixtures against a live embedding model (v2 batch 5).
  *
- * <p>This is the only part of the harness that needs infrastructure, and it is
- * not part of any automated run: {@code ./mvnw test} must stay hermetic, and CI
- * must never rewrite committed fixtures. Run it by hand after editing a dataset
- * or changing the routes:
+ * <p>It is not part of any automated run: {@code ./mvnw test} must stay
+ * hermetic, and CI must never rewrite committed fixtures. Run it by hand after
+ * editing a dataset, changing the routes or swapping the embedding model:
  *
  * <pre>{@code
- * docker compose up -d ollama
- * ./mvnw -Pit test -Dtest=EvalFixtureRecorderTest -Deval.record=true
+ * ./mvnw test -Dtest=EvalFixtureRecorderTest -Deval.record=true
  * }</pre>
+ *
+ * <p>Since v3 lot A it needs <b>no infrastructure at all</b> — the embedding
+ * model runs in-process from the jar's own resources, so it dropped the
+ * {@code integration} tag. What still keeps an automated run from rewriting
+ * fixtures is the {@code -Deval.record=true} gate, which is the guard that
+ * mattered.
  *
  * <p>It records exactly the texts the classifier asks for, by wrapping the real
  * model in a capturing decorator rather than guessing which texts matter. Add a
  * route, and its examples are recorded because the classifier embedded them.
  *
- * <p>No Spring context: the recorder needs Ollama and nothing else — no
- * database, no migrations, no chat models to pull.
+ * <p>No Spring context, no database, no migrations, no model server: it builds
+ * the same ONNX model the application ships, straight from
+ * {@code application.properties}.
  */
-@Tag("integration")
 @EnabledIfSystemProperty(named = "eval.record", matches = "true")
 class EvalFixtureRecorderTest {
 
@@ -55,7 +56,7 @@ class EvalFixtureRecorderTest {
     RoutingConfig routingConfig = config.routingConfig();
     String modelId = config.embeddingModelId();
 
-    CapturingEmbeddingModel model = new CapturingEmbeddingModel(ollama(modelId));
+    CapturingEmbeddingModel model = new CapturingEmbeddingModel(inProcess(config));
     // Recorded at the fixed threshold: fixtures hold vectors, and the vectors do
     // not depend on which threshold reads them.
     ComplexityClassifier classifier = EvalClassifierFactory.embeddingClassifier(
@@ -104,13 +105,24 @@ class EvalFixtureRecorderTest {
         model.captured().size(), similarities.size(), EvalPaths.FIXTURE_SOURCE_DIR);
   }
 
-  private static EmbeddingModel ollama(String modelId) {
-    String baseUrl = System.getenv().getOrDefault("SPRING_AI_OLLAMA_BASE_URL",
-        System.getenv().getOrDefault("OLLAMA_BASE_URL", "http://localhost:11434"));
-    return OllamaEmbeddingModel.builder()
-        .ollamaApi(OllamaApi.builder().baseUrl(baseUrl).build())
-        .options(OllamaEmbeddingOptions.builder().model(modelId).build())
-        .build();
+  /**
+   * The shipped embedding model, built exactly as the application builds it —
+   * from the resource paths in {@code application.properties}. Reading them
+   * rather than restating them is what keeps a re-recording honest after the
+   * model is swapped (v3 batch A.3).
+   */
+  private static EmbeddingModel inProcess(EvalConfig config) {
+    TransformersEmbeddingModel model = new TransformersEmbeddingModel();
+    model.setModelResource(config.embeddingModelResource());
+    model.setTokenizerResource(config.embeddingTokenizerResource());
+    model.setTokenizerOptions(Map.of("padding", "true"));
+    try {
+      model.afterPropertiesSet();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "could not load the bundled embedding model — run `git lfs pull`", e);
+    }
+    return model;
   }
 
   /**

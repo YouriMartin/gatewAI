@@ -8,7 +8,8 @@ A Java/Spring portfolio project, built solo.
 - **Java 25 LTS** (Virtual Threads + Scoped Values)
 - **Spring Boot 4.0**, **Spring AI 2.0**
 - **PostgreSQL + pgvector** — single database: vector cache **AND** relational metrics
-- **Ollama** — local embeddings (`nomic-embed-text`, 768 dimensions)
+- **In-process embeddings** — ONNX (DJL + ONNX Runtime) bundled in the jar, 384 dim, Git LFS-tracked (v3 lot A)
+- **Ollama** — local chat egress only (no longer on the decision path)
 - **Docker Compose** for local infra
 - Build: **Maven** (wrapper `./mvnw`)
 
@@ -37,9 +38,9 @@ Non-negotiable principles:
 
 ## Commands
 - Tests: `./mvnw test`
-- Run the app: `./mvnw spring-boot:run` (Boot starts Postgres + Ollama via `compose.yaml`)
+- Run the app: `./mvnw spring-boot:run` (Boot starts Postgres via `compose.yaml`; local chat egress is opt-in: `docker compose --profile inference up -d`)
 - Infra only: `docker compose up -d`
-- Pull the embedding model: `docker compose exec ollama ollama pull nomic-embed-text`
+- Clone requirement: `git lfs install && git lfs pull` — the embedding model is an LFS-tracked jar resource
 - **Always run `./mvnw test` before committing.**
 
 ## Hexagonal architecture (packages)

@@ -70,7 +70,8 @@ a tier and described by **example prompts** ("utterances"), e.g.:
 | `code-and-analysis` | `CLOUD_PREMIUM` | "Refactor this Java service…", "Analyse la complexité…" |
 
 The request is embedded with the **same local Ollama embedding model as the
-semantic cache** (`nomic-embed-text`) and compared to every example with cosine
+semantic cache** (in-process ONNX, `paraphrase-multilingual-MiniLM-L12-v2`,
+384 dim) and compared to every example with cosine
 similarity; the route holding the closest example wins
 (**max-over-utterances**, more robust than centroids when a route's examples
 are diverse — the ranking itself lives in the domain as `RouteScoring`, shared
@@ -83,8 +84,8 @@ Properties of this approach:
 - **Language-independent**: similarity happens in embedding space, not on
   keywords — "résume ce texte" matches a summarization route whose examples
   are English (within the embedding model's multilingual ability;
-  `nomic-embed-text` is English-centric, so keep bilingual examples per route
-  or swap in a multilingual embedding model for more languages).
+  the model shipped since v3 lot A is multilingual EN/FR, so keep bilingual
+  examples per route or swap in a wider model for more languages).
   **Measured since v2 batch 5, and not in the expected direction**: with the
   default routes, English prompts reach a mean best-route similarity of 0.538
   against 0.647 for French, so **82 % of English prompts fall below the 0.60

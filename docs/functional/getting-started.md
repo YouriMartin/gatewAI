@@ -26,10 +26,14 @@ docker compose -f docker-compose.yml up --build
 ```
 
 This starts the full stack: the **gateway** (port 8080), **PostgreSQL + pgvector**
-(cache + metrics) and **Ollama** (local embeddings + chat models). On the first
-start the gateway downloads the embedding model (`nomic-embed-text`) and the
-three default chat models (`qwen2.5` 0.5b/1.5b/3b, ~3 GB total) from Ollama, so
-give the health check some time to go green.
+(cache + metrics) and **Ollama** (local chat models). On the first start the
+gateway downloads the three default chat models (`qwen2.5` 0.5b/1.5b/3b, ~3 GB
+total) into Ollama, so give the health check some time to go green.
+
+> The **embedding** model is not downloaded: since v3 lot A it ships inside the
+> jar and runs in-process, which is why the semantic cache and the router work
+> the moment Postgres is up. `compose.yaml` (dev infra) starts Postgres alone;
+> add `--profile inference` when you want local chat egress too.
 
 > `compose.yaml` (infra only) is used in development mode and takes precedence
 > when you run `docker compose` without `-f`; the full stack is therefore invoked

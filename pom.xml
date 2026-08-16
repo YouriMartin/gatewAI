@@ -72,6 +72,28 @@
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-ollama</artifactId>
 		</dependency>
+		<!-- Embeddings run in-process (v3 lot A): DJL + ONNX Runtime behind
+		     Spring AI's EmbeddingModel, so the semantic cache, the router and
+		     the explanation services need no model server. The Ollama starter
+		     above stays for chat *egress* only. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-transformers</artifactId>
+			<exclusions>
+				<!-- Inference is ONNX Runtime; DJL is here for the tokenizer only.
+				     Left in, its PyTorch engine downloads ~250 MB of libtorch from
+				     publish.djl.ai on the first embedding — a network round trip on
+				     the very path this batch takes offline. -->
+				<exclusion>
+					<groupId>ai.djl.pytorch</groupId>
+					<artifactId>pytorch-engine</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>ai.djl</groupId>
+					<artifactId>model-zoo</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
@@ -149,6 +171,47 @@
 
 	<build>
 		<plugins>
+			<!-- The in-process embedding model (v3 lot A) is a 118 MB binary. It is
+			     fetched here rather than committed: it is over GitHub's 100 MB
+			     per-file limit, and Git LFS would spend an account-wide 1 GB/month
+			     bandwidth quota on every clone and every CI checkout. Downloaded
+			     once, verified by SHA-256, cached under ~/.m2 (which CI already
+			     caches), and copied straight into the classpath output — so the
+			     packaged jar still carries the model and the shipped artifact is
+			     unchanged. Swapping the model means changing these two URLs, their
+			     checksums, and the two `spring.ai.embedding.transformer.*`
+			     properties. -->
+			<plugin>
+				<groupId>com.googlecode.maven-download-plugin</groupId>
+				<artifactId>download-maven-plugin</artifactId>
+				<version>1.13.0</version>
+				<executions>
+					<execution>
+						<id>fetch-embedding-model</id>
+						<phase>generate-resources</phase>
+						<goals><goal>wget</goal></goals>
+						<configuration>
+							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/onnx/model_quantized.onnx</uri>
+							<outputDirectory>${project.build.outputDirectory}/onnx/paraphrase-multilingual-MiniLM-L12-v2</outputDirectory>
+							<outputFileName>model.onnx</outputFileName>
+							<sha256>66fc00f5f29afcaff34092e1bdd20008ca3918265a82fb9695a551e510cc4ebc</sha256>
+							<skipCache>false</skipCache>
+						</configuration>
+					</execution>
+					<execution>
+						<id>fetch-embedding-tokenizer</id>
+						<phase>generate-resources</phase>
+						<goals><goal>wget</goal></goals>
+						<configuration>
+							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/tokenizer.json</uri>
+							<outputDirectory>${project.build.outputDirectory}/onnx/paraphrase-multilingual-MiniLM-L12-v2</outputDirectory>
+							<outputFileName>tokenizer.json</outputFileName>
+							<sha256>b60b6b43406a48bf3638526314f3d232d97058bc93472ff2de930d43686fa441</sha256>
+							<skipCache>false</skipCache>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
