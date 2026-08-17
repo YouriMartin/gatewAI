@@ -1,7 +1,5 @@
 package io.github.yourimartin.gatewai.infrastructure.persistence;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -9,6 +7,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.DeferredJob;
 import io.github.yourimartin.gatewai.domain.model.DeferredJobStatus;
+import io.github.yourimartin.gatewai.domain.model.NodeIdentity;
 import io.github.yourimartin.gatewai.domain.port.out.DeferredJobStore;
 
 import org.slf4j.Logger;
@@ -39,8 +38,7 @@ class JpaDeferredJobStore implements DeferredJobStore {
       @Value("${gatewai.instance-id:}") String instanceId) {
     this.repository = repository;
     this.leaseTtl = Duration.ofMillis(leaseMs);
-    this.nodeId = instanceId == null || instanceId.isBlank()
-        ? localNodeId() : instanceId.trim();
+    this.nodeId = NodeIdentity.resolve(instanceId);
     LOG.info("Deferred jobs claimed as '{}' with a {} lease", nodeId, leaseTtl);
   }
 
@@ -96,20 +94,5 @@ class JpaDeferredJobStore implements DeferredJobStore {
   public int requeueExpiredLeases() {
     return repository.requeueExpiredLeases(
         DeferredJobStatus.QUEUED, DeferredJobStatus.RUNNING, Instant.now());
-  }
-
-  /**
-   * {@code host:pid}, which is enough to tell two replicas apart in a table and
-   * in a log. Override with {@code gatewai.instance-id} when the deployment
-   * already has a name for the node (a pod name, say).
-   */
-  private static String localNodeId() {
-    String host;
-    try {
-      host = InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      host = "unknown-host";
-    }
-    return host + ":" + ProcessHandle.current().pid();
   }
 }

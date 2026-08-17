@@ -170,6 +170,10 @@ docker compose -f compose.yaml up -d
 # Optional observability stack (Prometheus + Grafana)
 docker compose -f docker-compose.observability.yml up -d
 
+# Two replicas behind a load balancer, then the cluster scenario
+docker compose -f docker-compose.cluster.yml up --build -d
+./scripts/cluster-smoke.sh
+
 # Stop the full plug & play stack
 docker compose -f docker-compose.yml down
 ```

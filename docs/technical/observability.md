@@ -55,7 +55,12 @@ written off the request path and never fail a completion, so a store that is
 down would otherwise degrade in complete silence. A non-zero rate means the
 trace has holes, not that requests are failing.
 
-Common tag `application=gatewai` on every series.
+Common tags on every series: `application=gatewai`, and — since v3 lot B.5 —
+`instance`, which is `gatewai.instance-id` or `host:pid`. It is the **same string
+the deferred-job store writes to `claimed_by`**, so a graph and a job row name a
+node the same way; without that, "instance-2 is slow" is a coincidence rather than
+a lead. With one node it changes nothing; with two, a panel that does not
+aggregate would otherwise show whichever replica Prometheus scraped last.
 
 ## Decision metrics (v2 batch 6)
 
@@ -188,6 +193,11 @@ change it observed: one edit reads as **N** on a summed panel. A node also only
 counts a change it can see a transition to — one that served no traffic between
 two edits reports nothing. Measured on two nodes: one `PUT`, `1.0` on each
 ([`clustering.md`](clustering.md)).
+
+The provisioned panel therefore takes `max(increase(...))` across instances rather
+than the bare series (v3 lot B.5): each node counts the same edit once, so the
+maximum is "one edit", whatever the replica count. Summing would multiply it by N
+and drawing the raw series would put N identical lines on the graph.
 
 Other PromQL examples:
 

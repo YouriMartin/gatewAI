@@ -7,6 +7,44 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot B — B.5 (prove it, then say it)
+
+- **`NodeIdentity` went into the domain, which needs justifying.** Two adapters
+  need the same string — the deferred-job store writes it to `claimed_by`, the
+  metrics adapter publishes it as the `instance` tag — and ArchUnit forbids one
+  adapter depending on another, correctly. The alternatives were duplicating the
+  `host:pid` fallback in both (two sources for one value, free to drift) or an
+  untyped shared bean (the same coupling with the compiler switched off). A
+  framework-free value object in `domain/model` is the honest place: the point of
+  the class is precisely that the two names must be one name.
+- **The scenario is a script, not a JUnit test.** The plan allowed either. A test
+  would need the compose stack up before the JVM that asserts against it, which is
+  orchestration JUnit is bad at and `docker compose` is good at — and the artefact
+  worth having is one a reader can run and watch. It exits non-zero, so CI can run
+  it later without rewriting it.
+- **Checks are written so they can fail.** Three of them were rewritten after the
+  first green run, because they would have passed without the mechanism: counting
+  purge log lines passes with no gate at all (the second node finds nothing to
+  delete either way), so the lock is taken from `psql` instead; the rate-limit
+  check budgets the greedy refill instead of demanding `allowed == limit`; and
+  which node ran which job is *reported*, since it is emergent, with "exactly once"
+  asserted from `request_log` instead.
+- **`set -o pipefail` plus `grep -q` is a trap.** `grep -q` exits on the first
+  match, killing `curl` with SIGPIPE, and under `pipefail` the pipeline reports
+  that failure rather than the match. The metrics check failed against an endpoint
+  that visibly carried the tag. Replaced with `grep -c`, which reads to the end.
+- **A `LOGGING_LEVEL_` environment variable cannot name a class.** Relaxed binding
+  lowercases the property, and `...persistence.advisoryleaderlock` is not
+  `...persistence.AdvisoryLeaderLock`. The DEBUG level had to go on the package.
+  Worth writing down because the failure is silent — the variable is accepted and
+  simply does nothing.
+- **The two nodes' concurrent cold start never actually raced**, in three attempts.
+  Both booted, exactly one admin was seeded, and the second node took the idempotent
+  path each time because the first had already committed ~1 s earlier. The
+  criterion's *outcome* is verified; the *mechanisms* are covered deterministically
+  by the unit tests and by B.4's `psql`-held-lock run. Said plainly rather than
+  presented as a reproduced race.
+
 ## v3 lot B — B.4 (leader-gated scheduled work)
 
 - **Transaction-scoped lock, not session-scoped.** `pg_advisory_lock` is the

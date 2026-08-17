@@ -196,25 +196,55 @@ request in full, but its attribution and counterfactuals come back as
   apply from 2 August 2026 and bind the **provider or deployer of the AI
   system** — sources and scope in the compliance note.
 
-## Single-instance assumptions (not cluster-ready)
+## Running more than one replica
 
-- **Rate-limit buckets are in-memory per instance by default**, so the 60 req/min
-  limit is per process: N replicas allow N × the quota. A shared store exists —
-  `gatewai.ratelimit.store=postgres` (v3 lot B.3) — and costs ~3.8 ms p95 per
-  limited request; it is opt-in because a single node is correct and free without
-  it. **A cluster must set it.**
-- Everything else a second replica needs is in place: the **routing
-  configuration** is stored and propagated (v3 lot B.1), the **deferred-job
-  queue** is stored and claimed with `FOR UPDATE SKIP LOCKED` so jobs survive
-  restarts and run exactly once (v3 lot B.2), **rate limiting** can be shared
-  (v3 lot B.3, opt-in above), and **periodic jobs that must not run twice** —
-  the decision purge, the admin seeding — are gated on a PostgreSQL advisory lock
-  (v3 lot B.4). What is left is the end-to-end proof and this section's rewrite
-  (v3 lot B.5); until then, treat multi-replica as **supported but not yet
-  demonstrated as a whole**. The state-by-state inventory is in
-  [`../technical/clustering.md`](../technical/clustering.md).
-- Deferred jobs **persist the prompt in clear text** and have **no retention
-  policy**: completed jobs stay in `deferred_job` until deleted by hand.
+**Supported since v3 lot B**, and demonstrated rather than asserted:
+`docker-compose.cluster.yml` starts two replicas behind an nginx balancer on one
+PostgreSQL, and `scripts/cluster-smoke.sh` exercises every mechanism against it.
+The last run: config propagated node→node in ~4 s, 12 deferred jobs split 7/5
+across the nodes with each executed exactly once, a 60/min quota held cluster-wide
+(62 allowed / 8 refused, the 2 extra being the greedy refill during the burst),
+both nodes skipping the gated purge while its lock was held, one admin client
+seeded by two nodes booting together, and each node tagging its metrics with its
+own `instance`.
+
+**One setting a cluster must change.** Rate-limit buckets are in the heap by
+default, so the 60 req/min limit is per process and N replicas allow N × the
+quota. Set `gatewai.ratelimit.store=postgres` (v3 lot B.3) — it costs ~3.8 ms p95
+per limited request, which is why a single node, where the heap is correct and
+free, keeps the cheap default.
+
+**What stays node-local, and why that is fine:**
+
+- the **attribution LRU cache** — keyed on prompt hash + embedding model + config
+  version, so a miss costs a recomputation, never a wrong answer;
+- the **conformal snapshot** — a read-through cache with a 60 s TTL, so nodes
+  converge within a minute of a recalibration;
+- the **semantic route index** — derived from the shared configuration and rebuilt
+  when it changes.
+
+**What to know before scaling out:**
+
+- `gatewai_routing_config_changes_total` counts the edit **each node observed**, so
+  one edit reads as N summed across replicas. Read it per `instance`, or take the
+  `max` — the provisioned drift panel does.
+- A deferred job whose execution outlives `gatewai.dispatch.job-lease-ms` (5 min)
+  can be requeued and run twice. Concurrent claims are exactly-once; a lease
+  expiry is at-least-once, deliberately.
+- Every node must reach the same PostgreSQL, and nothing else. There is no Redis,
+  no ZooKeeper, no leader election to operate: coordination is `SKIP LOCKED`
+  claims and advisory locks in the database you already run.
+
+Full state-by-state inventory:
+[`../technical/clustering.md`](../technical/clustering.md).
+
+## Deferred jobs keep prompts, with no retention
+
+The carbon-aware queue stores the request in clear text — it has to, since the job
+runs long after the client is gone — and **nothing purges it**: completed jobs stay
+in `deferred_job` until deleted by hand. The endpoint is opt-in and disabled by
+default (`gatewai.dispatch.enabled=false`); the vector cache is the only other
+place prompt text is persisted, and that one has a TTL.
 
 ## Carbon-aware dispatch is off by default
 
@@ -243,6 +273,7 @@ worker will queue them without execution.
 ## Summary
 
 gatewAI convincingly demonstrates the *architecture and direction* of a green LLM
-gateway. The **savings logic, caching, routing and reporting are real**; the
-**absolute carbon numbers are placeholders**, the **provider matrix is minimal by
-default**, and the runtime assumes a **single instance**. Plan accordingly.
+gateway. The **savings logic, caching, routing and reporting are real**, and the
+runtime **runs as a cluster** (v3 lot B — one setting to change, one compose file
+to prove it); the **absolute carbon numbers are placeholders** and the **provider
+matrix is minimal by default**. Plan accordingly.

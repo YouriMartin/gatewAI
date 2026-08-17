@@ -85,7 +85,7 @@ via `frontend-maven-plugin` (profile `frontend`, active unless `-DskipFrontend`)
 > in the build context because Checkstyle runs at the `validate` phase during
 > `package`.
 
-## Compose: two files, on purpose
+## Compose: four files, on purpose
 
 - **`compose.yaml`** — infra only, with Spring Boot service-connection labels.
   Spring Boot's Docker Compose support **auto-starts it in dev**
@@ -105,6 +105,23 @@ name, and pulls its chat models from Ollama on first start.
 
 - **`docker-compose.observability.yml`** — optional Prometheus + Grafana stack (see
   [`observability.md`](observability.md)).
+- **`docker-compose.cluster.yml`** — **two gateway replicas behind an nginx
+  balancer** on one PostgreSQL (v3 lot B.5). Not a deployment template: it exists
+  to be run, and `scripts/cluster-smoke.sh` runs the scenario against it. The
+  `mock` egress is on, because it demonstrates clustering rather than inference
+  and a real egress would add a ~3 GB model pull that tests nothing here.
+
+  ```bash
+  docker compose -f docker-compose.cluster.yml up --build -d
+  ./scripts/cluster-smoke.sh
+  docker compose -f docker-compose.cluster.yml down -v
+  ```
+
+  The balancer publishes `:8080`; the nodes are also on `:8081` and `:8082`,
+  because some checks are about what a *particular* node believes. Two settings in
+  it are the ones a real cluster needs: `GATEWAI_RATELIMIT_STORE=postgres` (or each
+  replica grants the full quota on its own) and `GATEWAI_INSTANCE_ID` (which names
+  the node in `claimed_by` and in the `instance` metric tag).
 
 ## Configuration surface
 

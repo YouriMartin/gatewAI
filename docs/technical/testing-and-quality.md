@@ -139,16 +139,29 @@ a request from ingress to a persisted decision and back out through
 together against real infrastructure. The seam nobody tests end to end is
 therefore the *composition*, and that is the honest statement of the gap.
 
-**Multi-node behaviour is partly in the same category** (v3 lot B). Where the
-guarantee lives in SQL, there is a test that runs the SQL:
-`JpaDeferredJobStoreClaimTest` proves the concurrent claim and the lease sweep on
-a real database. Where it lives in a sequence of HTTP calls across two processes —
-a `PUT` on one node converging on another, a job submitted on A and completed by B
-after a restart — there is none: the pieces are unit-tested against fakes
-(`PersistentRoutingConfigPortTest`, `JpaRoutingConfigStoreTest`,
-`JpaDeferredJobStoreTest`) and the two-node behaviour was verified by hand, with
-the numbers written down in [`clustering.md`](clustering.md). B.5 is where that
-becomes a repeatable scenario.
+**Multi-node behaviour is covered on three levels** (v3 lot B), because no single
+one of them would do:
+
+1. **Unit tests against fakes** for the decision logic — what a node does when it
+   holds the lock or does not, when the store write fails, when a revision has
+   already been applied (`PersistentRoutingConfigPortTest`, `JpaDeferredJobStoreTest`,
+   `DecisionPurgeWorkerTest`, `AdminSeedRunnerTest`).
+2. **Integration tests against a real Postgres** for the guarantees that *are* SQL
+   — `SKIP LOCKED`, the lease sweep, a shared bucket, `pg_try_advisory_xact_lock`
+   (`JpaDeferredJobStoreClaimTest`, `PostgresRateLimiterTest`,
+   `AdvisoryLeaderLockTest`). A mock cannot demonstrate these; it would only prove
+   the mock agrees with itself.
+3. **A cluster scenario** — `scripts/cluster-smoke.sh` against
+   `docker-compose.cluster.yml`: two replicas behind a balancer, five checks, exits
+   non-zero on failure. It is the only level where the mechanisms are exercised
+   *together*, through HTTP, by a client that does not know which node it reached.
+
+It is a shell script rather than a JUnit test because the fixture is a compose
+stack: JUnit would have to orchestrate containers before the JVM that asserts
+against them, and the artefact worth having here is one a reader can run and
+watch. Its output and the reasoning behind each check are in
+[`clustering.md`](clustering.md). Not in CI yet — it needs Docker, and the
+integration job's service containers are a different shape.
 
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 

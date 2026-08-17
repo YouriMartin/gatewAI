@@ -465,7 +465,7 @@ transaction-scoped rather than session-scoped, lock ids are declared in a
 too — the plan only asked for a test there, but the lock is what makes the
 *random-key* mode produce one admin instead of two.
 
-## B.5 — Prove it, then say it
+## B.5 — Prove it, then say it — ✅ done
 
 - Add a compose file with **two gateway replicas** behind a minimal load
   balancer, sharing one Postgres.
@@ -480,10 +480,40 @@ too — the plan only asked for a test there, but the lock is what makes the
   is still node-local and why that is acceptable (attribution LRU, conformal
   snapshot delay, in-memory route index).
 
-**Acceptance**
-- `limitations.md` no longer says "running multiple replicas is not supported
-  as-is".
-- Every row of the B.0 table reads "fine", with a reason.
+**Acceptance** — both met:
+- `limitations.md`'s "Single-instance assumptions (not cluster-ready)" section is
+  gone, replaced by "Running more than one replica" — what is supported, the one
+  setting a cluster must change, what stays node-local and why that is fine, and
+  what to know before scaling out. The summary no longer says the runtime assumes
+  a single instance. No file in the repository claims it any more.
+- Every row of the B.0 inventory reads "fine", each with its reason and the batch
+  that earned it.
+
+**What was built**
+- `docker-compose.cluster.yml`: two replicas of the same image behind an nginx
+  round-robin balancer (no session affinity — pinning would hide exactly the bugs
+  this lot removed), one PostgreSQL, `mock` egress. The balancer is on `:8080`;
+  the nodes are also published on `:8081`/`:8082` because some checks are about
+  what a *particular* node believes.
+- `scripts/cluster-smoke.sh`: five checks, PASS/FAIL each, non-zero exit if any
+  failed, idempotent across runs. Last run: config propagated in **~4 s**, 12 jobs
+  split **7/5** across nodes with each executed exactly once, **62 allowed / 8
+  refused** against a 60/min cluster quota, **3 + 3** purge skips while the lock
+  was held, one admin seeded by two nodes booting together, both nodes carrying
+  their `instance` tag.
+- `NodeIdentity` (domain) resolving `gatewai.instance-id` or `host:pid`, used by
+  **both** the deferred-job store (`claimed_by`) and the metrics common tag, so a
+  graph and a job row cannot name the same node differently.
+- The drift panel now reads `max(increase(gatewai_routing_config_changes_total))`
+  across instances: each node counts the same edit once, so the maximum is "one
+  edit" whatever the replica count.
+
+**Two bugs the scenario found in itself, worth recording**: `set -o pipefail` with
+`grep -q` reports curl's SIGPIPE rather than grep's match, which made the metrics
+check fail against an endpoint that plainly carried the tag; and a `LOGGING_LEVEL_`
+environment variable cannot name a camel-case class, because the property it binds
+to is lowercased — the level had to go on the package. Both are in
+[`../decisions.md`](../decisions.md).
 
 ---
 

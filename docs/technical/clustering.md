@@ -8,10 +8,17 @@ behaviour between nodes.
 already requires. "One jar, one Postgres" is the argument; adding a second infra
 container to solve locking would spend it.
 
-Lot B is **nearly closed**: every row of the inventory below now reads "fine",
-with one configuration caveat (the rate-limit store) and one batch outstanding
-(B.5, the end-to-end proof). See [Where lot B stands](#where-lot-b-stands) and
-[`../functional/limitations.md`](../functional/limitations.md).
+Lot B is **done**. Every row of the inventory below reads "fine", and the whole is
+demonstrated rather than argued: `docker-compose.cluster.yml` starts two replicas
+behind an nginx balancer on one PostgreSQL, and `scripts/cluster-smoke.sh` runs the
+scenario against it. One setting has to change for a cluster
+(`gatewai.ratelimit.store=postgres`); everything else is default.
+
+```bash
+docker compose -f docker-compose.cluster.yml up --build -d
+./scripts/cluster-smoke.sh
+docker compose -f docker-compose.cluster.yml down -v
+```
 
 ## The inventory
 
@@ -32,6 +39,7 @@ and says why.
 | `CarbonAwareDispatchWorker` | runs on every node | **fine** — every node *should* work the queue; the claim is what makes that safe (B.2). No leader gating needed, and B.4 says so rather than adding it |
 | `DecisionPurgeWorker` | runs on every node, gated on an advisory lock | **fine** — one purge per interval across the cluster (B.4) ✅ |
 | Routing-config poll | runs on every node | **fine** — a read, and it must run everywhere (B.1) |
+| Metric series | tagged `instance` per node | **fine** — the same string as `claimed_by`, so a graph and a job row name a node alike (B.5) ✅ |
 
 ## Routing configuration (B.1)
 
@@ -276,6 +284,49 @@ the lock from a `psql` session** and watching what the nodes did.
 | Dying releases the lock | terminating the holder's backend dropped it (`pg_locks` empty), and the next start seeded exactly one admin |
 | Two nodes, one key | started together with the same `GATEWAI_ADMIN_API_KEY` against an empty table: **exactly one** admin, both nodes up, both accepting the key |
 
+## The scenario (B.5)
+
+`scripts/cluster-smoke.sh` is the proof, and it is written to be re-run: it clears
+its own scratch rows, prints PASS/FAIL per check and exits non-zero if any failed.
+Five checks, one per mechanism, all against a real two-replica stack. Last run:
+
+```
+1. Routing config propagates between nodes (B.1)
+  PASS node 2 picked up node 1's edit in ~4s
+  PASS one stored configuration, not one per node
+2. Deferred jobs cross nodes and run exactly once (B.2)
+  PASS 12/12 jobs completed
+  PASS work spread across 2 nodes
+    gateway-1 ran 7 job(s)
+    gateway-2 ran 5 job(s)
+  PASS every job executed exactly once
+3. The rate limit is the cluster's, not each node's (B.3)
+  PASS 62 allowed / 8 refused (quota 60, +3 refilled over 2s; per-node would allow ~120)
+4. A gated job runs on one node only (B.4)
+  PASS both nodes skipped the purge while the lock was held (3 + 3 skips)
+  PASS two nodes booted, exactly one admin client seeded
+5. Metrics tell the nodes apart (B.5)
+  PASS gateway-1 tags its series with instance="gateway-1"
+  PASS gateway-2 tags its series with instance="gateway-2"
+```
+
+Three things about how those checks are written, because a scenario that cannot
+fail proves nothing:
+
+- **The purge check holds the lock from outside** rather than counting purge log
+  lines. Counting would pass with no gate at all: the second node's purge finds
+  nothing left to delete either way. Taking `pg_advisory_lock(-189118924, 1)` from
+  `psql` — `"gatewai".hashCode()` and `LeaderTask.DECISION_PURGE` — makes the skip
+  observable, and makes the two sides agreeing on the lock id part of the evidence.
+- **The rate-limit check budgets the refill.** A greedy bucket hands back
+  `limit/60` tokens a second while the burst is in flight, so "allowed == limit" is
+  the wrong assertion; the ceiling is the quota plus what refilled, and the claim
+  being tested is that it is nowhere near twice the quota.
+- **Which node ran which job is reported, not asserted.** Both poll the same queue
+  and whoever ticks first takes the next job; the property that must hold is
+  "exactly once", and that one is asserted from `request_log`, an execution count
+  rather than an inspection of the queue's own state.
+
 ## Where lot B stands
 
 | Batch | Subject | Status |
@@ -285,11 +336,17 @@ the lock from a `psql` session** and watching what the nodes did.
 | B.2 | Persist deferred jobs | **done** |
 | B.3 | Distributed rate limiting, without Redis | **done** (opt-in) |
 | B.4 | Leader-gated scheduled work | **done** |
-| B.5 | Prove it end to end, then say it | to do |
+| B.5 | Prove it end to end, then say it | **done** |
 
 One thing still needs an operator's attention: **the rate limit stays per process
 until you set `gatewai.ratelimit.store=postgres`** — the mechanism exists, the safe
-value is not the default (B.3 explains why). Everything else in the inventory now
-reads "fine". What B.5 owes is not another mechanism but the **proof as a whole**:
-a two-replica compose file, one scenario exercising all four batches together, and
-the rewrite of `limitations.md` that this page has been getting ahead of.
+value is not the default (B.3 explains why), and the cluster compose file sets it.
+Everything else is default behaviour.
+
+What lot B did not build, deliberately: no leader election, no membership, no
+consensus, no second infrastructure component. Coordination is `SKIP LOCKED`
+claims, advisory locks and a polled row — all in the PostgreSQL the gateway
+already required. The cost of that choice is a bounded propagation delay (5 s for
+routing config, 60 s for a recalibration) and an at-least-once edge on a deferred
+job whose execution outlives its lease. Both are documented numbers rather than
+surprises.
