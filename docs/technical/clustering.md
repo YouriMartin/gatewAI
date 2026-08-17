@@ -8,9 +8,10 @@ behaviour between nodes.
 already requires. "One jar, one Postgres" is the argument; adding a second infra
 container to solve locking would spend it.
 
-Lot B is **in progress**. Until it closes, running multiple replicas is still not
-supported end to end — see [Where lot B stands](#where-lot-b-stands) for exactly
-what is missing, and [`../functional/limitations.md`](../functional/limitations.md).
+Lot B is **nearly closed**: every row of the inventory below now reads "fine",
+with one configuration caveat (the rate-limit store) and one batch outstanding
+(B.5, the end-to-end proof). See [Where lot B stands](#where-lot-b-stands) and
+[`../functional/limitations.md`](../functional/limitations.md).
 
 ## The inventory
 
@@ -25,11 +26,11 @@ and says why.
 | `RequestEmbeddingMemo` | scoped value, per request | **fine** by construction — it never outlives one request |
 | `InMemoryAttributionCache` (LRU 500) | heap | **fine** — a cache keyed on prompt hash + embedding model + config version; a miss costs a recomputation, never a wrong answer |
 | Conformal snapshot (60 s TTL) | heap, per node | **fine** — a read-through cache of `conformal_calibration`; nodes converge within 60 s of a recalibration |
-| `AdminSeedRunner` | idempotent on `api_key_hash` | needs a concurrent-cold-start test (**B.4**) |
+| `AdminSeedRunner` | idempotent on `api_key_hash`, under a leader lock | **fine** — one seeder, and losing the key race no longer fails a boot (B.4) ✅ |
 | Deferred job queue | `deferred_job` table, claimed with `SKIP LOCKED` | **fine** — shared, durable, exactly-once per claim (B.2) ✅ |
 | `RateLimiter` buckets | heap, or the `rate_limit_bucket` table | **fine** — shared when `gatewai.ratelimit.store=postgres` (B.3) ✅; the heap default is per process, so a cluster must set it |
 | `CarbonAwareDispatchWorker` | runs on every node | **fine** — every node *should* work the queue; the claim is what makes that safe (B.2). No leader gating needed, and B.4 says so rather than adding it |
-| `DecisionPurgeWorker` | runs on every node | **must be gated** (**B.4**) — purging twice is harmless but the pattern needs a rule |
+| `DecisionPurgeWorker` | runs on every node, gated on an advisory lock | **fine** — one purge per interval across the cluster (B.4) ✅ |
 | Routing-config poll | runs on every node | **fine** — a read, and it must run everywhere (B.1) |
 
 ## Routing configuration (B.1)
@@ -216,6 +217,65 @@ Because the cost was measured rather than feared, the local-token-batching
 optimisation the roadmap held in reserve was **not** built: at 3.8 ms there is
 nothing to buy.
 
+## Scheduled work (B.4)
+
+### The rule
+
+A periodic job needs gating only when running it twice is wrong **and** it has no
+claim of its own. That is a narrower set than "everything scheduled", and the
+inventory above says which side each job is on:
+
+| Job | Gated? | Why |
+|---|---|---|
+| Decision purge | **yes** | the same `DELETE` on every node, and N log lines describing one event |
+| Admin seeding | **yes** | two nodes with no configured key would create two admins with two keys |
+| Routing-config poll | no | it is a read, and it **must** run everywhere (B.1) |
+| Carbon-aware dispatch | no | the queue's own `SKIP LOCKED` claim coordinates it; a gate would elect one dispatcher and idle the rest (B.2) |
+| Conformal snapshot refresh | no | a per-node read-through cache |
+
+### There is no leader
+
+`LeaderLock` is named after what it does, not after an algorithm: no election, no
+term, no heartbeat, nothing to fail over. Each tick asks
+`pg_try_advisory_xact_lock(namespace, task)`, does the work if it gets it, and
+forgets. A node that dies holds nothing, so the next tick on any node wins — that
+is the entire recovery story, and it needs no operator.
+
+Three choices worth stating:
+
+- **Transaction-scoped, not session-scoped.** A session lock must be released by
+  hand, so a node killed mid-job holds it until its connection is reaped: "one
+  node died" would become "nothing runs any more". A transaction lock is released
+  by the commit, the rollback, *or* the connection dying.
+- **The work runs inside the lock's transaction**, so the lock is held for exactly
+  as long as the job and the job's writes share its connection. A job writing
+  through another `DataSource` would fall outside that protection; none does, and
+  `LeaderTask` is where a new one has to be declared.
+- **One declared lock id per task**, not a hash of its name. Two jobs sharing a key
+  would silently serialize against each other, and ids are namespaced by
+  `"gatewai".hashCode()` so another application on the same database cannot
+  collide. Ids are permanent: reusing one would let a new node's job block an old
+  node's during a rolling upgrade.
+
+**No migration.** B.4 is the one batch of this lot that adds no schema — PostgreSQL
+already has the primitive.
+
+### Verified, on two JVMs sharing one Postgres
+
+The natural experiment (watch two nodes purge) proves nothing: the second node's
+purge would find nothing to delete either way. So the gate was tested by **holding
+the lock from a `psql` session** and watching what the nodes did.
+
+| Criterion | Result |
+|---|---|
+| The purge gate is real | with the lock held externally, both nodes logged `skipping` on **every** tick (7 and 6 skips over 20 s at a 3 s interval) and the purgeable rows stayed in place |
+| The key computation matches | that is only possible because Java's `pg_try_advisory_xact_lock(-189118924, 1)` and the SQL session asked for the same lock |
+| Release resumes work | the tick after the lock was freed purged the rows, on whichever node ticked first |
+| Losing a node needs no intervention | node B killed → node A purged on its next tick |
+| The seed gate is real | a node booting while `ADMIN_SEED` was held logged *"Another instance is seeding the admin client; skipping"*, left `api_client` **empty**, and **started anyway** |
+| Dying releases the lock | terminating the holder's backend dropped it (`pg_locks` empty), and the next start seeded exactly one admin |
+| Two nodes, one key | started together with the same `GATEWAI_ADMIN_API_KEY` against an empty table: **exactly one** admin, both nodes up, both accepting the key |
+
 ## Where lot B stands
 
 | Batch | Subject | Status |
@@ -224,11 +284,12 @@ nothing to buy.
 | B.1 | Persist and propagate the routing config | **done** |
 | B.2 | Persist deferred jobs | **done** |
 | B.3 | Distributed rate limiting, without Redis | **done** (opt-in) |
-| B.4 | Leader-gated scheduled work | to do |
+| B.4 | Leader-gated scheduled work | **done** |
 | B.5 | Prove it end to end, then say it | to do |
 
-What still breaks with a second replica: **the decision purge** runs on every node
-(harmless, but ungoverned — B.4), and **the rate limit stays per process until you
-set `gatewai.ratelimit.store=postgres`** — the mechanism exists, the safe value is
-not the default. Routing, the deferred queue and (so configured) rate limiting are
-safe to replicate today.
+One thing still needs an operator's attention: **the rate limit stays per process
+until you set `gatewai.ratelimit.store=postgres`** — the mechanism exists, the safe
+value is not the default (B.3 explains why). Everything else in the inventory now
+reads "fine". What B.5 owes is not another mechanism but the **proof as a whole**:
+a two-replica compose file, one scenario exercising all four batches together, and
+the rewrite of `limitations.md` that this page has been getting ahead of.

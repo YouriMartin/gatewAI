@@ -17,11 +17,12 @@ Architecture rules are themselves a test (ArchUnit).
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
 | dispatch queue | claiming, leases, crash recovery | `DeferredChatServiceTest`, `JpaDeferredJobStoreTest`, `DeferredJobJsonTest`, `JpaDeferredJobStoreClaimTest` (integration) |
 | rate limiting | both stores, the filter's scope, the check timer | `InMemoryRateLimiterTest`, `RateLimitFilterTest`, `PostgresRateLimiterTest` (integration) |
+| clustered scheduling | who runs a periodic job, and what a concurrent cold start seeds | `DecisionPurgeWorkerTest`, `AdminSeedRunnerTest`, `AdvisoryLeaderLockTest` (integration) |
 | decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 | embedding | the real ONNX model, in-process, and its native-image hints | `InProcessEmbeddingModelTest`, `EmbeddingNativeRuntimeHintsTest` |
 
-**593 tests** run in the default build (v3 lot B.3). Per the project convention,
+**599 tests** run in the default build (v3 lot B.4). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -41,13 +42,21 @@ Two conventions the v2 decision work added, both of them deliberate:
 Tests that need **external services** (Postgres/pgvector, Ollama, a real model)
 are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `ChatClientSmokeTest`,
 `ActuatorHealthSmokeTest`, `ContextLoadsTest`, and — since v3 lot B —
-`JpaDeferredJobStoreClaimTest` and `PostgresRateLimiterTest`.
+`JpaDeferredJobStoreClaimTest`, `PostgresRateLimiterTest` and
+`AdvisoryLeaderLockTest`.
 
-Those last two are tagged for a reason worth stating: what they test **is** the
+Those last three are tagged for a reason worth stating: what they test **is** the
 SQL. `FOR UPDATE SKIP LOCKED` handing each job to exactly one of two concurrent
-workers, a bulk update requeueing an expired lease, and one token bucket shared by
-two limiter instances cannot be demonstrated against a mock repository — a passing
-mock would only prove the mock agrees with itself.
+workers, a bulk update requeueing an expired lease, one token bucket shared by two
+limiter instances, and `pg_try_advisory_xact_lock` refusing a second node cannot be
+demonstrated against a mock repository — a passing mock would only prove the mock
+agrees with itself.
+
+`AdvisoryLeaderLockTest` is also the only thing proving the lock is taken on the
+**same connection as the work**: if `JdbcTemplate` did not join the transaction,
+the lock would be released the instant it was taken and both threads would run.
+Its timing is not left to chance — the second node always asks while the first is
+inside its job, and the first waits for the answer before releasing.
 
 `PostgresRateLimiterTest` also covers the trap of a *persisted* bucket: it carries
 the bandwidth it was created with, so a test asserts that editing

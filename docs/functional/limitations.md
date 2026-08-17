@@ -203,16 +203,16 @@ request in full, but its attribution and counterfactuals come back as
   `gatewai.ratelimit.store=postgres` (v3 lot B.3) — and costs ~3.8 ms p95 per
   limited request; it is opt-in because a single node is correct and free without
   it. **A cluster must set it.**
-- The **decision purge worker runs on every node**. Purging twice is harmless, but
-  nothing coordinates it.
-- Running multiple replicas is therefore **not supported end to end yet**. Three
-  pieces already are: the **routing configuration** is stored and propagated
-  (v3 lot B.1), the **deferred-job queue** is stored and claimed with
-  `FOR UPDATE SKIP LOCKED` so jobs survive restarts and run exactly once
-  (v3 lot B.2), and **rate limiting** can be shared (v3 lot B.3, opt-in above).
-  What is left is the scheduler gating — see
-  [`../technical/clustering.md`](../technical/clustering.md) for the full
-  state-by-state inventory.
+- Everything else a second replica needs is in place: the **routing
+  configuration** is stored and propagated (v3 lot B.1), the **deferred-job
+  queue** is stored and claimed with `FOR UPDATE SKIP LOCKED` so jobs survive
+  restarts and run exactly once (v3 lot B.2), **rate limiting** can be shared
+  (v3 lot B.3, opt-in above), and **periodic jobs that must not run twice** —
+  the decision purge, the admin seeding — are gated on a PostgreSQL advisory lock
+  (v3 lot B.4). What is left is the end-to-end proof and this section's rewrite
+  (v3 lot B.5); until then, treat multi-replica as **supported but not yet
+  demonstrated as a whole**. The state-by-state inventory is in
+  [`../technical/clustering.md`](../technical/clustering.md).
 - Deferred jobs **persist the prompt in clear text** and have **no retention
   policy**: completed jobs stay in `deferred_job` until deleted by hand.
 

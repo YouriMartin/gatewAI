@@ -91,7 +91,7 @@ against today's routes.
 | Property | Default | Meaning |
 |---|---|---|
 | `gatewai.decisions.enabled` | `true` | switches recording off without touching the metrics, which are fed by a sibling port |
-| `gatewai.decisions.retention-days` | `90` | a scheduled worker purges older rows |
+| `gatewai.decisions.retention-days` | `90` | a scheduled worker purges older rows; leader-gated since v3 lot B.4, so N replicas purge once per interval rather than N times |
 
 An explanation that 404s on a request you know happened is usually one of these
 two: recording off, or retention passed. The 404 says so.

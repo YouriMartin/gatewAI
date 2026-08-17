@@ -416,7 +416,7 @@ that is now the one footgun lot B leaves standing. Stated in `security.md`,
 `clustering.md`, `limitations.md` and the property's own comment; B.5's two-replica
 compose sets it.
 
-## B.4 — Leader-gated scheduled work
+## B.4 — Leader-gated scheduled work — ✅ done
 
 `CarbonAwareDispatchWorker`, `DecisionPurgeWorker` and the calibration snapshot
 refresh currently run on every node. Purging twice is harmless; dispatching
@@ -433,13 +433,37 @@ twice is not (B.2 fixes that specific case, but the pattern needs a rule).
   that are not idempotent and have no claim of their own — the purge.
 - The calibration snapshot refresh stays per-node (it is a read).
 
-**Acceptance**
-- With two instances, the purge runs once per interval, not twice.
-- Losing the leader node causes another to pick the work up on the next tick,
-  with no manual intervention.
-- Concurrent cold start of two instances with the same `GATEWAI_ADMIN_API_KEY`
-  seeds exactly one admin client (unique constraint on `api_key_hash` must be
-  caught, not thrown to the startup).
+**Acceptance** — all three met, on two JVMs sharing one Postgres:
+- The purge gate was tested by **holding the lock from a `psql` session**, because
+  the obvious experiment proves nothing: a second node purging after the first
+  finds nothing to delete either way, so "one log line" is not evidence. With the
+  lock held externally, both nodes logged `skipping` on every tick (7 and 6 skips
+  over 20 s at a 3 s interval) and the purgeable rows stayed. That the SQL session
+  and the Java code contended at all is also the proof that
+  `pg_try_advisory_xact_lock(-189118924, 1)` is computed identically on both sides.
+- Losing a node needs no intervention: node B killed, node A purged on its next
+  tick. Note there is no leader to lose — over the run both nodes purged at
+  different times, which is the design rather than a wobble.
+- Concurrent cold start: two nodes started together with the same
+  `GATEWAI_ADMIN_API_KEY` against an empty `api_client` produced **exactly one**
+  admin, both up, both accepting the key. The gate itself was then proven
+  deterministically the same way as the purge — a node booting while `ADMIN_SEED`
+  was held logged *"Another instance is seeding the admin client; skipping"*, left
+  the table empty and **started anyway**; terminating the holder's backend released
+  the lock (`pg_locks` empty) and the next start seeded exactly one.
+- The unique-constraint catch is in, and it sits at the **transaction boundary**,
+  not around the insert: the insert joins the lock's transaction, so a violation
+  surfaces at commit, one frame further out. A catch around `save()` would have
+  looked right and never fired.
+- `./mvnw -DskipFrontend verify` green: **599 tests**. `AdvisoryLeaderLockTest`
+  (`@Tag("integration")`) covers mutual exclusion, release on success and on
+  failure, and that two tasks do not block each other, against a real database.
+
+**Deviations** (detail in [`../decisions.md`](../decisions.md)): the lock is
+transaction-scoped rather than session-scoped, lock ids are declared in a
+`LeaderTask` enum rather than hashed from a name, and the admin seeding is gated
+too — the plan only asked for a test there, but the lock is what makes the
+*random-key* mode produce one admin instead of two.
 
 ## B.5 — Prove it, then say it
 

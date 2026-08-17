@@ -59,6 +59,20 @@ system is usable without hand-inserting a key. Two modes:
   generated key logged **once** (`WARN: "...Admin API key (shown ONCE, copy it now):
   gw_…"`). Copy it; it is never shown again.
 
+Since **v3 lot B.4** the whole seeding runs under a `LeaderLock`
+(`pg_try_advisory_xact_lock`), so two instances booting together produce **one**
+admin, not two. The lock is what the *random* mode needs — two nodes generating
+two different keys break no constraint, they just create two admins and log two
+"copy this now" lines, only one of which anyone reads. The *configured* mode is
+covered twice: the unique constraint on `api_key_hash` is caught rather than
+thrown, because losing that race means the key is already there — which is the
+outcome the runner wanted, and not a reason for a gateway to refuse to boot.
+
+Verified against a real database by holding the seed lock from a `psql` session
+while a node booted: it logged *"Another instance is seeding the admin client;
+skipping"*, left `api_client` empty and **started anyway**; the next start after
+the lock was released seeded exactly one admin.
+
 The default in-memory user from Spring's `UserDetailsServiceAutoConfiguration` is
 **excluded** (auth is API-key based), so the misleading `Using generated security
 password` log does not appear.

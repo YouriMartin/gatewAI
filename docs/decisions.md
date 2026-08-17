@@ -7,6 +7,45 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot B — B.4 (leader-gated scheduled work)
+
+- **Transaction-scoped lock, not session-scoped.** `pg_advisory_lock` is the
+  better-known one and it is the wrong one here: it must be released by hand, so a
+  node killed mid-job holds it until its connection is reaped, and "one node died"
+  becomes "nothing runs any more". `pg_try_advisory_xact_lock` is released by the
+  commit, the rollback, or the connection dying. The consequence is that the job
+  runs **inside** the lock's transaction — noted in the class, because a future job
+  writing through a different `DataSource` would silently fall outside it.
+- **Lock ids are declared in an enum, not hashed from a job name.** Hashing is
+  shorter and has a failure mode nobody sees coming: two jobs colliding on a key
+  silently serialize against each other, and the bug only appears when a third job
+  is added. `LeaderTask` makes adding a gated job a decision someone took, the same
+  discipline ArchUnit applies to adapter packages. Ids are namespaced by
+  `"gatewai".hashCode()` — specified by the JDK, so it is stable forever — so
+  another application sharing the database cannot collide either.
+- **The admin seeding is gated too, which the plan did not ask for.** B.4's third
+  criterion only requires that the unique-constraint race not fail a startup. That
+  fixes the *configured-key* mode; it does nothing for the *random-key* mode, where
+  two nodes generate two different keys, break no constraint, and produce two
+  admins with two "copy this now" log lines. The lock is what makes that one admin,
+  and it costs three lines given the abstraction now exists. Both defences ship
+  because they cover different failures.
+- **The constraint catch sits at the transaction boundary, not around the insert.**
+  The first version wrapped `repository.save(...)`, which reads as the obvious
+  place and would never have fired: the insert joins the lock's transaction, so the
+  violation surfaces at **commit**, out of `runIfLeader`. Caught one frame further
+  out instead, with the reason written next to it.
+- **The gate was verified by holding the lock from `psql`, not by watching two
+  nodes.** The natural experiment is worthless here — a second node purging after
+  the first finds nothing to delete, so "only one node logged a purge" is equally
+  consistent with no gate at all. Taking the lock from an outside session makes the
+  skip observable, and makes the two sides agreeing on the lock id part of the
+  evidence rather than an assumption.
+- **`LeaderLock` stays in `infrastructure/persistence`, not in a domain port.**
+  Same reasoning as B.3's rate limiter: it coordinates infrastructure, no use case
+  ever calls it, and a domain port for "am I the one who should run this" would be
+  an abstraction the domain never uses.
+
 ## v3 lot B — B.3 (distributed rate limiting)
 
 - **`SELECT … FOR UPDATE`, not the advisory-lock strategy.** The plan offered
