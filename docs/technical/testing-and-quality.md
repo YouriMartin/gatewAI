@@ -19,7 +19,7 @@ Architecture rules are themselves a test (ArchUnit).
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 | embedding | the real ONNX model, in-process, and its native-image hints | `InProcessEmbeddingModelTest`, `EmbeddingNativeRuntimeHintsTest` |
 
-**559 tests** run in the default build (v3 lot A). Per the project convention,
+**580 tests** run in the default build (v3 lot B.1). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -111,6 +111,14 @@ a request from ingress to a persisted decision and back out through
 (`AdminDecisionControllerTest`) — with `ContextLoadsTest` proving the pieces wire
 together against real infrastructure. The seam nobody tests end to end is
 therefore the *composition*, and that is the honest statement of the gap.
+
+**Multi-node behaviour is in the same category** (v3 lot B.1). The routing-config
+store, the write-through and the poll are unit-tested against a fake store
+(`PersistentRoutingConfigPortTest`, `JpaRoutingConfigStoreTest`), and the
+`ON CONFLICT` and check-constraint semantics are SQL, not Java — so what no test
+covers is *two JVMs actually converging*. That was verified by hand, with the
+numbers written down in [`clustering.md`](clustering.md); B.5 is where it becomes
+a repeatable scenario.
 
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 

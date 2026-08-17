@@ -253,7 +253,7 @@ behaviour between nodes.
 The single-infra-container story is the product argument; adding a second one to
 solve locking would spend it.
 
-## B.0 — Audit and pin the contract
+## B.0 — Audit and pin the contract — ✅ done
 
 Before writing anything, produce `docs/technical/clustering.md` listing every
 piece of node-local state and its verdict. Expected inventory:
@@ -273,7 +273,12 @@ piece of node-local state and its verdict. Expected inventory:
 This table is the acceptance criterion for the whole lot: at the end, every row
 says "fine" and says why.
 
-## B.1 — Persist and propagate the routing config
+**Written** as [`../technical/clustering.md`](../technical/clustering.md), with
+every row's verdict, the batch that owns it, and a per-batch status table. It
+shipped with B.1 rather than as its own commit — see
+[`../decisions.md`](../decisions.md).
+
+## B.1 — Persist and propagate the routing config — ✅ done
 
 The highest-risk item and the easiest to overlook. Today a
 `PUT /v1/admin/routing` on node A leaves node B routing on the old rules
@@ -293,12 +298,35 @@ decisions, which makes the trace lie.
   replicas).
 - Route index rebuild happens on version change, per node.
 
-**Acceptance**
-- Two instances, a `PUT` on one, and the other routes on the new rules within
-  the documented window.
-- A restart of either node loads the persisted config, not
-  `application.properties` defaults.
-- `routing_config_version` is identical across nodes once converged.
+**Acceptance** — all three met, measured on two JVMs sharing one pgvector
+container (packaged jar, `mock` profile), written up in
+[`../technical/clustering.md`](../technical/clustering.md):
+- A `PUT` on node A reached node B in **2.05 s** at the default 5 s interval —
+  rules *and* cascade band. Node A applied revisions 2 then 3 (its own two
+  column-scoped writes); node B adopted 3 directly, which is intermediate
+  revisions coalescing rather than a missed update.
+- Node B restarted at **revision 3**, not at the `application.properties`
+  defaults, with no `PUT` replayed.
+- `routing_config_version` identical (`ce59c5bc8f5961ff`) on the decisions each
+  node recorded.
+- `gatewai_routing_config_changes_total` read **1.0 on each node** after one
+  edit — the N-replicas reading is documented in `observability.md` beside the
+  drift panel, including the case of a node that served no traffic between two
+  edits and therefore counts nothing.
+- Two behaviours verified in SQL rather than in Java, because that is where they
+  live: the losing `INSERT … ON CONFLICT (id) DO NOTHING` reports `INSERT 0 0`
+  and leaves the winner's row intact, and `routing_config_single_row` refuses an
+  `id = 2`.
+- Resilience checked by stopping Postgres under a running node: one failed poll
+  logged `WARN … keeping revision 5`, the node kept its rules, and it accepted
+  the next `PUT` at revision 6 after recovery.
+- `./mvnw -DskipFrontend verify` green: **580 tests**, 0 failures, Checkstyle and
+  SpotBugs included.
+
+**Deviations** (detail in [`../decisions.md`](../decisions.md)): the two writers
+are **column-scoped** (`saveConfig` / `saveCascadeMarginBand`) instead of one
+whole-row write, and the seed is an `ON CONFLICT DO NOTHING` insert instead of a
+caught constraint violation.
 
 ## B.2 — Persist deferred jobs
 

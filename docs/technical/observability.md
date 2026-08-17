@@ -164,6 +164,13 @@ exists: a log line cannot be graphed next to the mix, a counter can. Read it
 beside the margin panel — decisions holding steady while margins collapse is the
 same signal, earlier.
 
+**With more than one replica, read that series per instance.** Since v3 lot B.1
+the rules are shared and every node picks up an edit, so each node counts the
+change it observed: one edit reads as **N** on a summed panel. A node also only
+counts a change it can see a transition to — one that served no traffic between
+two edits reports nothing. Measured on two nodes: one `PUT`, `1.0` on each
+([`clustering.md`](clustering.md)).
+
 Other PromQL examples:
 
 ```promql

@@ -7,6 +7,54 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot B — B.1 (persist and propagate the routing config)
+
+- **B.0 shipped with B.1 instead of on its own.** The plan makes B.0 a separate
+  writing batch. Its output is `clustering.md`, and that file is also where B.1's
+  propagation window, counter semantics and failure modes belong — writing the
+  inventory first, then immediately rewriting one of its rows plus adding three
+  sections, would have been two commits describing one state of the code. The
+  inventory is complete and every row names the batch that owns it, so the lot's
+  acceptance criterion is still checkable row by row.
+- **The two writers are column-scoped, which the plan did not ask for.** The plan
+  says "`RoutingConfigPort` gains a persistent implementation". The obvious shape
+  is one `save(config, band)`, and it has a bug: a node's cached copy can be a
+  poll interval stale, so a rules edit on node A written from that copy would
+  silently revert a band edit made on node B a second earlier. `saveConfig` and
+  `saveCascadeMarginBand` each touch only their own columns, under
+  `SELECT … FOR UPDATE`. The cost is that one `PUT` produces two revisions, which
+  is visible in the logs and harmless — the second write carries the final state.
+- **The seed is `INSERT … ON CONFLICT DO NOTHING`, not a caught constraint
+  violation.** The first draft was "check absent, insert, catch the violation,
+  re-read". Worse in two ways: a JPA merge of an entity with an assigned id turns
+  into an *update* when the row exists, so the loser of a concurrent first start
+  would have overwritten the winner's configuration with its own defaults — the
+  exact divergence the batch removes — and the recovery needed a second
+  transaction to survive the rollback. One native statement makes losing the race
+  a no-op with nothing to catch. Verified in psql: `INSERT 0 0`, winner intact.
+- **The defaults are not seeded by the migration.** They live in
+  `ClassifierProperties` and `application.properties`, bilingual route examples
+  included; duplicating them in `V6` would have created two sources for one set
+  of values with nothing keeping them equal. The first node to start writes them
+  instead.
+- **`@PostConstruct`, not `ApplicationRunner`, for the initial read.** Runners fire
+  after the web server is accepting connections, which leaves a window where
+  requests route on defaults the cluster has already replaced. Failures propagate
+  and stop startup, which changes nothing operationally: `ddl-auto=validate`,
+  Flyway and `AdminSeedRunner` already make this database a boot requirement.
+- **`PersistentRoutingConfigPort` decorates `ClassifierRoutingConfigAdapter`
+  rather than replacing it.** The plan's wording — "the in-memory adapter becomes
+  a per-node cache over it" — reads as a rewrite of that class. Keeping it a
+  separate `RoutingConfigPort` and marking the new one `@Primary` costs one
+  annotation and buys a unit-testable write-through with no database, plus an
+  obvious fallback for a future single-node mode.
+- **The change counter's per-node semantics were measured, not assumed.** The plan
+  asks that `gatewai_routing_config_changes_total` increment once per node per
+  change. It does (1.0 on each of two nodes for one edit) — but only on a node
+  that has *observed* the previous version, because the tracker recomputes on the
+  request path. A node serving no traffic between two edits counts nothing. That
+  qualifier is now next to the drift panel in `observability.md`.
+
 ## v3 lot A — A.5 (native image, docs, ADR)
 
 - **The embedding hints live in `infrastructure/llm`, not in the web package.**

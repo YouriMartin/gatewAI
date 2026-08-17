@@ -35,6 +35,7 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 - [`evaluation.md`](technical/evaluation.md) — labelled datasets, harness, quality metrics
 - [`api-reference.md`](technical/api-reference.md) — REST endpoints + MCP tools
 - [`testing-and-quality.md`](technical/testing-and-quality.md) — test strategy, ArchUnit, Checkstyle, SpotBugs
+- [`clustering.md`](technical/clustering.md) — what is shared and what is node-local across replicas
 - [`adr/`](technical/adr/) — architecture decision records
 
 ## Functional ([`functional/`](functional/))

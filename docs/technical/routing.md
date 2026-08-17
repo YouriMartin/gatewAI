@@ -283,6 +283,21 @@ The router config is changeable at runtime (no restart):
 - Exposed via `GET/PUT /v1/admin/routing` and the dashboard (see
   [`api-reference.md`](api-reference.md)).
 
+Since **v3 lot B.1** the rules are **stored in Postgres, not in the process**.
+`PersistentRoutingConfigPort` is the `@Primary` `RoutingConfigPort`: it writes
+through to the `routing_config` table, keeps `ClassifierRoutingConfigAdapter` as
+the node-local copy the classifier reads (so a classification is still a memory
+read), and re-reads the row every
+`gatewai.routing.config-sync-interval-ms` (5 s) to pick up an edit made on
+another replica. Two consequences worth knowing:
+
+- **A restart no longer resets the rules** to `application.properties`. Those
+  defaults now seed the row on a first start and are ignored afterwards, so an
+  edit made through the API survives a redeploy.
+- **An edit takes effect elsewhere within the poll interval**, not instantly. See
+  [`clustering.md`](clustering.md) for what that window means for
+  `routing_config_version` and the conformal calibration.
+
 ## Multi-provider egress (Phase 7.2, generalized in Phase 8)
 
 Egress is **bring-your-own-model-mix**. Provider *instances* are declared under

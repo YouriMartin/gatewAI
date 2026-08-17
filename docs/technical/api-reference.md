@@ -165,6 +165,13 @@ Body: a `RoutingConfigView`. Applies at runtime (next request); invalid config �
 `400` (unknown strategy, `embedding`/`cascade` with no route, a band outside
 `[0, 1]`). Returns the updated config.
 
+Since v3 lot B.1 the edit is **persisted** (`routing_config` table), so it
+survives a restart instead of being reset to `application.properties`. It is also
+**propagated**: other replicas pick it up within
+`gatewai.routing.config-sync-interval-ms` (5 s by default). A write that cannot be
+persisted returns `5xx` and takes effect nowhere — deliberately, so a config can
+never be live on one node only. See [`clustering.md`](clustering.md).
+
 ## Admin — calibration (`ROLE_ADMIN`)
 
 ### `GET /v1/admin/calibration`

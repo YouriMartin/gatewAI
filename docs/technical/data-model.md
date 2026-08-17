@@ -126,6 +126,47 @@ happens to hold today — the same reasoning that put `routing_config_version` o
 detectably stale; see
 [`conformal-calibration.md`](conformal-calibration.md).
 
+## `routing_config` (v3 lot B.1)
+
+The live routing rules, **one row, `id = 1`** — a check constraint says so at the
+database level, so no code path can create a second live configuration.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | integer | PK, always `1` (`routing_config_single_row` check) |
+| `revision` | bigint | bumped on **every** write; the propagation signal |
+| `strategy` | varchar(32) | `heuristic` \| `embedding` \| `llm` \| `cascade` |
+| `entry_length_threshold` | integer | heuristic |
+| `premium_length_threshold` | integer | heuristic |
+| `premium_keywords` | jsonb | array of strings |
+| `route_similarity_threshold` | float8 | embedding |
+| `routes` | jsonb | ordered array of `{name, tier, examples}` |
+| `cascade_margin_band` | float8 | written **independently** of the rules |
+| `updated_at` | instant | last write |
+
+Two design points that are easy to get wrong:
+
+- **`revision` is not the identity of the rules.** `routing_config_version` is —
+  a hash of the content, and the thing a `routing_decision` row carries.
+  `revision` only answers "have I already read this?", which is why it moves even
+  when a write stores identical values.
+- **The band and the rules are written by separate statements.** A node's copy
+  can be a poll interval stale, so writing the whole row from that copy would let
+  a rules edit on one replica silently revert a band edit made on another. Each
+  write touches only its own columns, under `SELECT … FOR UPDATE`.
+
+No history table, for the reason `conformal_calibration` has none: a decision
+that needs explaining already carries the version it was taken under. Ordering
+inside `routes` is preserved on the round trip because route order decides ties
+and `RoutingConfigVersion` hashes it.
+
+The row is **not** seeded by the migration. The defaults live in
+`ClassifierProperties` / `application.properties`, and duplicating them in SQL
+would let the two drift; the first node to start inserts them with
+`ON CONFLICT (id) DO NOTHING`, so whoever loses a concurrent first start adopts
+the winner's configuration instead of overwriting it. See
+[`clustering.md`](clustering.md).
+
 ## `api_client` (auth/admin)
 
 `ApiClientEntity` ⇄ domain `ApiClient` ⇄ `JpaApiClientAdapter`.
@@ -173,6 +214,7 @@ startup instead of silently altering a table.
 | `V3__decision_tables.sql` | `routing_decision` + `cache_decision` and their indexes |
 | `V4__conformal_calibration.sql` | `conformal_calibration`, plus `routing_decision.conformal_set` / `conformal_alpha` and `cache_decision.conformal_status` |
 | `V5__cascade_routing.sql` | `routing_decision.escalated_to` |
+| `V6__routing_config.sql` | `routing_config`, the single-row live routing rules |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them
