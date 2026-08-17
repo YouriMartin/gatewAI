@@ -27,7 +27,7 @@ and says why.
 | Conformal snapshot (60 s TTL) | heap, per node | **fine** — a read-through cache of `conformal_calibration`; nodes converge within 60 s of a recalibration |
 | `AdminSeedRunner` | idempotent on `api_key_hash` | needs a concurrent-cold-start test (**B.4**) |
 | Deferred job queue | `deferred_job` table, claimed with `SKIP LOCKED` | **fine** — shared, durable, exactly-once per claim (B.2) ✅ |
-| `RateLimiter` buckets | `ConcurrentHashMap` | **must be shared** (**B.3**) — the limit is per process, so N replicas allow N × the quota |
+| `RateLimiter` buckets | heap, or the `rate_limit_bucket` table | **fine** — shared when `gatewai.ratelimit.store=postgres` (B.3) ✅; the heap default is per process, so a cluster must set it |
 | `CarbonAwareDispatchWorker` | runs on every node | **fine** — every node *should* work the queue; the claim is what makes that safe (B.2). No leader gating needed, and B.4 says so rather than adding it |
 | `DecisionPurgeWorker` | runs on every node | **must be gated** (**B.4**) — purging twice is harmless but the pattern needs a rule |
 | Routing-config poll | runs on every node | **fine** — a read, and it must run everywhere (B.1) |
@@ -179,6 +179,43 @@ of their own — the decision purge.
 | Work actually spread | 10 / 22 split between nodes |
 | Lease recovery | integration test: an unfinished claim returns to `QUEUED`, zone cleared, claimable again |
 
+## Rate limiting (B.3)
+
+### What was wrong
+
+Bucket4j's buckets were a `ConcurrentHashMap`, so "60 requests per minute" meant
+60 *per process*. Two replicas behind a load balancer let a client through 120
+times a minute and neither node was doing anything wrong. Measured on two nodes
+with the limit set to 6/min: **10 of 10 requests allowed**.
+
+### How it works now
+
+`gatewai.ratelimit.store=postgres` moves the buckets into the
+`rate_limit_bucket` table, read with `SELECT … FOR UPDATE` inside the transaction
+that writes the new state back. Same two nodes, same 6/min limit: **6 allowed, 4
+refused** with `Retry-After: 9`.
+
+`RateLimiter` is now an interface with two implementations, and the limit plus the
+`Retry-After` calculation live on it as shared statics — the two stores enforce one
+definition rather than two that happen to agree today. Details, including why not
+`SKIP LOCKED` and why not an advisory lock, are in
+[`security.md`](security.md#rate-limiting).
+
+### The default is still `memory`, on purpose
+
+The shared store costs **3.4 ms p50 / 3.8 ms p95** per limited request against
+21–24 µs in the heap (`gatewai_ratelimit_check_seconds`, quantiles published by
+default). Under 1 % of a real model call, ~15 % of a cache hit. A single node is
+the common deployment and is *correct* with the heap store, so it keeps the cheap
+path and a cluster sets one property. The consequence — a cluster that forgets to
+set it silently grants N × the quota — is the one footgun lot B leaves standing,
+which is why it is stated here, in `security.md`, in `limitations.md` and in the
+property's own comment.
+
+Because the cost was measured rather than feared, the local-token-batching
+optimisation the roadmap held in reserve was **not** built: at 3.8 ms there is
+nothing to buy.
+
 ## Where lot B stands
 
 | Batch | Subject | Status |
@@ -186,11 +223,12 @@ of their own — the decision purge.
 | B.0 | This inventory | done |
 | B.1 | Persist and propagate the routing config | **done** |
 | B.2 | Persist deferred jobs | **done** |
-| B.3 | Distributed rate limiting, without Redis | to do |
+| B.3 | Distributed rate limiting, without Redis | **done** (opt-in) |
 | B.4 | Leader-gated scheduled work | to do |
 | B.5 | Prove it end to end, then say it | to do |
 
-What still breaks with a second replica: **the rate limit** (per process, so N
-replicas allow N × the quota — B.3) and **the decision purge** (runs on every
-node; harmless, but ungoverned — B.4). Routing and the deferred queue are safe to
-replicate today.
+What still breaks with a second replica: **the decision purge** runs on every node
+(harmless, but ungoverned — B.4), and **the rate limit stays per process until you
+set `gatewai.ratelimit.store=postgres`** — the mechanism exists, the safe value is
+not the default. Routing, the deferred queue and (so configured) rate limiting are
+safe to replicate today.

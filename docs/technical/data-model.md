@@ -199,6 +199,27 @@ Prompt retention: this is the second place the gateway persists prompt text (the
 first is the vector cache). There is **no purge worker for it yet** — see
 [`carbon-aware-dispatch.md`](carbon-aware-dispatch.md).
 
+## `rate_limit_bucket` (v3 lot B.3)
+
+One Bucket4j token bucket per API client, so the rate limit is the cluster's
+rather than each process's. Used only when
+`gatewai.ratelimit.store=postgres`; the table is created either way, so switching
+a running deployment is a property change and not a migration.
+
+| Column | Type | Notes |
+|---|---|---|
+| `client_id` | varchar(255) | PK — the bucket's key, the client id as-is |
+| `state` | bytea | Bucket4j's serialized bucket; **deliberately opaque** |
+
+Read with `SELECT state … WHERE client_id = ? FOR UPDATE` inside the transaction
+that writes it back. No `SKIP LOCKED` here, unlike the deferred-job claim in `V7`:
+two requests from one client *must* queue on the same counter — that is what makes
+it one counter. Different clients take different rows and never wait on each other.
+
+`state` is not parsed by this project. Its layout belongs to the library, and
+reading those bytes from SQL would couple the schema to a Bucket4j version. One row
+per client, so the table is bounded by the client count and needs no purge.
+
 ## `api_client` (auth/admin)
 
 `ApiClientEntity` ⇄ domain `ApiClient` ⇄ `JpaApiClientAdapter`.
@@ -248,6 +269,7 @@ startup instead of silently altering a table.
 | `V5__cascade_routing.sql` | `routing_decision.escalated_to` |
 | `V6__routing_config.sql` | `routing_config`, the single-row live routing rules |
 | `V7__deferred_job.sql` | `deferred_job`, the carbon-aware queue + its claim index |
+| `V8__rate_limit_bucket.sql` | `rate_limit_bucket`, the shared Bucket4j buckets |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

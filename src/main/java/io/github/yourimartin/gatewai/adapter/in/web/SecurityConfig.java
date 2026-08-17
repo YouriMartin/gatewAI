@@ -1,7 +1,13 @@
 package io.github.yourimartin.gatewai.adapter.in.web;
 
+import javax.sql.DataSource;
+
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,16 +21,31 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableConfigurationProperties(RateLimitProperties.class)
 class SecurityConfig {
 
+  /**
+   * The rate-limit store, chosen by configuration (v3 lot B.3). The default stays
+   * in-memory: it is correct and free on one node, which is how most deployments
+   * of a self-hosted gateway run, and the shared store is one property away for
+   * the ones that scale out.
+   */
   @Bean
-  RateLimiter rateLimiter(RateLimitProperties rateLimitProperties) {
-    return new RateLimiter(rateLimitProperties);
+  RateLimiter rateLimiter(RateLimitProperties rateLimitProperties,
+                          ObjectProvider<DataSource> dataSource) {
+    return switch (rateLimitProperties.getStore()) {
+      case MEMORY -> new InMemoryRateLimiter(rateLimitProperties);
+      // Resolved only on this branch: an ObjectProvider keeps the security
+      // configuration loadable in a @WebMvcTest slice, which has no DataSource
+      // and does not need one to test a filter chain.
+      case POSTGRES ->
+          new PostgresRateLimiter(rateLimitProperties, dataSource.getObject());
+    };
   }
 
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http,
                                           ApiClientRepository apiClientRepository,
                                           RateLimiter rateLimiter,
-                                          RateLimitProperties rateLimitProperties)
+                                          RateLimitProperties rateLimitProperties,
+                                          ObjectProvider<MeterRegistry> registry)
       throws Exception {
     http
         .csrf(csrf -> csrf.disable())
@@ -37,7 +58,10 @@ class SecurityConfig {
         // binds the RequestContext for the advisor chain (v2 batch 0.3).
         .addFilterBefore(new CorrelationIdFilter(), ApiKeyAuthenticationFilter.class)
         .addFilterAfter(
-            new RateLimitFilter(rateLimiter, rateLimitProperties),
+            new RateLimitFilter(rateLimiter, rateLimitProperties,
+                // Actuator always provides one; a @WebMvcTest slice does not, and
+                // a filter-chain test should not have to care about metrics.
+                registry.getIfAvailable(SimpleMeterRegistry::new)),
             ApiKeyAuthenticationFilter.class)
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/actuator/info",

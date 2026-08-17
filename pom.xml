@@ -35,6 +35,16 @@
 			<artifactId>bucket4j_jdk17-core</artifactId>
 			<version>8.14.0</version>
 		</dependency>
+		<!--
+			Postgres-backed token buckets (v3 lot B.3): the rate limit becomes the
+			cluster's instead of each process's, through the database the gateway
+			already requires. Opt-in via gatewai.ratelimit.store=postgres.
+		-->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-postgresql</artifactId>
+			<version>8.14.0</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>

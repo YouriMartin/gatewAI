@@ -92,6 +92,24 @@ Three rules this table follows, and one deviation from the plan:
   `singleton` / `ambiguous` / `not_calibrated` / `stale_calibration`) without
   inventing a number nothing measured.
 
+## Rate-limit cost (v3 lot B.3)
+
+Emitted by `RateLimitFilter` — not by either recorder above, because it measures
+the gateway's own overhead rather than anything about a request's content.
+
+| Metric | Type | Tags | Meaning |
+|---|---|---|---|
+| `gatewai_ratelimit_check_seconds` | timer (p50/p95) | `store` (`memory`/`postgres`) | time spent deciding whether a request is within its limit |
+
+It exists to settle an argument with a number. With
+`gatewai.ratelimit.store=postgres` the check is a row lock on the request path, so
+its 0.5/0.95 quantiles are published by default
+(`management.metrics.distribution.percentiles`) and "should we batch tokens
+locally?" becomes a reading rather than a guess: measured **3.4 ms p50 / 3.8 ms
+p95**, against **21–24 µs** in the heap. That is why the batching optimisation was
+not built — see [`security.md`](security.md#rate-limiting). Only checks that
+actually run are timed (unlimited paths are not), which a test asserts.
+
 ### Deprecated: `gatewai_cache_hits_total` / `gatewai_cache_misses_total`
 
 Superseded by `gatewai_cache_decisions_total{outcome}`, which distinguishes what

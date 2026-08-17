@@ -198,16 +198,20 @@ request in full, but its attribution and counterfactuals come back as
 
 ## Single-instance assumptions (not cluster-ready)
 
-- **Rate-limit buckets are in-memory per instance**, so the 60 req/min limit is
-  per process, not cluster-wide. N replicas allow N × the quota.
+- **Rate-limit buckets are in-memory per instance by default**, so the 60 req/min
+  limit is per process: N replicas allow N × the quota. A shared store exists —
+  `gatewai.ratelimit.store=postgres` (v3 lot B.3) — and costs ~3.8 ms p95 per
+  limited request; it is opt-in because a single node is correct and free without
+  it. **A cluster must set it.**
 - The **decision purge worker runs on every node**. Purging twice is harmless, but
   nothing coordinates it.
-- Running multiple replicas is therefore **not supported end to end yet**. Two
+- Running multiple replicas is therefore **not supported end to end yet**. Three
   pieces already are: the **routing configuration** is stored and propagated
-  (v3 lot B.1) and the **deferred-job queue** is stored and claimed with
-  `FOR UPDATE SKIP LOCKED`, so jobs survive restarts and run exactly once
-  (v3 lot B.2). What is left is the rate limiter and the scheduler gating —
-  see [`../technical/clustering.md`](../technical/clustering.md) for the full
+  (v3 lot B.1), the **deferred-job queue** is stored and claimed with
+  `FOR UPDATE SKIP LOCKED` so jobs survive restarts and run exactly once
+  (v3 lot B.2), and **rate limiting** can be shared (v3 lot B.3, opt-in above).
+  What is left is the scheduler gating — see
+  [`../technical/clustering.md`](../technical/clustering.md) for the full
   state-by-state inventory.
 - Deferred jobs **persist the prompt in clear text** and have **no retention
   policy**: completed jobs stay in `deferred_job` until deleted by hand.

@@ -7,6 +7,59 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot B — B.3 (distributed rate limiting)
+
+- **`SELECT … FOR UPDATE`, not the advisory-lock strategy.** The plan offered
+  either. Bucket4j's advisory-lock proxy manager keys on a `bigint`, so a string
+  client id would have to be hashed to 64 bits — and a hash collision there does
+  not fail, it silently merges two tenants' quotas. Row locking takes the id as it
+  is (`PrimaryKeyMapper.STRING`). Deliberately **no** `SKIP LOCKED` either, unlike
+  B.2's claim: two requests from one client *must* queue on the same counter.
+- **The default store stays `memory`.** The plan's wording ("move Bucket4j to a
+  Postgres-backed store … keep the in-memory implementation behind a property")
+  reads as making Postgres the default. The measurement argued the other way:
+  3.8 ms p95 per limited request against 21–24 µs, on a single node that is
+  *already correct* without it. Most self-hosted deployments are that single node,
+  and paying a row lock on every chat request to protect the ones that scale out
+  without reading the docs is the wrong trade. The cost of the choice is stated
+  four times over (`security.md`, `clustering.md`, `limitations.md`, the property
+  comment) and B.5's two-replica compose sets it.
+- **`RateLimiter` became the interface and the old class was renamed.** The
+  acceptance criterion asks that the single-node tests still pass *unchanged*. They
+  do, assertion for assertion; the one edit is `new RateLimiter(...)` →
+  `new InMemoryRateLimiter(...)` in the fixture, plus the class rename that the
+  `{Class}Test` convention then requires. Keeping the old name on the in-memory
+  implementation to avoid touching two lines would have left the codebase with a
+  `RateLimiter` that is one of two limiters.
+- **The limit and the `Retry-After` are shared statics on the interface.** Not
+  tidiness: with two stores, "60 requests per minute" and "round the wait up to at
+  least a second" must have exactly one definition, or the two paths drift into
+  enforcing subtly different things and the difference only shows up in production.
+- **The persisted-bucket trap was found by asking, not by failing.** A stored
+  bucket carries the bandwidth it was created with, so editing
+  `requests-per-minute` would have been a setting that silently did nothing until
+  the rows were deleted. Fixed with an implicit configuration replacement whose
+  *version is the limit itself*, so any change to the number replaces the stored
+  config. `ADDITIVE` inheritance over `PROPORTIONALLY`: an operator raising a limit
+  because clients are throttled wants the headroom now, not after a refill window.
+  Both directions verified — including accidentally, when a bucket left over from a
+  100 000/min latency run started a 6/min node with zero tokens.
+- **The limiter fails open.** A rate limiter whose bookkeeping is unavailable
+  should not convert that into an outage. Nearly unobservable in practice: API-key
+  auth reads the same database one filter earlier.
+- **It stays in `adapter/in/web`, with a `DataSource`, rather than going through a
+  domain out port.** Every other persistence adapter in this project sits behind a
+  port in `infrastructure/persistence`, so this is a real inconsistency. The
+  alternative was a domain port whose contract is "consume a token from a bucket" —
+  a token-bucket abstraction in the domain that no use case ever calls, wrapping
+  bytes whose layout belongs to a library. Rate limiting is transport policy; it
+  lives with the filter that applies it, and the schema is still documented in
+  `data-model.md` like everything else.
+- **`ObjectProvider` for both the `DataSource` and the `MeterRegistry`.** Injecting
+  them directly broke all eight `@WebMvcTest` slices that import `SecurityConfig`
+  and have neither. Resolving the DataSource only on the Postgres branch, and falling
+  back to a throwaway registry, keeps a filter-chain test about the filter chain.
+
 ## v3 lot B — B.2 (persist deferred jobs)
 
 - **`findQueued()` was removed from the port, not supplemented.** The plan says

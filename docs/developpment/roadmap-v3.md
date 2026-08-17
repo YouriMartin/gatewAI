@@ -372,7 +372,7 @@ is answered here — **no leader gate**, the claim is the coordination.
 has no retention policy. Documented in `carbon-aware-dispatch.md`,
 `decision-tracing.md`'s compliance note and `limitations.md`.
 
-## B.3 — Distributed rate limiting, without Redis
+## B.3 — Distributed rate limiting, without Redis — ✅ done
 
 - Move Bucket4j to a Postgres-backed store (`bucket4j-postgresql`, advisory-lock
   or `SELECT FOR UPDATE` strategy). Keep the same
@@ -383,10 +383,38 @@ has no retention policy. Documented in `carbon-aware-dispatch.md`,
   round trip on the hot path. Measure it and publish the number; if it is
   material, consider a local-token-batch strategy before reaching for Redis.
 
-**Acceptance**
-- The 60 req/min limit holds across two instances, not per instance.
-- The single-node mode still passes the existing rate-limit tests unchanged.
-- Added p95 latency measured and recorded.
+**Strategy chosen**: `SELECT … FOR UPDATE` with `PrimaryKeyMapper.STRING`, over the
+advisory-lock variant, which keys on a `bigint` and would mean hashing the client id
+to 64 bits — a collision there silently merges two tenants' quotas. Table
+`rate_limit_bucket` (`V8`), one opaque Bucket4j state per client.
+
+**Acceptance** — all three met:
+- The limit holds across two instances, and the *before* was measured too: two
+  nodes with the limit at 6/min let **10 of 10** requests through on the in-memory
+  store, and exactly **6 allowed + 4 × `429`** (`Retry-After: 9`) on the shared one.
+  Also asserted without HTTP by `PostgresRateLimiterTest` (`@Tag("integration")`),
+  where two limiter instances over one DataSource stand in for two replicas.
+- The single-node path kept **every assertion of its existing test verbatim**; only
+  the constructor name changed (`RateLimiter` → `InMemoryRateLimiter`), the
+  interface having taken the old name.
+- Latency published: the check costs **3.4 ms p50 / 3.8 ms p95** against
+  **21–24 µs** in the heap, read from the app's own
+  `gatewai_ratelimit_check_seconds` (0.5/0.95 quantiles enabled by default).
+  End-to-end on a `mock`-egress cache hit that is +4 to +7 ms on ~22 ms, which is
+  consistent with the isolated figure once the ±2.6 ms run-to-run variance
+  (measured, two identical in-memory runs) is accounted for — not a hidden extra
+  cost.
+- **The token-batching optimisation was therefore not built.** At 3.8 ms it is
+  under 1 % of a real model call; the roadmap said "if it is material", and it is
+  not. The metric stays so that claim can be re-checked instead of trusted.
+- `./mvnw -DskipFrontend verify` green: **593 tests**.
+
+**Deviation**: the default stays `memory`, not `postgres`. Correct and free on the
+single node most self-hosted deployments run, one property away for a cluster — but
+it does mean a cluster that forgets the property silently grants N × the quota, and
+that is now the one footgun lot B leaves standing. Stated in `security.md`,
+`clustering.md`, `limitations.md` and the property's own comment; B.5's two-replica
+compose sets it.
 
 ## B.4 — Leader-gated scheduled work
 

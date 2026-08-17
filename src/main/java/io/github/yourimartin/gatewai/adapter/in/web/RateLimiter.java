@@ -1,45 +1,45 @@
 package io.github.yourimartin.gatewai.adapter.in.web;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 
 /**
- * Per-client token-bucket rate limiter (Bucket4j, in-memory). One bucket per
- * client id; adequate for a single node (a distributed limiter would back it
- * with Redis/Hazelcast).
+ * Per-client rate limiting, with two interchangeable stores (v3 lot B.3):
+ * {@link InMemoryRateLimiter} for a single node and {@link PostgresRateLimiter}
+ * for a cluster.
+ *
+ * <p>The two shared statics below are the point of having an interface here
+ * rather than two unrelated classes. The limit and the {@code Retry-After} it
+ * reports are defined <b>once</b>, so "60 requests per minute" cannot come to
+ * mean two slightly different things depending on which store a deployment
+ * happens to run.
  */
-class RateLimiter {
+interface RateLimiter {
 
-  private final RateLimitProperties properties;
-  private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+  RateLimitResult tryAcquire(String clientId);
 
-  RateLimiter(RateLimitProperties properties) {
-    this.properties = properties;
+  /** The one definition of the limit both stores enforce. */
+  static Bandwidth bandwidth(int requestsPerMinute) {
+    return Bandwidth.builder()
+        .capacity(requestsPerMinute)
+        .refillGreedy(requestsPerMinute, Duration.ofMinutes(1))
+        .build();
   }
 
-  RateLimitResult tryAcquire(String clientId) {
-    Bucket bucket = buckets.computeIfAbsent(clientId, id -> newBucket());
-    ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+  /**
+   * Translates a Bucket4j probe into the filter's answer, rounding the wait
+   * <b>up</b> to at least one second: {@code Retry-After: 0} invites an immediate
+   * retry that is guaranteed to fail again.
+   */
+  static RateLimitResult resultOf(ConsumptionProbe probe) {
     if (probe.isConsumed()) {
       return RateLimitResult.granted();
     }
     long seconds = Math.max(1L,
         TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
     return RateLimitResult.limited(seconds);
-  }
-
-  private Bucket newBucket() {
-    int perMinute = properties.getRequestsPerMinute();
-    Bandwidth limit = Bandwidth.builder()
-        .capacity(perMinute)
-        .refillGreedy(perMinute, Duration.ofMinutes(1))
-        .build();
-    return Bucket.builder().addLimit(limit).build();
   }
 }

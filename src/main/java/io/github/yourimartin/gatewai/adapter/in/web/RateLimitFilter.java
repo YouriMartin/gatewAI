@@ -1,6 +1,10 @@
 package io.github.yourimartin.gatewai.adapter.in.web;
 
 import java.io.IOException;
+import java.util.Locale;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,6 +27,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * to {@code /v1/admin/decisions/explain}, which embeds a prompt once per segment
  * plus one against the same local model that serves traffic. Not limited: status
  * polls, reports, and the {@code GET} decision endpoints, which only read rows.
+ *
+ * <p>The check is timed as {@code gatewai.ratelimit.check}, tagged with the store
+ * (v3 lot B.3). With the Postgres store this is a row lock on the request path,
+ * and "how much did that cost" should be a reading rather than an argument — it is
+ * also what tells you whether a token-batching optimisation is worth its
+ * complexity.
  */
 class RateLimitFilter extends OncePerRequestFilter {
 
@@ -31,10 +41,16 @@ class RateLimitFilter extends OncePerRequestFilter {
 
   private final RateLimiter rateLimiter;
   private final RateLimitProperties properties;
+  private final Timer checkLatency;
 
-  RateLimitFilter(RateLimiter rateLimiter, RateLimitProperties properties) {
+  RateLimitFilter(RateLimiter rateLimiter, RateLimitProperties properties,
+                  MeterRegistry registry) {
     this.rateLimiter = rateLimiter;
     this.properties = properties;
+    this.checkLatency = Timer.builder("gatewai.ratelimit.check")
+        .description("Time spent deciding whether a request is within its limit")
+        .tag("store", properties.getStore().name().toLowerCase(Locale.ROOT))
+        .register(registry);
   }
 
   @Override
@@ -54,7 +70,8 @@ class RateLimitFilter extends OncePerRequestFilter {
       return;
     }
 
-    RateLimitResult result = rateLimiter.tryAcquire(auth.getName());
+    RateLimitResult result =
+        checkLatency.record(() -> rateLimiter.tryAcquire(auth.getName()));
     if (result.allowed()) {
       filterChain.doFilter(request, response);
       return;

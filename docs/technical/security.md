@@ -70,10 +70,59 @@ limits only `POST /v1/chat/completions*` (sync + async submit); status polls,
 admin and report calls are not limited. Over the limit → **`429`** with a
 `Retry-After` header and a JSON error body.
 
-`RateLimiter` is a **Bucket4j** token bucket, **one bucket per client id**, held in
-an in-memory `ConcurrentHashMap`. Default: `60` requests/minute (greedy refill),
-configurable via `gatewai.ratelimit.{enabled,requests-per-minute}`. Being
-in-memory, the limit is **per instance**, not cluster-wide.
+`RateLimiter` is a **Bucket4j** token bucket, **one bucket per client id**.
+Default: `60` requests/minute (greedy refill), configurable via
+`gatewai.ratelimit.{enabled,requests-per-minute}`.
+
+### Two stores (v3 lot B.3)
+
+`gatewai.ratelimit.store` picks where the buckets live. The limit itself and the
+`Retry-After` it reports are defined once, on the `RateLimiter` interface, so the
+two stores cannot drift into enforcing subtly different things.
+
+| Store | Buckets in | Limit applies to | Cost per limited request |
+|---|---|---|---|
+| `memory` (default) | `ConcurrentHashMap` | **each process** | ~21–24 µs |
+| `postgres` | `rate_limit_bucket` table | **the cluster** | ~3.4 ms p50 / 3.8 ms p95 |
+
+Both numbers are measured, not estimated: `gatewai_ratelimit_check_seconds`
+publishes them per store, with 0.5/0.95 quantiles enabled by default.
+
+**Why `memory` is still the default.** It is correct and free on one node, which
+is how a self-hosted gateway usually runs, and 3.8 ms is not nothing on a cached
+response. The trade-off is that N replicas then grant N × the quota — measured,
+not assumed: two nodes with a 6/min limit let **10 of 10** requests through.
+Switching to `postgres` on the same setup gives exactly **6 allowed, 4 × `429`**
+with `Retry-After: 9`. If you run more than one instance, set it.
+
+**Is 3.8 ms material?** Against a real model call — hundreds of milliseconds to
+seconds — it is under 1 %, so lot B.3 stops here rather than adding the
+local-token-batching optimisation the roadmap held in reserve. It is ~15 % of a
+*cache hit* under the `mock` egress, which is the shape of request where it would
+show; if that ever matters, the metric is already there to prove it before any
+complexity is added.
+
+**Mechanics of the shared store.** Bucket4j's `SELECT … FOR UPDATE` strategy,
+keyed on the client id as a string. Deliberately **not** `SKIP LOCKED` (unlike the
+deferred-job claim): two requests from the same client *must* queue on the same
+counter, which is what makes it one counter — requests from different clients take
+different rows and never wait on each other. Deliberately **not**
+`pg_advisory_xact_lock` either, which keys on a `bigint` and would mean hashing the
+client id to 64 bits, where a collision silently merges two tenants' quotas.
+
+**Editing the limit works.** A persisted bucket carries the bandwidth it was
+created with, so `requests-per-minute` would otherwise be a setting that silently
+does nothing until the rows were deleted by hand. The configuration version *is*
+the limit, and the difference is credited (or debited) immediately: raising it
+hands out the new headroom at once, and lowering it was observed to take effect
+the same way — a bucket left over from a 100 000/min run started a 6/min node with
+zero tokens.
+
+**Failure mode: open.** If the bucket cannot be read, the request is allowed and
+the failure is logged. A limiter whose bookkeeping is unavailable should not turn
+that into an outage. This is largely theoretical: API-key authentication reads the
+same database one filter earlier, so a database that cannot serve the limiter
+cannot serve the request either.
 
 ## Request context propagation
 

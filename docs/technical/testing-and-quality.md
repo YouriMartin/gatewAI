@@ -16,11 +16,12 @@ Architecture rules are themselves a test (ArchUnit).
 | `eval` | decision-quality harness on labelled data | `EvaluationHarnessTest`, `VectorFixtureTest` |
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
 | dispatch queue | claiming, leases, crash recovery | `DeferredChatServiceTest`, `JpaDeferredJobStoreTest`, `DeferredJobJsonTest`, `JpaDeferredJobStoreClaimTest` (integration) |
+| rate limiting | both stores, the filter's scope, the check timer | `InMemoryRateLimiterTest`, `RateLimitFilterTest`, `PostgresRateLimiterTest` (integration) |
 | decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 | embedding | the real ONNX model, in-process, and its native-image hints | `InProcessEmbeddingModelTest`, `EmbeddingNativeRuntimeHintsTest` |
 
-**592 tests** run in the default build (v3 lot B.2). Per the project convention,
+**593 tests** run in the default build (v3 lot B.3). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -39,14 +40,23 @@ Two conventions the v2 decision work added, both of them deliberate:
 
 Tests that need **external services** (Postgres/pgvector, Ollama, a real model)
 are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `ChatClientSmokeTest`,
-`ActuatorHealthSmokeTest`, `ContextLoadsTest`, and — since v3 lot B.2 —
-`JpaDeferredJobStoreClaimTest`.
+`ActuatorHealthSmokeTest`, `ContextLoadsTest`, and — since v3 lot B —
+`JpaDeferredJobStoreClaimTest` and `PostgresRateLimiterTest`.
 
-That last one is tagged for a reason worth stating: what it tests **is** the SQL.
-`FOR UPDATE SKIP LOCKED` handing each job to exactly one of two concurrent workers,
-and a bulk update requeueing an expired lease, cannot be demonstrated against a
-mock repository — a passing mock would only prove the mock agrees with itself. It
-runs two real threads, in two real transactions, against a real Postgres.
+Those last two are tagged for a reason worth stating: what they test **is** the
+SQL. `FOR UPDATE SKIP LOCKED` handing each job to exactly one of two concurrent
+workers, a bulk update requeueing an expired lease, and one token bucket shared by
+two limiter instances cannot be demonstrated against a mock repository — a passing
+mock would only prove the mock agrees with itself.
+
+`PostgresRateLimiterTest` also covers the trap of a *persisted* bucket: it carries
+the bandwidth it was created with, so a test asserts that editing
+`requests-per-minute` actually changes what is enforced instead of being a setting
+that silently does nothing.
+
+**The in-memory limiter's own test kept its assertions verbatim** across B.3 (only
+the constructor name moved, to `InMemoryRateLimiter`), which is how the batch shows
+it did not regress the single-node path while adding the shared one.
 
 Since v3 lot A the **embedding tests are not among them**. `EmbeddingModelSmokeTest`
 needed Ollama and is replaced by `InProcessEmbeddingModelTest`, an ordinary unit

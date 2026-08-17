@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,12 +17,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class RateLimitFilterTest {
 
   private RateLimitProperties properties;
+  private SimpleMeterRegistry registry;
   private RateLimitFilter filter;
 
   @BeforeEach
   void setUp() {
     properties = new RateLimitProperties();
-    filter = new RateLimitFilter(new RateLimiter(properties), properties);
+    registry = new SimpleMeterRegistry();
+    filter = new RateLimitFilter(
+        new InMemoryRateLimiter(properties), properties, registry);
   }
 
   @AfterEach
@@ -117,6 +122,21 @@ class RateLimitFilterTest {
     filter.doFilter(post(), new MockHttpServletResponse(), chain);
 
     assertNotNull(chain.getRequest());
+  }
+
+  @Test
+  void timesEveryCheckItActuallyPerforms() throws Exception {
+    // The measurement that says what the Postgres store costs on the hot path
+    // (v3 lot B.3), so it must count the checks and only the checks.
+    properties.setRequestsPerMinute(5);
+    authenticate("client");
+    filter.doFilter(post(), new MockHttpServletResponse(), new MockFilterChain());
+    filter.doFilter(new MockHttpServletRequest("GET", "/v1/reports/green"),
+        new MockHttpServletResponse(), new MockFilterChain());
+
+    assertEquals(1, registry.get("gatewai.ratelimit.check").timer().count());
+    assertEquals("memory", registry.get("gatewai.ratelimit.check")
+        .timer().getId().getTag("store"));
   }
 
   @Test

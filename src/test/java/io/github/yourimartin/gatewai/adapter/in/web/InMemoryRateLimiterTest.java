@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-class RateLimiterTest {
+class InMemoryRateLimiterTest {
 
   private static RateLimiter limiter(int perMinute) {
     RateLimitProperties properties = new RateLimitProperties();
     properties.setRequestsPerMinute(perMinute);
-    return new RateLimiter(properties);
+    return new InMemoryRateLimiter(properties);
   }
 
   @Test
