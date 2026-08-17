@@ -19,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.port.out.DeferredJobStore;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -28,6 +29,11 @@ import org.springframework.stereotype.Service;
  * {@link ChatCompletionUseCase}. The chosen zone is bound via
  * {@link CarbonZoneContext} so emissions are accounted at that zone's intensity
  * — no duplication of the metering path.
+ *
+ * <p>Since v3 lot B.2 the queue is a Postgres table and jobs are taken by
+ * <b>claiming</b>, so the same queue can be worked by every replica without a job
+ * running twice. The service is unaware of which node it is; that belongs to the
+ * store.
  */
 @Service
 class DeferredChatService implements SubmitDeferredRequestUseCase,
@@ -39,13 +45,17 @@ class DeferredChatService implements SubmitDeferredRequestUseCase,
   private final DeferredJobStore store;
   private final ChatCompletionUseCase chatCompletion;
   private final CarbonAwareZoneSelector zoneSelector;
+  private final int maxJobsPerTick;
 
-  DeferredChatService(DeferredJobStore store,
-                      ChatCompletionUseCase chatCompletion,
-                      CarbonAwareZoneSelector zoneSelector) {
+  DeferredChatService(
+      DeferredJobStore store,
+      ChatCompletionUseCase chatCompletion,
+      CarbonAwareZoneSelector zoneSelector,
+      @Value("${gatewai.dispatch.max-jobs-per-tick:20}") int maxJobsPerTick) {
     this.store = store;
     this.chatCompletion = chatCompletion;
     this.zoneSelector = zoneSelector;
+    this.maxJobsPerTick = maxJobsPerTick;
   }
 
   @Override
@@ -63,22 +73,57 @@ class DeferredChatService implements SubmitDeferredRequestUseCase,
     return store.find(id);
   }
 
+  /**
+   * Runs what the queue holds, one claim at a time (v3 lot B.2).
+   *
+   * <p>The loop claims rather than lists: the store hands out a job by flipping
+   * it to {@code RUNNING} atomically, so a second worker on another node sees an
+   * empty queue instead of the same job. It stops at
+   * {@code gatewai.dispatch.max-jobs-per-tick} so a busy queue cannot keep one
+   * tick — and therefore one node — running indefinitely; the rest is picked up
+   * on the next tick, by whichever node asks first.
+   */
   @Override
   public void dispatchPending(Map<String, Double> zoneIntensities) {
+    reclaimStrandedJobs();
     String zone = zoneSelector.greenest(zoneIntensities).orElse(null);
-    for (DeferredJob job : store.findQueued()) {
-      runJob(job, zone);
+    for (int dispatched = 0; dispatched < maxJobsPerTick; dispatched++) {
+      Optional<DeferredJob> claimed = store.claimNextQueued(zone);
+      if (claimed.isEmpty()) {
+        return;
+      }
+      runClaimed(claimed.get());
+    }
+    LOG.debug("Dispatch tick stopped at {} jobs; the rest waits for the next one",
+        maxJobsPerTick);
+  }
+
+  /**
+   * A node that died mid-job left its rows {@code RUNNING} with nothing to
+   * release them. Requeueing on every tick means recovery does not depend on the
+   * dead node ever coming back.
+   */
+  private void reclaimStrandedJobs() {
+    int requeued = store.requeueExpiredLeases();
+    if (requeued > 0) {
+      LOG.warn("Requeued {} deferred job(s) whose lease expired — a worker "
+          + "holding them stopped without finishing", requeued);
     }
   }
 
-  private void runJob(DeferredJob job, String zone) {
-    store.save(job.running(zone));
+  /**
+   * Runs a job this node already owns. There is no {@code RUNNING} write here:
+   * the claim was that write, and doing it again from the application layer would
+   * be a second, non-atomic path into the same state.
+   */
+  private void runClaimed(DeferredJob job) {
+    String zone = job.chosenZone();
     try {
       LlmResponse response = execute(job, zone);
-      store.save(job.running(zone).completed(response, Instant.now()));
+      store.save(job.completed(response, Instant.now()));
       LOG.info("Completed deferred job {} (zone={})", job.id(), zone);
     } catch (RuntimeException e) {
-      store.save(job.running(zone).failed(e.getMessage(), Instant.now()));
+      store.save(job.failed(e.getMessage(), Instant.now()));
       LOG.warn("Deferred job {} failed: {}", job.id(), e.getMessage());
     }
   }

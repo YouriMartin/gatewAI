@@ -15,11 +15,12 @@ Architecture rules are themselves a test (ArchUnit).
 | context / arch | boot + ArchUnit | `GatewaiApplicationTests`, `ArchitectureTest` |
 | `eval` | decision-quality harness on labelled data | `EvaluationHarnessTest`, `VectorFixtureTest` |
 | calibration | conformal quantile, guarantees, degradation | `ConformalQuantileTest`, `ConformalCalibrationTest`, `ConformalCalibrationServiceTest`, `SemanticCacheConformalTest` |
+| dispatch queue | claiming, leases, crash recovery | `DeferredChatServiceTest`, `JpaDeferredJobStoreTest`, `DeferredJobJsonTest`, `JpaDeferredJobStoreClaimTest` (integration) |
 | decisions | what is traced, how it is read back and explained | `AsyncDecisionRecorderTest`, `CacheDecisionTracerTest`, `JustificationJsonTest`, `JpaDecisionHistoryTest`, `DecisionExplanationServiceTest`, `AdminDecisionControllerTest` |
 | explanation | occlusion, segmentation, counterfactuals | `OcclusionTest`, `PromptSegmentationTest`, `OcclusionAttributionServiceTest`, `CounterfactualsTest`, `RouteCounterfactualServiceTest`, `InMemoryAttributionCacheTest` |
 | embedding | the real ONNX model, in-process, and its native-image hints | `InProcessEmbeddingModelTest`, `EmbeddingNativeRuntimeHintsTest` |
 
-**580 tests** run in the default build (v3 lot B.1). Per the project convention,
+**592 tests** run in the default build (v3 lot B.2). Per the project convention,
 **REST controllers are integration-tested** (MockMvc) and **trivial mappers are
 not unit tested**; everything else has unit coverage.
 
@@ -38,7 +39,14 @@ Two conventions the v2 decision work added, both of them deliberate:
 
 Tests that need **external services** (Postgres/pgvector, Ollama, a real model)
 are tagged `@Tag("integration")`: `VectorStoreSmokeTest`, `ChatClientSmokeTest`,
-`ActuatorHealthSmokeTest`, and `ContextLoadsTest`.
+`ActuatorHealthSmokeTest`, `ContextLoadsTest`, and — since v3 lot B.2 —
+`JpaDeferredJobStoreClaimTest`.
+
+That last one is tagged for a reason worth stating: what it tests **is** the SQL.
+`FOR UPDATE SKIP LOCKED` handing each job to exactly one of two concurrent workers,
+and a bulk update requeueing an expired lease, cannot be demonstrated against a
+mock repository — a passing mock would only prove the mock agrees with itself. It
+runs two real threads, in two real transactions, against a real Postgres.
 
 Since v3 lot A the **embedding tests are not among them**. `EmbeddingModelSmokeTest`
 needed Ollama and is replaced by `InProcessEmbeddingModelTest`, an ordinary unit
@@ -112,13 +120,16 @@ a request from ingress to a persisted decision and back out through
 together against real infrastructure. The seam nobody tests end to end is
 therefore the *composition*, and that is the honest statement of the gap.
 
-**Multi-node behaviour is in the same category** (v3 lot B.1). The routing-config
-store, the write-through and the poll are unit-tested against a fake store
-(`PersistentRoutingConfigPortTest`, `JpaRoutingConfigStoreTest`), and the
-`ON CONFLICT` and check-constraint semantics are SQL, not Java — so what no test
-covers is *two JVMs actually converging*. That was verified by hand, with the
-numbers written down in [`clustering.md`](clustering.md); B.5 is where it becomes
-a repeatable scenario.
+**Multi-node behaviour is partly in the same category** (v3 lot B). Where the
+guarantee lives in SQL, there is a test that runs the SQL:
+`JpaDeferredJobStoreClaimTest` proves the concurrent claim and the lease sweep on
+a real database. Where it lives in a sequence of HTTP calls across two processes —
+a `PUT` on one node converging on another, a job submitted on A and completed by B
+after a restart — there is none: the pieces are unit-tested against fakes
+(`PersistentRoutingConfigPortTest`, `JpaRoutingConfigStoreTest`,
+`JpaDeferredJobStoreTest`) and the two-node behaviour was verified by hand, with
+the numbers written down in [`clustering.md`](clustering.md). B.5 is where that
+becomes a repeatable scenario.
 
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 

@@ -328,7 +328,7 @@ are **column-scoped** (`saveConfig` / `saveCascadeMarginBand`) instead of one
 whole-row write, and the seed is an `ON CONFLICT DO NOTHING` insert instead of a
 caught constraint violation.
 
-## B.2 — Persist deferred jobs
+## B.2 — Persist deferred jobs — ✅ done
 
 - Replace `InMemoryDeferredJobStore` with a JPA-backed `DeferredJobStore`
   (`V7__deferred_job.sql`): id, status, request payload, chosen zone, result,
@@ -339,11 +339,38 @@ caught constraint violation.
   reclaim rule, or requeue on startup. Pick one and state it.
 - `CarbonZoneContext` binding is unchanged.
 
-**Acceptance**
-- A job submitted on node A completes on node B and is readable from either.
-- Jobs survive a restart.
-- Two workers polling concurrently execute each job exactly once (test with a
-  deliberate concurrent claim).
+**Chosen recovery rule**: a **lease** (`claimed_by`, `lease_expires_at`), swept at
+the start of every dispatch tick. Requeue-on-startup was rejected because it
+depends on the dead node coming back; a lease lets whichever node is alive recover
+the work. Stated consequence: concurrent claims are **exactly-once**, a lease
+expiry is **at-least-once** — a job that genuinely outlives
+`gatewai.dispatch.job-lease-ms` (5 min) can run twice.
+
+**Acceptance** — all three met:
+- Verified on two JVMs sharing one Postgres: 2 jobs submitted on node A survived
+  **both nodes being stopped**, were completed by node B afterwards
+  (`claimed_by = node-b`), and the full result was readable from the *restarted*
+  node A as well as from B.
+- Exactly-once under real concurrency: 30 further jobs with both nodes
+  dispatching gave **32 jobs, 32 executions, 0 duplicates**, counted in
+  `request_log` by `correlation_id` (the job id) — an execution count, not an
+  inspection of the queue's own state. Claims split 10 / 22 across the nodes.
+- The deliberate concurrent claim is an automated test:
+  `JpaDeferredJobStoreClaimTest` (`@Tag("integration")`) runs two threads claiming
+  40 jobs against a real Postgres and asserts none lost, none claimed twice; a
+  second test strands a claim and shows the lease sweep returning it to the queue
+  with its zone cleared.
+- `./mvnw -DskipFrontend verify` green: **592 tests**, 0 failures.
+
+**Deviations** (detail in [`../decisions.md`](../decisions.md)): the port lost
+`findQueued()` instead of gaining a claim next to it; claims are **one job at a
+time**, not a batch; the JPA store lives in `infrastructure/persistence` rather
+than `infrastructure/dispatch`; and B.4's open question about the dispatch worker
+is answered here — **no leader gate**, the claim is the coordination.
+
+**Named gap, not fixed here**: `deferred_job` persists prompts in clear text and
+has no retention policy. Documented in `carbon-aware-dispatch.md`,
+`decision-tracing.md`'s compliance note and `limitations.md`.
 
 ## B.3 — Distributed rate limiting, without Redis
 
@@ -370,8 +397,12 @@ twice is not (B.2 fixes that specific case, but the pattern needs a rule).
 - Introduce a small `LeaderLock` abstraction over `pg_try_advisory_lock`, one
   lock key per job. Non-blocking: a node that does not get the lock skips the
   tick.
-- Apply to the purge worker and any future periodic job. The dispatch worker can
-  either be leader-gated or rely on `SKIP LOCKED`; choose and document.
+- Apply to the purge worker and any future periodic job. ~~The dispatch worker can
+  either be leader-gated or rely on `SKIP LOCKED`; choose and document.~~
+  **Answered by B.2: no gate on the dispatch worker.** A leader lock would make one
+  node do all the dispatching and the others spectate, which defeats a shared
+  queue; the `SKIP LOCKED` claim is the coordination. Gating is for periodic jobs
+  that are not idempotent and have no claim of their own — the purge.
 - The calibration snapshot refresh stays per-node (it is a read).
 
 **Acceptance**

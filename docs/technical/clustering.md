@@ -26,9 +26,9 @@ and says why.
 | `InMemoryAttributionCache` (LRU 500) | heap | **fine** — a cache keyed on prompt hash + embedding model + config version; a miss costs a recomputation, never a wrong answer |
 | Conformal snapshot (60 s TTL) | heap, per node | **fine** — a read-through cache of `conformal_calibration`; nodes converge within 60 s of a recalibration |
 | `AdminSeedRunner` | idempotent on `api_key_hash` | needs a concurrent-cold-start test (**B.4**) |
-| `InMemoryDeferredJobStore` | heap | **must be persisted** (**B.2**) — jobs are lost on restart and invisible to other nodes |
+| Deferred job queue | `deferred_job` table, claimed with `SKIP LOCKED` | **fine** — shared, durable, exactly-once per claim (B.2) ✅ |
 | `RateLimiter` buckets | `ConcurrentHashMap` | **must be shared** (**B.3**) — the limit is per process, so N replicas allow N × the quota |
-| `CarbonAwareDispatchWorker` | runs on every node | **must be gated** (**B.4**) — dispatching twice is not harmless |
+| `CarbonAwareDispatchWorker` | runs on every node | **fine** — every node *should* work the queue; the claim is what makes that safe (B.2). No leader gating needed, and B.4 says so rather than adding it |
 | `DecisionPurgeWorker` | runs on every node | **must be gated** (**B.4**) — purging twice is harmless but the pattern needs a rule |
 | Routing-config poll | runs on every node | **fine** — a read, and it must run everywhere (B.1) |
 
@@ -127,17 +127,70 @@ Both nodes ran the packaged jar, `mock` profile, one pgvector container:
 | Change counter | `gatewai_routing_config_changes_total` read **1.0 on each** of the two nodes after one edit |
 | Database outage | one failed poll → `WARN … keeping revision 5`; the node kept routing, recovered, and accepted the next `PUT` at revision 6 |
 
+## Deferred jobs (B.2)
+
+### What was wrong
+
+The queue was a `ConcurrentHashMap`. Queued jobs were lost on restart, and a job
+submitted on node A was invisible to node B — including to node B's dispatch
+worker, which was supposed to run it. A client polling
+`GET /v1/chat/completions/async/{id}` through a load balancer got a `404` for a
+job that existed, on whichever node had not taken the submission.
+
+### How it works now
+
+The queue is the `deferred_job` table, and a worker **claims** instead of listing:
+`SELECT … WHERE status = 'QUEUED' ORDER BY submitted_at FOR UPDATE SKIP LOCKED
+LIMIT 1`, inside the transaction that flips the row to `RUNNING`. Reading the
+queue and then writing each status is two operations and a race that both workers
+win; the claim is one operation, so a second worker sees an empty queue rather
+than the same job. The mechanics — one job per claim, the per-tick cap, the lease
+and the at-least-once caveat — are in
+[`carbon-aware-dispatch.md`](carbon-aware-dispatch.md).
+
+### This is why the dispatch worker is *not* leader-gated
+
+B.4 asks for scheduled work to be gated on a leader lock and leaves the dispatch
+worker's answer open. The answer is **no gate**: a leader lock would make one node
+do all the dispatching and turn the other into a spectator, which is the opposite
+of what a shared queue is for. Every node runs the worker, and the claim decides
+who gets what. Gating belongs to jobs that are *not* idempotent and have no claim
+of their own — the decision purge.
+
+### Consequences to know
+
+- **A restart mid-job costs one lease**, not the job. The row stays `RUNNING`
+  until `lease_expires_at` passes, then any node requeues it.
+- **`claimed_by` is the answer to "where did this run?"** — `gatewai.instance-id`
+  if set, `host:pid` otherwise. It survives the completion write, which is why
+  that write is column-scoped.
+- **Prompts are now persisted here.** The queue holds the request in clear text
+  and has no retention policy yet; the vector cache was the only other place
+  prompt text lands.
+
+### Verified, on two JVMs sharing one Postgres
+
+| Criterion | Result |
+|---|---|
+| Jobs survive a restart | 2 jobs submitted on node A stayed `QUEUED` with **both nodes stopped** |
+| Submitted on A, completed on B | node B (started after A was killed) ran both, `claimed_by = node-b` |
+| Readable from either node | the restarted node A returned the full result for a job node B ran |
+| Exactly once under concurrency | 30 more jobs with both nodes dispatching: **32 jobs, 32 executions, 0 duplicates**, counted in `request_log` by `correlation_id` |
+| Work actually spread | 10 / 22 split between nodes |
+| Lease recovery | integration test: an unfinished claim returns to `QUEUED`, zone cleared, claimable again |
+
 ## Where lot B stands
 
 | Batch | Subject | Status |
 |---|---|---|
 | B.0 | This inventory | done |
 | B.1 | Persist and propagate the routing config | **done** |
-| B.2 | Persist deferred jobs | to do |
+| B.2 | Persist deferred jobs | **done** |
 | B.3 | Distributed rate limiting, without Redis | to do |
 | B.4 | Leader-gated scheduled work | to do |
 | B.5 | Prove it end to end, then say it | to do |
 
-Until B.2–B.4 land, a second replica would double the effective rate limit and
-would not see another node's queued jobs. Routing is the part that is safe to
+What still breaks with a second replica: **the rate limit** (per process, so N
+replicas allow N × the quota — B.3) and **the decision purge** (runs on every
+node; harmless, but ungoverned — B.4). Routing and the deferred queue are safe to
 replicate today.

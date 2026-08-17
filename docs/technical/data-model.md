@@ -167,6 +167,38 @@ would let the two drift; the first node to start inserts them with
 the winner's configuration instead of overwriting it. See
 [`clustering.md`](clustering.md).
 
+## `deferred_job` (v3 lot B.2)
+
+The carbon-aware queue. One row per submitted async request, from `QUEUED` to
+`COMPLETED`/`FAILED`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK; also the job's **correlation id** in `request_log` |
+| `status` | varchar(32) | `QUEUED` \| `RUNNING` \| `COMPLETED` \| `FAILED` |
+| `client_id` | varchar(255) | tenant captured at submission (the worker has no scope) |
+| `request` | jsonb | the LLM request — **prompt in clear text** |
+| `result` | jsonb | the response once completed |
+| `chosen_zone` | varchar(32) | grid zone selected at claim time; cleared on requeue |
+| `error_message` | text | set when `FAILED` |
+| `claimed_by` | varchar(255) | which node holds the job (`gatewai.instance-id`, else `host:pid`) |
+| `lease_expires_at` | instant | when another node may take it back; cleared on a terminal status |
+| `submitted_at` | instant | queue order |
+| `completed_at` | instant | terminal timestamp |
+
+One index, `(status, submitted_at)`, serving both queries that matter on its
+leading column: the claim (`status = 'QUEUED'`, oldest first) and the lease sweep
+(`status = 'RUNNING'`).
+
+`claimed_by` and `lease_expires_at` are **not** in the domain `DeferredJob`: they
+describe running the queue, not the job. That is also why a completion is written
+column-scoped — writing the whole row from the domain record would erase which
+node ran the job on the very write that finishes it.
+
+Prompt retention: this is the second place the gateway persists prompt text (the
+first is the vector cache). There is **no purge worker for it yet** — see
+[`carbon-aware-dispatch.md`](carbon-aware-dispatch.md).
+
 ## `api_client` (auth/admin)
 
 `ApiClientEntity` ⇄ domain `ApiClient` ⇄ `JpaApiClientAdapter`.
@@ -215,6 +247,7 @@ startup instead of silently altering a table.
 | `V4__conformal_calibration.sql` | `conformal_calibration`, plus `routing_decision.conformal_set` / `conformal_alpha` and `cache_decision.conformal_status` |
 | `V5__cascade_routing.sql` | `routing_decision.escalated_to` |
 | `V6__routing_config.sql` | `routing_config`, the single-row live routing rules |
+| `V7__deferred_job.sql` | `deferred_job`, the carbon-aware queue + its claim index |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

@@ -7,6 +7,59 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot B — B.2 (persist deferred jobs)
+
+- **`findQueued()` was removed from the port, not supplemented.** The plan says
+  "claim with `SELECT … FOR UPDATE SKIP LOCKED`", which could have been a new
+  method beside the old one. Leaving `findQueued()` in place would have left a
+  correct-looking way to read the queue and then write each status — two
+  operations, and with two workers a race both of them win. The port now only
+  hands out jobs one claim at a time, so the unsafe pattern is not expressible.
+- **One job per claim, not a batch.** The obvious reading of "claim" is "claim the
+  next N". It has a bug: the lease of every job in the batch starts when the batch
+  was taken, so the last job of a slow batch can have its lease expire before it
+  begins, and be requeued while it is still waiting its turn. Claiming one at a
+  time makes the lease start when the work does, lets two workers interleave on one
+  queue instead of splitting it into blocks, and keeps `job-lease-ms` a statement
+  about one completion. The per-tick bound moved to the loop
+  (`gatewai.dispatch.max-jobs-per-tick`), where it belongs — it exists so one node
+  cannot monopolise a full queue, not to size a lease.
+- **The claim is two statements, not `UPDATE … RETURNING`.** A native
+  `SELECT id … FOR UPDATE SKIP LOCKED LIMIT 1` followed by a JPA load-and-mutate of
+  that locked row, inside one transaction. `UPDATE … RETURNING` would be one round
+  trip, but it takes the entity out of JPA's hands and needs its own row mapping;
+  the extra `findById` hits a row this transaction already holds a lock on. The
+  statement that has to be exactly right is spelled out in SQL, which was the
+  priority.
+- **The JPA store lives in `infrastructure/persistence`, not
+  `infrastructure/dispatch`.** The in-memory one it replaces was in `dispatch`.
+  Every `@Entity` and Spring Data repository in this project is in `persistence`,
+  and `data-model.md` documents the schema from there; splitting the JPA
+  conventions across two adapter packages to preserve the old file's address would
+  have been the worse trade. `dispatch` keeps what is actually about dispatching:
+  the worker, its properties and its scheduling.
+- **A completion writes columns, not rows.** `claimed_by` and `lease_expires_at`
+  are not in the domain `DeferredJob` — they are about running the queue, not about
+  the job — so saving a completed job merges onto the existing row instead of
+  replacing it. Otherwise the write that finishes a job would erase the record of
+  which node ran it. Same discipline as B.1's config writes, for the same reason.
+- **`DeferredJob.running(zone)` survived, and is used by the entity.** The
+  `RUNNING` transition moved out of the application service (where it was a
+  separate, non-atomic write) into the claim. Rather than re-implement the
+  transition in the entity, `claim()` calls the domain method and then adds the
+  lease columns: one definition of what entering `RUNNING` means, used in
+  production rather than kept alive by tests.
+- **B.4's open question about the dispatch worker is answered here.** The plan
+  leaves "leader-gated or `SKIP LOCKED`" to be chosen. `SKIP LOCKED`, with no gate:
+  a leader lock would elect one dispatcher and idle the rest, which is the opposite
+  of what a shared queue buys. Recorded in the B.4 section so the batch does not
+  re-open it.
+- **Prompt retention is named, not solved.** The queue now persists prompts in
+  clear text, which the heap-based store did not, and nothing purges them. Adding a
+  retention worker was in reach but is not B.2's scope, and it would need the
+  leader gating B.4 is about. It is written down in three places instead of being
+  smuggled in as a bonus.
+
 ## v3 lot B — B.1 (persist and propagate the routing config)
 
 - **B.0 shipped with B.1 instead of on its own.** The plan makes B.0 a separate

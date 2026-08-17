@@ -198,13 +198,19 @@ request in full, but its attribution and counterfactuals come back as
 
 ## Single-instance assumptions (not cluster-ready)
 
-- The **deferred-job store is in-memory**: queued async jobs are **lost on
-  restart** and are not shared across instances.
 - **Rate-limit buckets are in-memory per instance**, so the 60 req/min limit is
-  per process, not cluster-wide.
-- PostgreSQL (cache + metrics) is shared, but the in-memory state above means
-  running multiple replicas is **not supported as-is**. Treat gatewAI as a single
-  instance.
+  per process, not cluster-wide. N replicas allow N × the quota.
+- The **decision purge worker runs on every node**. Purging twice is harmless, but
+  nothing coordinates it.
+- Running multiple replicas is therefore **not supported end to end yet**. Two
+  pieces already are: the **routing configuration** is stored and propagated
+  (v3 lot B.1) and the **deferred-job queue** is stored and claimed with
+  `FOR UPDATE SKIP LOCKED`, so jobs survive restarts and run exactly once
+  (v3 lot B.2). What is left is the rate limiter and the scheduler gating —
+  see [`../technical/clustering.md`](../technical/clustering.md) for the full
+  state-by-state inventory.
+- Deferred jobs **persist the prompt in clear text** and have **no retention
+  policy**: completed jobs stay in `deferred_job` until deleted by hand.
 
 ## Carbon-aware dispatch is off by default
 

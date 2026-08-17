@@ -117,13 +117,18 @@ two: recording off, or retention passed. The 404 says so.
 | `routing_decision` | tier, model, strategy, justification, confidence, config version, `prompt_hash` + `prompt_length` | no |
 | `cache_decision` | outcome, similarity, runner-up, threshold, matched entry, conformal status | no |
 | Vector cache (`vector_store`) | the **question text and the answer text**, per client, with the embedding | **yes** — similarity search needs it |
+| `deferred_job` (v3 lot B.2) | the **full request and response**, client id, chosen zone, which node ran it | **yes** — the request runs after the client is gone |
 | Metrics (Micrometer) | counters and summaries with enum-valued tags only | no |
 
-That fourth row is the one to read twice. The decision trace is hash-only by
-design, but the semantic cache is a cache: it stores what it will replay. It is
-namespaced per client (`client-namespacing=true` by default) and can be given a
-TTL; a deployment that must not retain prompt text turns the cache off, not the
-tracing.
+The two "yes" rows are the ones to read twice. The decision trace is hash-only by
+design; these two are not, and for different reasons. The semantic cache is a
+cache: it stores what it will replay. It is namespaced per client
+(`client-namespacing=true` by default) and can be given a TTL; a deployment that
+must not retain prompt text turns the cache off, not the tracing. The deferred
+queue stores the prompt because deferral means executing it later — turning that
+off means not using `POST /v1/chat/completions/async`, which is opt-in and
+disabled by default. Unlike the cache and the decision tables, **it has no
+retention setting yet**: completed jobs are deleted by hand.
 
 ### What is replayable
 

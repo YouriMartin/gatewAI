@@ -87,6 +87,11 @@ Returns the current `DeferredJobResponse`. `status` ∈
 Unknown id → `404`, malformed id → `400`. Requires dispatch enabled to progress
 (see [`carbon-aware-dispatch.md`](carbon-aware-dispatch.md)).
 
+Since v3 lot B.2 the queue is a Postgres table, so a job **survives a restart** and
+is readable from **any replica** — polling through a load balancer no longer
+depends on reaching the node that took the submission. Note that the request is
+stored in clear text until the job is deleted.
+
 ## Green reporting
 
 ### `GET /v1/reports/green?from=<iso>&to=<iso>&format=json|csv|pdf`

@@ -127,7 +127,7 @@ Progress: _(to be kept up to date)_
   - **lot B — multi-instance readiness** (no Redis; state inventory + per-batch status in [`docs/technical/clustering.md`](docs/technical/clustering.md)):
     - [x] B.0 — audit: every piece of node-local state, its verdict and the batch that owns it
     - [x] B.1 — routing config persisted (`routing_config`, single row, `V6`) and propagated: `PersistentRoutingConfigPort` (`@Primary`) writes through and polls every `gatewai.routing.config-sync-interval-ms` (5 s); `application.properties` is now only the seed, edits survive restarts, `routing_config_version` identical cluster-wide. Measured on two nodes: convergence 2.05 s, one change counted per node
-    - [ ] B.2 — persist deferred jobs (`SELECT … FOR UPDATE SKIP LOCKED`)
+    - [x] B.2 — deferred jobs persisted (`deferred_job`, `V7`) and **claimed** one at a time with `FOR UPDATE SKIP LOCKED` (`JpaDeferredJobStore`); crash recovery by lease (`claimed_by` + `lease_expires_at`, swept every tick) → concurrent claims exactly-once, a lease expiry at-least-once. Every node works the queue, so the dispatch worker is deliberately **not** leader-gated. Verified on two nodes: 32 jobs / 32 executions / 0 duplicates, jobs survived a full stop, node A's job completed by node B. Gap named: prompts stored in clear text with no retention policy
     - [ ] B.3 — Postgres-backed rate limiting (hot-path latency to measure)
     - [ ] B.4 — leader-gated schedulers (`pg_try_advisory_lock`)
     - [ ] B.5 — two-replica compose, end-to-end scenario, rewrite `limitations.md`
