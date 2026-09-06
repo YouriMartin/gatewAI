@@ -150,6 +150,36 @@ passing by:
 A separate `CarbonZoneContext.CURRENT` Scoped Value carries the chosen zone for
 deferred jobs (see [`carbon-aware-dispatch.md`](carbon-aware-dispatch.md)).
 
+## Dependency CVE scanning
+
+`.github/workflows/security.yml` scans **both** ecosystems on push, on every PR,
+and on a **weekly schedule** — the schedule is the part that matters, since an
+advisory can land against code nobody touched.
+
+`osv-scanner` (pinned by version *and* SHA-256) covers Maven and npm in one pass
+against [OSV.dev](https://osv.dev), and exits non-zero on findings. It is used
+instead of the two obvious alternatives for concrete reasons:
+
+| Tool | Why not |
+|---|---|
+| OWASP dependency-check | needs an NVD API key since NIST began rate-limiting — a CI secret just to run a scan |
+| Sonatype OSS Index | dropped anonymous access; the Maven plugin now answers **401 and still reports `BUILD SUCCESS`** — a scanner that passes when it could not scan is worse than none |
+
+`pom.xml` is scanned as a *manifest*, not a lockfile: Maven has no lockfile, so
+osv-scanner resolves the transitive graph itself. That resolution was cross-checked
+against `./mvnw dependency:list` queried directly on the OSV API — identical
+results (25 advisories over 13 artifacts) on the run that introduced the job.
+
+**Where fixes go.** Nearly every finding is a *transitive* dependency whose version
+comes from `spring-boot-starter-parent`, so the fix is usually a parent bump, not
+an edit under `<dependencies>`. When the parent lags a published fix, override the
+managed property in `<properties>` with a comment saying which advisory forced it
+and when it can be dropped — see the `tomcat.version` pin in `pom.xml`.
+
+**When a finding does not apply.** Add an entry to an `osv-scanner.toml` ignore
+file with a reason **and an expiry date**, so a suppression cannot quietly become
+permanent. Do not disable the job.
+
 ## Honest security boundaries
 
 - **API-key auth only** — no OAuth/SSO/session login.
@@ -159,5 +189,8 @@ deferred jobs (see [`carbon-aware-dispatch.md`](carbon-aware-dispatch.md)).
   network/firewall in production.
 - Provider keys and the ElectricityMaps token are supplied via environment
   variables and never committed.
+- The CVE scan covers **declared dependencies only** — not the base images
+  (`eclipse-temurin`, `pgvector/pgvector`, `ollama/ollama`), and not the JDK. Image
+  scanning is not wired up.
 
 See also the functional [`limitations.md`](../functional/limitations.md).

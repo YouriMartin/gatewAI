@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.0</version>
+		<version>4.1.1</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>io.github.yourimartin</groupId>
@@ -19,6 +19,15 @@
 		<checkstyle.version>13.6.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
 		<archunit.version>1.4.2</archunit.version>
+		<!--
+			Security overrides, on top of what spring-boot-starter-parent manages.
+			Each one exists only because the parent's managed version is still
+			flagged; drop the override as soon as a parent bump catches up, and
+			check with ./mvnw -DskipFrontend dependency:list before assuming it has.
+			- tomcat: parent 4.1.1 ships 11.0.24, the authenticator fixes
+			  (CVE-2026-65905 / -65182 / -68525) landed in 11.0.25.
+		-->
+		<tomcat.version>11.0.25</tomcat.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -175,6 +184,19 @@
 				<version>${spring-ai.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
+			</dependency>
+			<!--
+				The project speaks Jackson 3 (tools.jackson), which the Boot parent
+				manages through jackson-bom. This is the *other* Jackson: Spring AI
+				still pulls com.fasterxml jackson-databind 2.x transitively, and
+				nothing in either BOM manages it, so its CVEs (CVE-2026-59889,
+				CVE-2026-54515, GHSA-mhm7-754m-9p8w) can only be closed by pinning it
+				here. Revisit when Spring AI drops the Jackson 2 dependency.
+			-->
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-databind</artifactId>
+				<version>2.21.6</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

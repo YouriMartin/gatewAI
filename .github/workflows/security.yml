@@ -1,0 +1,81 @@
+name: Security
+
+# Dependency CVE scan, separate from ci.yml on purpose. A scan that only runs on
+# push tells you nothing the day an advisory lands against code nobody touched,
+# so this workflow also runs on a schedule — that weekly run is the one that
+# actually catches things, and it must not drag the full test matrix with it.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    # Mondays 06:00 UTC. GitHub disables scheduled runs on repos with no activity
+    # for 60 days; if the badge goes quiet on a dormant repo, that is why.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One tool for both ecosystems (Maven + npm), against the OSV.dev database.
+  #
+  # Why osv-scanner rather than the usual suspects:
+  # - OWASP dependency-check needs an NVD API key to stay usable since NIST began
+  #   rate-limiting; a CI secret to run a scan is a maintenance burden.
+  # - Sonatype OSS Index dropped anonymous access — its Maven plugin now answers
+  #   401 and, worse, still reports BUILD SUCCESS. A scanner that passes when it
+  #   could not scan is worse than no scanner.
+  # - osv-scanner needs no key, covers Maven and npm in one pass, and exits
+  #   non-zero on findings.
+  scan:
+    name: Dependency CVEs (Maven + npm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned by version *and* checksum: this binary reads the dependency graph
+      # and fails the build, so an unpinned download would be a supply-chain hole
+      # inside the tool meant to close them.
+      - name: Install osv-scanner
+        env:
+          OSV_VERSION: v2.5.1
+          OSV_SHA256: f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SHA256}  /tmp/osv-scanner" | sha256sum -c -
+          chmod +x /tmp/osv-scanner
+
+      # pom.xml is scanned as a manifest, not a lockfile: osv-scanner resolves the
+      # transitive graph itself (Maven has no lockfile). Verified to agree exactly
+      # with `./mvnw dependency:list` queried against the OSV API — same 25
+      # advisories over the same 13 artifacts on the run that introduced this job.
+      #
+      # Nearly every finding here will be a *transitive* dependency managed by the
+      # spring-boot-starter-parent, so the fix is usually a parent bump rather
+      # than anything in <dependencies>. Where the parent lags, override the
+      # managed property in <properties> and say why (see the pom's tomcat pin).
+      - name: Scan Maven and npm dependencies
+        run: |
+          /tmp/osv-scanner scan source \
+            -L pom.xml \
+            -L src/main/frontend/package-lock.json
+
+      # Runs even when the scan failed — the readable table is the point.
+      - name: Publish the findings to the job summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency CVE scan"
+            echo
+            /tmp/osv-scanner scan source \
+              -L pom.xml \
+              -L src/main/frontend/package-lock.json \
+              --format markdown || true
+          } >> "$GITHUB_STEP_SUMMARY"
