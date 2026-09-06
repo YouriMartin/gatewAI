@@ -1,9 +1,11 @@
-# v3 — In-process embedding and multi-instance readiness
+# v3 — In-process embedding, multi-instance readiness, cloud carbon
 
-Two lots, sequential. Lot A removes the embedding model's network hop; lot B removes
-the single-instance assumptions. B depends on A only in that A changes the embedding
-dimensions and every calibration/fixture with them — doing B first would mean
-redoing part of its test surface.
+Three lots, sequential. Lot A removes the embedding model's network hop; lot B
+removes the single-instance assumptions; lot C makes the carbon figure for cloud
+egress sourced and region-attributed. B depends on A only in that A changes the
+embedding dimensions and every calibration/fixture with them — doing B first would
+mean redoing part of its test surface. C is independent of both: it touches the
+green-accounting path, which A and B never enter.
 
 Same conventions as v2: each batch is independently mergeable, has explicit
 acceptance criteria, and updates the docs it invalidates in the same commit.
@@ -30,6 +32,14 @@ What changes is the dependency shape:
 
 The pitch line this unlocks is "one jar, one Postgres, no API key, starts in
 seconds" for the gateway itself; local inference stays an opt-in extra container.
+
+**Lot C does not make the carbon numbers measured.** It makes them *sourced,
+region-attributed and labelled*. Cloud inference cannot be metered from here, and
+metering self-hosted inference is lot D — so for v3 local egress is booked at zero
+and rendered as **excluded from scope**, never as "0 gCO2". The claim lot C earns is
+"location-based Scope 2 for cloud egress, from a cited method, at the grid that
+served the request, with local egress out of scope" — which is defensible. The
+claim it does not earn is "measured".
 
 ---
 
@@ -517,6 +527,210 @@ to is lowercased — the level had to go on the package. Both are in
 
 ---
 
+# Lot C — Cloud carbon: attributed to a region, sourced, self-describing
+
+**Goal.** Make the CO2 figure for **cloud** egress (Anthropic, OpenAI, any hosted
+endpoint) defensible: energy from a cited source rather than a placeholder, grid
+intensity taken from the region that actually served the request, and every stored
+row carrying enough context to re-derive its own number.
+
+**Why now.** Two different defects sit under the same headline figure. The energy
+coefficients are admitted placeholders — `application.properties` says so out loud,
+*"rough placeholders preserving the order premium > entry > local"*, and 0.0005 /
+0.001 / 0.002 kWh per 1k tokens is a made-up geometric sequence. The region is
+worse: it is not approximate, it is **absent**.
+`ChatCompletionService.accountGreen` resolves **one** intensity for every request,
+the gateway's own zone:
+
+```java
+double gridIntensity = CarbonZoneContext.CURRENT.isBound()
+    ? carbonIntensityProvider.gramsCo2PerKwh(CarbonZoneContext.CURRENT.get())
+    : carbonIntensityProvider.gramsCo2PerKwh();   // the gateway's own zone
+```
+
+So a gateway configured `zone=FR` (56 gCO2/kWh) books a Claude call — compute that
+physically happened in a US datacenter, plausibly 350–400 — at France's intensity.
+That is the wrong grid applied to the right energy, and it is the cheapest error in
+the carbon path to fix.
+
+**Constraint.** No measurement anywhere in this lot. Cloud inference is not
+observable from here, and metering self-hosted inference is deliberately deferred.
+Everything C produces is an estimate; the lot's job is to make each estimate
+**sourced and labelled**, not to make it exact.
+
+**Non-goal — local energy.** Self-hosted egress is declared **out of scope** and
+booked at zero for v3 (C.1). Not "measured as zero": *excluded*, and rendered as
+excluded. Metering it — RAPL, NVML, amdgpu hwmon, an offline calibration harness
+fitting per-model coefficients on the host that runs them — is lot D.
+
+**Non-goal — market-based Scope 2.** Hyperscalers report both location-based (the
+physical grid) and market-based (net of renewable PPAs), and the two differ by an
+order of magnitude. Publishing one number without saying which is the same class of
+error as the missing region. Lot C computes **location-based only** and states that
+in the report header; dual reporting is post-v3.
+
+**Two calls taken up front**, so the batches below are unambiguous:
+
+- **C.3 precedence.** The dispatch-chosen zone overrides the provider region *only*
+  for providers the operator controls. Deferring a job does not move Anthropic's
+  compute — for a hosted API the chosen zone is recorded but not applied. This
+  turns the accounting-versus-physical caveat in
+  [`../technical/carbon-intensity-reliability.md`](../technical/carbon-intensity-reliability.md)
+  §4.1 from a footnote into a code path.
+- **C.5 schema.** In scope. Without the resolved zone, the intensity and the source
+  stored on the row, no report can be re-derived and every historical row silently
+  changes meaning the moment someone edits a coefficient.
+
+## C.1 — Local egress out of scope, said explicitly
+
+- `energy-intensity=0` on the three Ollama registry entries.
+- New `EnergySource` enum on `ModelDefinition` (domain, no Spring):
+  `NOT_ACCOUNTED` | `VENDOR_PUBLISHED` | `MODELLED`.
+- Every renderer — JSON, CSV, PDF, dashboard — prints `NOT_ACCOUNTED` as
+  **"excluded from scope"**, never as a bare `0 gCO2`. That distinction is the
+  whole difference between a simplification and a false claim, and it costs one
+  enum.
+- Check the interaction with ADR 0006: on a request served locally, "avoided CO2"
+  is still computed against the premium baseline while the actual is *excluded*.
+  The arithmetic stays correct but the two must not sit side by side unfootnoted.
+
+**Acceptance.**
+- The default all-local configuration produces a report whose CO2 totals are zero
+  **and** labelled excluded, on every export format.
+- A test asserts no renderer emits a bare zero for a `NOT_ACCOUNTED` model.
+- The avoided-CO2 footnote is present wherever an excluded actual is shown next to
+  a non-zero avoided figure.
+
+## C.2 — Region and PUE on the provider instance
+
+Region belongs to the **provider instance**, not the model: every model behind
+`gatewai.providers.anthropic` runs wherever Anthropic runs.
+
+```properties
+gatewai.providers.anthropic.type=anthropic
+gatewai.providers.anthropic.region=US            # grid zone or cloud region id
+gatewai.providers.anthropic.region-provenance=assumed
+gatewai.providers.anthropic.pue=1.12
+```
+
+Two tiers of knowledge, and the config must distinguish them:
+
+| | Region is | Examples |
+|---|---|---|
+| `KNOWN` | a fact — you picked it | Bedrock, Azure OpenAI, a vLLM box, any `openai-compatible` endpoint you host |
+| `ASSUMED` | an operator declaration | the direct Anthropic and OpenAI APIs, which do not tell you which datacenter served the call |
+
+- `ProviderEntry` gains `region`, `regionProvenance`, `pue`.
+- Ship a small cloud-region → grid-zone mapping (`us-east-1` → the PJM zone,
+  `eu-west-1` → IE, `eu-central-1` → DE), config-overridable, falling back to the
+  default zone with a **once-per-region** warning rather than a failure — zero-config
+  boot must keep working.
+- Extend the existing fail-fast provider validation with a *warning* (not an error)
+  when a non-Ollama instance declares no region.
+
+**Acceptance.**
+- Zone ids verified against the ElectricityMaps zone list on the day the table is
+  written, with that date recorded in the doc. Do not carry over a remembered id.
+- An unknown region logs once, falls back, and does not throw.
+- Boot with no region configured anywhere still succeeds.
+
+## C.3 — Resolve the intensity per request, not per gateway
+
+- The application layer needs provider → region. Keep the hexagonal rules: a
+  `CarbonZoneResolver` in the domain, an infrastructure adapter reading
+  `ProviderProperties`. `ArchitectureTest` gets the new adapter package declared or
+  the build fails, which is correct.
+- Resolution chain, in order:
+
+  ```
+  dispatch-chosen zone   (CarbonZoneContext — operator-controlled providers only)
+    → provider instance region
+      → gateway default zone
+  ```
+
+- For a hosted API the dispatch zone is **recorded and not applied** (see the call
+  taken up front). The recorded-versus-applied distinction lands in the row from
+  C.5, so a reader can tell the two apart afterwards.
+
+**Acceptance.**
+- One test in which an Anthropic-tier request accounts at the US zone while a
+  local-tier request in the same run accounts at the gateway zone.
+- The deferred-dispatch path is unchanged for controlled providers.
+- A deferred job against a hosted API stores the chosen zone but accounts at the
+  provider region, asserted.
+
+## C.4 — A sourced energy estimate for cloud models
+
+- Replace the scalar `energyIntensity` with a prefill/decode split:
+
+  ```
+  energyKwh = a × promptTokens/1000 + b × completionTokens/1000 + c
+  ```
+
+  Physically motivated — prefill is compute-bound and batched, decode is
+  memory-bandwidth-bound and strictly sequential, and per-token energy differs by
+  roughly an order of magnitude. Today a 10k-token prompt with a 50-token reply and
+  its mirror image produce identical numbers. `RequestLog` already persists
+  `promptTokens` and `completionTokens` separately, so the data is there and only
+  the model throws it away; the split costs a domain change and no new storage.
+- Two sources, both behind the `EnergySource` label from C.1:
+  - **`VENDOR_PUBLISHED`** where a figure exists (Google's per-prompt Gemini
+    number, Mistral's Large 2 LCA). Highest credibility, spotty coverage.
+  - **`MODELLED`** otherwise: the EcoLogits / Boavizta parametric method — active
+    parameter count on a reference GPU, × PUE. For Claude and GPT the parameter
+    count is itself unknown, so this yields a **range**, not a point.
+- Every coefficient gets a row in a documentation table: value, source, URL, and
+  **the date it was read**. Re-verify each figure when wiring it — a number
+  recalled from memory is not a citation.
+- Deliberately *not* in this batch: propagating an uncertainty interval through
+  `CarbonFootprint` → `GreenMetrics` → the schema. The range is documented, the
+  stored value stays a point estimate. Interval propagation touches every report
+  surface and is post-v3.
+
+**Acceptance.**
+- A coefficient table with source and read-date for every registry entry that is
+  not `NOT_ACCOUNTED`.
+- A test asserting a long-prompt/short-answer request and its mirror image produce
+  **different** energy figures.
+- No registry entry is left `MODELLED` without a documented parameter assumption.
+
+## C.5 — Self-describing rows, region and provider reporting
+
+- `RequestLog` / `GreenMetrics`, the entity, and Flyway `V9__green_provenance.sql`
+  gain `grid_zone`, `grid_intensity_g_per_kwh`, `energy_source`.
+- Reports break gCO2 down **by region** and **by provider** — the view the lot
+  exists to produce.
+- CSV and PDF headers state location-based Scope 2 explicitly and list which
+  regions were assumed rather than known.
+- Dashboard panel for the same breakdown.
+
+**Acceptance.**
+- A stored row can be re-derived from its own columns without consulting the
+  current configuration.
+- Editing a coefficient changes new rows and leaves history untouched, asserted.
+- An export naming an `ASSUMED` region says so on its face.
+
+## C.6 — ADRs, docs, and the honesty pass
+
+- **ADR 0012** — region attribution belongs to the provider instance, and why the
+  dispatch zone does not override a hosted API.
+- **ADR 0013** — sourced-and-labelled over measured: what lot C deliberately does
+  not measure, and precisely what lot D would change.
+- Rewrite the parts the lot invalidates, in the same commits that invalidate them:
+  `green-accounting.md` (the formula and the honesty note),
+  `carbon-intensity-reliability.md` §4 (the placeholder caveat, now scoped to the
+  entries that are still modelled), `api-reference.md`, `data-model.md`.
+- Update the README and the CLAUDE.md status line.
+
+**Acceptance.**
+- No document still calls the energy coefficients "placeholders" without naming
+  *which* ones and *why* they remain so.
+- `carbon-intensity-reliability.md` §5 ("for audited carbon claims you would
+  need…") is re-scored against what C actually delivered — the marginal-intensity
+  and measured-energy rows stay open, and say which lot owns them.
+
+---
+
 ## Suggested order and rough shape
 
 | Batch | Depends on | Risk |
@@ -532,11 +746,24 @@ to is lowercased — the level had to go on the package. Both are in
 | B.3 | B.0 | medium — hot-path latency |
 | B.4 | B.2 | low |
 | B.5 | B.1–B.4 | low |
+| C.1 | — | low |
+| C.2 | — | low |
+| C.3 | C.2 | medium — touches the accounting path of every request |
+| C.4 | C.1 | low, mostly sourcing and reading |
+| C.5 | C.3, C.4 | medium — schema plus every report surface |
+| C.6 | C.1–C.5 | low (writing) |
 
 Merge A entirely before starting B. A changes the numbers every baseline and
 calibration is written against; B changes where state lives. Interleaving them
 would make a regression ambiguous between the two, which is the one thing the
 evaluation harness cannot help with.
+
+Lot C can be interleaved with either, since nothing in it reaches the embedding
+model, the routing decision or the shared-state work — the one file all three touch
+is `application.properties`. Inside C the order matters more than usual: C.1 and
+C.2 are independent and can land in any order, but C.5 must come last of the code
+batches, because it stores the outputs of C.3 and C.4 and there is no value in
+migrating the schema twice.
 
 ## Rules for the implementation sessions
 
