@@ -723,7 +723,7 @@ Two tiers of knowledge, and the config must distinguish them:
   taking plain values (the onion rule forbids a domain model reaching the ports), and
   C.2 had already placed both adapters in declared packages.
 
-## C.4 — A sourced energy estimate for cloud models
+## C.4 — A sourced energy estimate for cloud models — ✅ done
 
 - Replace the scalar `energyIntensity` with a prefill/decode split:
 
@@ -751,12 +751,37 @@ Two tiers of knowledge, and the config must distinguish them:
   stored value stays a point estimate. Interval propagation touches every report
   surface and is post-v3.
 
-**Acceptance.**
-- A coefficient table with source and read-date for every registry entry that is
-  not `NOT_ACCOUNTED`.
-- A test asserting a long-prompt/short-answer request and its mirror image produce
-  **different** energy figures.
-- No registry entry is left `MODELLED` without a documented parameter assumption.
+**Acceptance** — all three met, `./mvnw -o -DskipFrontend verify` green
+(**670 tests**), and the arithmetic re-checked live on a real Postgres:
+- [`green-accounting.md`](../technical/green-accounting.md#the-coefficients-and-where-they-come-from)
+  carries the table: every input, its URL and its **read-date (2026-09-13)**, plus the
+  arithmetic that turns it into a coefficient. `MODELLED` = EcoLogits' fitted
+  per-output-token GPU energy (H100, batch 64) × the 60 GPUs their memory formula
+  requires, with prefill derived from 2 FLOPs/parameter/token at 40 % of an H100's
+  989 TFLOPS dense BF16 and 700 W. `VENDOR_PUBLISHED` = Google's 0.24 Wh median
+  Gemini text prompt (arXiv:2508.15734), full-stack, so PUE is **not** applied on top.
+- The mirror-image property is asserted twice: in `EnergyProfileTest` (10 000/50 →
+  4.735e-3 kWh against 50/10 000 → 0.1610 kWh, a 34× gap) and end to end in
+  `ChatCompletionServiceCarbonZoneTest`, where two rows with swapped token counts
+  carry different energy and the **same** cost — cost is billed on the total, which is
+  right.
+- The parameter assumption is documented and is a **range**: 200–600 B active
+  (EcoLogits' estimate for the Opus class, ~2 T total), giving decode 0.0093–0.0230
+  and prefill 0.000197–0.000590 kWh/1k. Only the midpoint is stored; no interval is
+  propagated, as planned.
+- Live verification (mock egress, coefficients bound from properties): a 320-prompt /
+  322-completion request booked **0.0059471552 kWh → 2.0815 gCO2** and a 4/6 request
+  **0.000109953 kWh**, both matching `prefill×p + decode×c` × PUE 1.12 × 350 to the
+  last digit; the vendor entry booked exactly **0.00024 kWh** for both a 22-token and
+  a 962-token request, with its `pue=1.5` correctly *not* applied.
+- Beyond the plan: a fifth setting, `energy.includes-datacenter-overhead`, because a
+  full-stack vendor figure and a GPU-level parametric one cannot share one PUE rule;
+  and `DEFAULT_PUE = 1.2` (top of EcoLogits' published range) for providers that
+  declare none, since 1.0 would claim a datacenter with no overhead. See
+  [`../decisions.md`](../decisions.md).
+- Deliberately not done, as specified: no uncertainty interval through
+  `CarbonFootprint` → `GreenMetrics` → the schema. Mistral's LCA is cited but **not**
+  used as a coefficient (it is gCO2e including embodied impacts, not kWh).
 
 ## C.5 — Self-describing rows, region and provider reporting
 

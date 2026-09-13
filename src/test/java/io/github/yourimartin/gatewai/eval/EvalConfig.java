@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
+import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -131,7 +132,9 @@ final class EvalConfig {
         continue;
       }
       String remainder = property.substring(REGISTRY_PREFIX.length());
-      int separator = remainder.lastIndexOf('.');
+      // The registry key is the FIRST segment; the rest is the property path, which
+      // since v3 lot C.4 can itself be nested (energy.source, energy.decode-...).
+      int separator = remainder.indexOf('.');
       if (separator < 0) {
         continue;
       }
@@ -145,15 +148,32 @@ final class EvalConfig {
         entry.getOrDefault("provider", ""),
         entry.getOrDefault("model-id", ""),
         Double.parseDouble(entry.getOrDefault("cost-per-1k-tokens", "0")),
-        Double.parseDouble(entry.getOrDefault("energy-intensity", "0")),
-        energySource(entry.get("energy-source")),
+        energyProfile(entry),
         tier(entry.get("tier")))));
     return List.copyOf(models);
   }
 
   /**
-   * Parses {@code energy-source}; {@code null} lets {@link ModelDefinition} derive
-   * it from the coefficient, exactly as Spring binding does when it is omitted.
+   * Reads the {@code energy.*} group (v3 lot C.4): the prefill/decode split and its
+   * provenance, exactly as Spring relaxed binding would.
+   */
+  private static EnergyProfile energyProfile(Map<String, String> entry) {
+    return new EnergyProfile(
+        number(entry, "energy.prefill-kwh-per-1k-prompt-tokens"),
+        number(entry, "energy.decode-kwh-per-1k-completion-tokens"),
+        number(entry, "energy.fixed-kwh-per-request"),
+        energySource(entry.get("energy.source")),
+        Boolean.parseBoolean(
+            entry.getOrDefault("energy.includes-datacenter-overhead", "false")));
+  }
+
+  private static double number(Map<String, String> entry, String key) {
+    return Double.parseDouble(entry.getOrDefault(key, "0"));
+  }
+
+  /**
+   * Parses {@code energy.source}; {@code null} lets {@link EnergyProfile} derive it
+   * from the coefficients, exactly as Spring binding does when it is omitted.
    */
   private static EnergySource energySource(String raw) {
     return raw == null || raw.isBlank()

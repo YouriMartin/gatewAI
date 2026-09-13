@@ -80,11 +80,17 @@ how **it** knows.
      energy is not metered and not estimated, so it contributes nothing and every
      export says *"excluded from scope"* rather than printing `0 gCO2`. Metering
      it (RAPL / NVML host counters + per-model calibration) is a later lot.
-   - **`MODELLED`** — cloud entries, whose `energy-intensity` coefficient is still
-     a **placeholder**: good grid data does not save an approximate upstream
-     energy estimate. Sourcing those coefficients (vendor-published where it
-     exists, EcoLogits / Boavizta parametric otherwise) and splitting them into
-     prefill/decode is lot C.4.
+   - **`MODELLED`** — cloud entries. Since v3 lot C.4 these are no longer
+     placeholders but **sourced** estimates: a prefill/decode split derived from
+     EcoLogits' published parametric method and NVIDIA's H100 figures, with every
+     input, its URL and its read-date in
+     [`green-accounting.md`](green-accounting.md#the-coefficients-and-where-they-come-from).
+     Sourced is not measured: for a closed model the active-parameter count is
+     itself an estimate (200–600 B for the Opus class), so the honest output is a
+     range, of which only the midpoint is stored.
+   - **`VENDOR_PUBLISHED`** — a figure the vendor measured (Google's median
+     Gemini-prompt energy). Highest credibility, spotty coverage, and full-stack:
+     its PUE is already inside, so the gateway does not apply one.
 3. **Temporal** shifting (the `@Scheduled` worker that defers execution) =
    **real**.
 
@@ -94,9 +100,10 @@ how **it** knows.
   method as Google/Microsoft" — owning the limits.
 - **For audited carbon claims (CSRD)**, you would need to:
   - move to **marginal** intensity (WattTime);
-  - use **measured energy factors** (not the kWh/token placeholders) — lot C.4
-    makes the cloud figures *sourced and dated*, which is a step short of
-    measured; measuring local inference is later still;
+  - use **measured energy factors**. Lot C.4 made the cloud figures *sourced,
+    dated and phase-split*, which is a step short of measured: the parametric
+    inputs are published, the parameter counts behind them are not. Measuring
+    local inference is later still;
   - have a real **multi-region execution** (regional endpoints);
   - document an auditable methodology (datacenter PUE, Scope 2/3 boundary).
 
@@ -106,4 +113,4 @@ how **it** knows.
 |---|---|
 | Do we know which zone is greenest? | Yes — the **ranking** is reliable. |
 | Are the **absolute numbers** reliable? | Moderately (marginal ≠ average, uncertain factors, revisions). |
-| Is our implementation "real"? | Temporal is real; geo = accounting; cloud energy = labelled placeholders; local energy = **not accounted at all**, and said so. |
+| Is our implementation "real"? | Temporal is real; geo = accounting; cloud energy = **sourced and labelled** estimates (phase-split, with citations and read-dates), never measured; local energy = **not accounted at all**, and said so. |

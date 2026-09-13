@@ -16,6 +16,7 @@ import java.util.Optional;
 import io.github.yourimartin.gatewai.domain.model.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.CarbonZoneContext;
 import io.github.yourimartin.gatewai.domain.model.CarbonZoneSource;
+import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.LlmMessage;
@@ -57,20 +58,25 @@ class ChatCompletionServiceCarbonZoneTest {
   private static final double US_INTENSITY = 350.0;
   private static final double SWEDEN_INTENSITY = 30.0;
 
-  /** Premium tier on a hosted API: 0.005 kWh per 1k tokens, US grid. */
+  /**
+   * Premium tier on a hosted API. Round coefficients and PUE 1.0 on the provider
+   * keep the zone arithmetic readable — PUE itself is covered in
+   * {@code CarbonCalculatorTest}.
+   */
   private static final ModelDefinition CLAUDE = new ModelDefinition(
-      "claude-premium", "anthropic", "claude-opus-4-8", 0.015, 0.005,
-      EnergySource.MODELLED, ModelTier.CLOUD_PREMIUM);
+      "claude-premium", "anthropic", "claude-opus-4-8", 0.015,
+      new EnergyProfile(0.001, 0.005, 0.0, EnergySource.MODELLED, false),
+      ModelTier.CLOUD_PREMIUM);
 
   /** Local tier on the operator's own box: excluded from scope (lot C.1). */
   private static final ModelDefinition QWEN = new ModelDefinition(
-      "local-small", "ollama", "qwen2.5:0.5b", 0.0, 0.0,
-      EnergySource.NOT_ACCOUNTED, ModelTier.LOCAL);
+      "local-small", "ollama", "qwen2.5:0.5b", 0.0, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
 
   /** A self-hosted box with a real coefficient, to see the dispatch zone bite. */
   private static final ModelDefinition VLLM = new ModelDefinition(
-      "vllm-medium", "vllm", "mistral-large", 0.0, 0.004,
-      EnergySource.MODELLED, ModelTier.CLOUD_ENTRY);
+      "vllm-medium", "vllm", "mistral-large", 0.0,
+      new EnergyProfile(0.001, 0.004, 0.0, EnergySource.MODELLED, false),
+      ModelTier.CLOUD_ENTRY);
 
   @Mock
   private LlmClient llmClient;
@@ -112,7 +118,7 @@ class ChatCompletionServiceCarbonZoneTest {
 
     lenient().when(providerRegions.findByProvider("anthropic")).thenReturn(Optional.of(
         new ProviderRegion("anthropic", "US-MIDA-PJM", RegionProvenance.ASSUMED,
-            null, false)));
+            1.0, false)));
     lenient().when(providerRegions.findByProvider("ollama")).thenReturn(Optional.of(
         new ProviderRegion("ollama", null, null, null, true)));
     lenient().when(providerRegions.findByProvider("vllm")).thenReturn(Optional.of(
@@ -142,13 +148,14 @@ class ChatCompletionServiceCarbonZoneTest {
 
     List<RequestLog> logs = savedLogs(2);
 
-    // 20 tokens x 0.005 kWh/1k = 0.0001 kWh, at the US grid: 0.035 gCO2.
-    // Before C.3 this was 0.0001 x 230 = 0.023 — the gateway's grid, not Anthropic's.
-    assertEquals(0.035, logs.get(0).green().gramsCo2(), 1e-9);
+    // 12 prompt x 0.001/1k + 8 completion x 0.005/1k = 5.2e-5 kWh, at the US grid:
+    // 0.0182 gCO2. Before C.3 it was x 230 = 0.01196 — the gateway's grid, not
+    // Anthropic's.
+    assertEquals(0.0182, logs.get(0).green().gramsCo2(), 1e-9);
     // Same run, same gateway: the local tier is excluded from scope (0 kWh), and its
     // avoided figure prices the premium baseline at ANTHROPIC's grid, not here.
     assertEquals(0.0, logs.get(1).green().gramsCo2(), 1e-9);
-    assertEquals(0.035, logs.get(1).green().gramsCo2Avoided(), 1e-9);
+    assertEquals(0.0182, logs.get(1).green().gramsCo2Avoided(), 1e-9);
   }
 
   @Test
@@ -158,8 +165,8 @@ class ChatCompletionServiceCarbonZoneTest {
     ScopedValue.where(CarbonZoneContext.CURRENT, "SE").run(() -> service.complete(request()));
 
     // Accounted at the provider's grid: deferring moved nothing in Anthropic's
-    // datacenter. 0.0001 kWh x 350, not x 30.
-    assertEquals(0.035, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
+    // datacenter. 5.2e-5 kWh x 350, not x 30.
+    assertEquals(0.0182, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
 
     // The chosen zone is kept as recorded-not-applied. Persisting it is lot C.5.
     ResolvedCarbonZone resolved = ScopedValue
@@ -178,10 +185,10 @@ class ChatCompletionServiceCarbonZoneTest {
 
     ScopedValue.where(CarbonZoneContext.CURRENT, "SE").run(() -> service.complete(request()));
 
-    // 20 tokens x 0.004 kWh/1k = 0.00008 kWh at Sweden's 30 gCO2/kWh = 0.0024.
-    // The dispatch zone still wins on the operator's own box — that is the whole
-    // point of carbon-aware dispatch, and C.3 must not regress it.
-    assertEquals(0.0024, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
+    // (12 x 0.001 + 8 x 0.004)/1k = 4.4e-5 kWh, x PUE 1.15 = 5.06e-5, at Sweden's
+    // 30 gCO2/kWh = 0.001518. The dispatch zone still wins on the operator's own
+    // box — that is the point of carbon-aware dispatch, and C.3 must not regress it.
+    assertEquals(0.001518, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
 
     ResolvedCarbonZone resolved = ScopedValue
         .where(CarbonZoneContext.CURRENT, "SE")
@@ -206,14 +213,36 @@ class ChatCompletionServiceCarbonZoneTest {
   @Test
   void aRegionThatCannotBeMappedFallsBackRatherThanGuessing() {
     when(providerRegions.findByProvider("anthropic")).thenReturn(Optional.of(
+        // No PUE either: the documented default applies on top.
         new ProviderRegion("anthropic", "mars-north-1", null, null, false)));
     when(cloudRegionZones.zoneFor("mars-north-1")).thenReturn(Optional.empty());
     when(llmClient.call(any())).thenReturn(response("claude-opus-4-8", false));
 
     service.complete(request());
 
-    // Gateway default: 0.0001 kWh x 230 = 0.023 gCO2.
-    assertEquals(0.023, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
+    // Gateway default zone, and the default PUE 1.2 since this provider declares
+    // none: 5.2e-5 kWh x 1.2 x 230 = 0.014352 gCO2.
+    assertEquals(0.014352, savedLogs(1).getFirst().green().gramsCo2(), 1e-9);
+  }
+
+  @Test
+  void aLongPromptAndItsMirrorImageNoLongerProduceTheSameRow() {
+    when(llmClient.call(any()))
+        .thenReturn(new LlmResponse("claude-opus-4-8", "…", "stop", 10_000, 50, 10_050, false))
+        .thenReturn(new LlmResponse("claude-opus-4-8", "…", "stop", 50, 10_000, 10_050, false));
+
+    service.complete(request());
+    service.complete(request());
+
+    List<RequestLog> logs = savedLogs(2);
+    // Same 10 050 tokens both ways. Reading them: 10 x 0.001 + 0.05 x 0.005 =
+    // 0.01025 kWh. Generating them: 0.05 x 0.001 + 10 x 0.005 = 0.05005 kWh.
+    assertEquals(0.01025, logs.get(0).green().energyKwh(), 1e-9);
+    assertEquals(0.05005, logs.get(1).green().energyKwh(), 1e-9);
+    assertTrue(logs.get(1).green().gramsCo2() > logs.get(0).green().gramsCo2(),
+        "a scalar per-1k-token coefficient would have made these two identical");
+    // Cost is billed on the total, so it is the same both ways — as it should be.
+    assertEquals(logs.get(0).green().costEur(), logs.get(1).green().costEur(), 1e-12);
   }
 
   private static LlmRequest request() {

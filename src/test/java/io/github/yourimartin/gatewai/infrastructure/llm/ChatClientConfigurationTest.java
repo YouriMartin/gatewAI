@@ -55,7 +55,7 @@ class ChatClientConfigurationTest {
     sonnet.setProvider("anthropic");
     sonnet.setModelId("claude-sonnet-4-20250514");
     sonnet.setCostPer1kTokens(0.015);
-    sonnet.setEnergyIntensity(0.6);
+    sonnet.getEnergy().setDecodeKwhPer1kCompletionTokens(0.6);
     sonnet.setTier(ModelTier.CLOUD_PREMIUM);
     entries.put("claude-sonnet", sonnet);
 
@@ -64,7 +64,7 @@ class ChatClientConfigurationTest {
     haiku.setProvider("anthropic");
     haiku.setModelId("claude-haiku-4-20250506");
     haiku.setCostPer1kTokens(0.002);
-    haiku.setEnergyIntensity(0.15);
+    haiku.getEnergy().setDecodeKwhPer1kCompletionTokens(0.15);
     haiku.setTier(ModelTier.CLOUD_ENTRY);
     entries.put("claude-haiku", haiku);
 

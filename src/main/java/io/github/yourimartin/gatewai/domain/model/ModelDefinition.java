@@ -1,24 +1,18 @@
 package io.github.yourimartin.gatewai.domain.model;
 
 /**
- * A model the gateway can route to, with its cost and energy coefficients.
+ * A model the gateway can route to, with its cost and its energy profile.
  *
- * <p>{@code energySource} labels where {@code energyIntensity} comes from, so a
- * report can never present an unaccounted model as a measured zero (v3 lot C.1).
- * The two fields are kept consistent by construction: a
- * {@link EnergySource#NOT_ACCOUNTED} model must carry a zero coefficient, and a
- * zero coefficient with no declared source <em>is</em> {@code NOT_ACCOUNTED}.
+ * <p>Energy lives in an {@link EnergyProfile} (v3 lot C.4): a prefill/decode split
+ * with a provenance label, rather than one scalar per 1000 tokens. The label is what
+ * stops a report presenting an unaccounted model as a measured zero (lot C.1).
  *
  * @param key             registry key (stable identifier in configuration)
  * @param provider        provider name (e.g. {@code anthropic}, {@code ollama})
  * @param modelId         provider-specific model id sent on the wire
  * @param costPer1kTokens monetary cost per 1000 tokens, in the billing currency
- * @param energyIntensity estimated electrical energy per 1000 tokens, in kWh
- *                        (energy only — carbon is energy × grid intensity);
- *                        {@code 0} when the energy is not accounted at all
- * @param energySource    provenance of {@code energyIntensity}; {@code null} is
- *                        resolved from the coefficient (0 → {@code NOT_ACCOUNTED},
- *                        otherwise {@code MODELLED})
+ * @param energy          how much electricity one inference draws, and where that
+ *                        estimate comes from; {@code null} means excluded from scope
  * @param tier            complexity tier used by the router
  */
 public record ModelDefinition(
@@ -26,22 +20,18 @@ public record ModelDefinition(
     String provider,
     String modelId,
     double costPer1kTokens,
-    double energyIntensity,
-    EnergySource energySource,
+    EnergyProfile energy,
     ModelTier tier
 ) {
 
   public ModelDefinition {
-    if (energySource == null) {
-      energySource = energyIntensity == 0.0
-          ? EnergySource.NOT_ACCOUNTED
-          : EnergySource.MODELLED;
+    if (energy == null) {
+      energy = EnergyProfile.NOT_ACCOUNTED;
     }
-    if (energySource == EnergySource.NOT_ACCOUNTED && energyIntensity != 0.0) {
-      throw new IllegalArgumentException(
-          "Model '" + key + "' declares energy-source=not-accounted but a non-zero "
-              + "energy-intensity (" + energyIntensity + "): an unaccounted model is "
-              + "booked at zero. Drop the coefficient or declare its source.");
-    }
+  }
+
+  /** Shorthand for {@code energy().source()}, the label every renderer prints. */
+  public EnergySource energySource() {
+    return energy.source();
   }
 }

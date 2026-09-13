@@ -96,8 +96,9 @@ fixable by setting a TTL per deployment. See [`limitations.md`](limitations.md).
 (aggregates over a date range, downloadable files).
 
 **Why:** the differentiating story is turning a regulatory reporting constraint into
-a concrete, quantifiable feature. The figures are directional today (placeholders),
-but the *shape* of the deliverable matches what a sustainability team needs.
+a concrete, quantifiable feature. The figures are directional — sourced estimates
+with their provenance printed next to them, not measurements — but the *shape* of the
+deliverable matches what a sustainability team needs.
 
 ## Carbon-aware dispatch off by default
 

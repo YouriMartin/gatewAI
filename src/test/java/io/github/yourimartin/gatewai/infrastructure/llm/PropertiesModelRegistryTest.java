@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -30,7 +31,7 @@ class PropertiesModelRegistryTest {
     sonnet.setProvider("anthropic");
     sonnet.setModelId("claude-sonnet-4-20250514");
     sonnet.setCostPer1kTokens(0.015);
-    sonnet.setEnergyIntensity(0.6);
+    sonnet.getEnergy().setDecodeKwhPer1kCompletionTokens(0.6);
     sonnet.setTier(ModelTier.CLOUD_PREMIUM);
     entries.put("claude-sonnet", sonnet);
 
@@ -39,7 +40,7 @@ class PropertiesModelRegistryTest {
     haiku.setProvider("anthropic");
     haiku.setModelId("claude-haiku-4-20250506");
     haiku.setCostPer1kTokens(0.002);
-    haiku.setEnergyIntensity(0.15);
+    haiku.getEnergy().setDecodeKwhPer1kCompletionTokens(0.15);
     haiku.setTier(ModelTier.CLOUD_ENTRY);
     entries.put("claude-haiku", haiku);
 
@@ -48,8 +49,8 @@ class PropertiesModelRegistryTest {
     llama.setProvider("ollama");
     llama.setModelId("llama3");
     llama.setCostPer1kTokens(0.0);
-    llama.setEnergyIntensity(0.05);
-    llama.setEnergySource(EnergySource.MODELLED);
+    llama.getEnergy().setDecodeKwhPer1kCompletionTokens(0.05);
+    llama.getEnergy().setSource(EnergySource.MODELLED);
     llama.setTier(ModelTier.LOCAL);
     entries.put("llama3", llama);
 
@@ -134,8 +135,33 @@ class PropertiesModelRegistryTest {
 
     assertTrue(result.isPresent());
     assertEquals(0.0, result.get().costPer1kTokens());
-    assertEquals(0.05, result.get().energyIntensity());
+    assertEquals(0.05, result.get().energy().decodeKwhPer1kCompletionTokens());
     assertEquals(EnergySource.MODELLED, result.get().energySource());
+  }
+
+  @Test
+  void bindsThePrefillDecodeSplitAndItsOverheadFlag() {
+    ModelRegistryProperties.ModelEntry vendor =
+        new ModelRegistryProperties.ModelEntry();
+    vendor.setProvider("gemini");
+    vendor.setModelId("gemini-2.5-flash");
+    vendor.getEnergy().setPrefillKwhPer1kPromptTokens(0.0001);
+    vendor.getEnergy().setDecodeKwhPer1kCompletionTokens(0.002);
+    vendor.getEnergy().setFixedKwhPerRequest(0.00024);
+    vendor.getEnergy().setSource(EnergySource.VENDOR_PUBLISHED);
+    vendor.getEnergy().setIncludesDatacenterOverhead(true);
+    vendor.setTier(ModelTier.CLOUD_ENTRY);
+    ModelRegistryProperties properties = new ModelRegistryProperties();
+    properties.setRegistry(new LinkedHashMap<>(Map.of("gemini-entry", vendor)));
+
+    ModelDefinition definition = new PropertiesModelRegistry(properties)
+        .findByKey("gemini-entry").orElseThrow();
+
+    assertEquals(0.0001, definition.energy().prefillKwhPer1kPromptTokens());
+    assertEquals(0.002, definition.energy().decodeKwhPer1kCompletionTokens());
+    assertEquals(0.00024, definition.energy().fixedKwhPerRequest());
+    assertEquals(EnergySource.VENDOR_PUBLISHED, definition.energySource());
+    assertTrue(definition.energy().includesDatacenterOverhead());
   }
 
   @Test
@@ -147,7 +173,7 @@ class PropertiesModelRegistryTest {
     local.setProvider("ollama");
     local.setModelId("qwen2.5:3b");
     local.setCostPer1kTokens(0.0);
-    local.setEnergyIntensity(0.0);
+    local.getEnergy().setDecodeKwhPer1kCompletionTokens(0.0);
     local.setTier(ModelTier.LOCAL);
     ModelRegistryProperties properties = new ModelRegistryProperties();
     properties.setRegistry(new LinkedHashMap<>(Map.of("local-large", local)));
@@ -166,7 +192,7 @@ class PropertiesModelRegistryTest {
 
     try {
       all.add(new ModelDefinition(
-          "test", "test", "test", 0, 0, EnergySource.NOT_ACCOUNTED, ModelTier.LOCAL));
+          "test", "test", "test", 0, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL));
       // If add succeeds, test fails
       assertTrue(false, "List should be immutable");
     } catch (UnsupportedOperationException expected) {

@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
-import io.github.yourimartin.gatewai.domain.model.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
@@ -67,8 +67,8 @@ class GreenReportServiceTest {
         "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0), false);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
     when(modelRegistry.findByModelId("qwen2.5:3b")).thenReturn(Optional.of(
-        new ModelDefinition("local-large", "ollama", "qwen2.5:3b", 0.0, 0.0,
-            EnergySource.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
+        new ModelDefinition("local-large", "ollama", "qwen2.5:3b", 0.0,
+            EnergyProfile.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
 
     GreenReport report = service.generate(FROM, TO);
 

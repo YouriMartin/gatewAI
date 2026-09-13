@@ -189,12 +189,14 @@ Sends each request to the cheapest/leanest model able to handle it:
 local (Ollama) for simple tasks, cloud premium for complex ones.
 
 ### Carbon accounting
-Estimates the footprint (tokens → kWh → gCO2) and computes the CO2 avoided thanks
-to the cache and routing. CSRD-compatible reporting export. Each model declares
-where its energy figure comes from, and **self-hosted inference is excluded from
-scope** — it is not metered, so every report says "excluded from scope" instead of
-printing a bare `0 gCO2` (see
-[limitations](docs/functional/limitations.md#carbon-figures-are-directional-not-audited)).
+Estimates the footprint (prompt/completion tokens → kWh × PUE → gCO2, at the grid
+that served the request) and computes the CO2 avoided thanks to the cache and
+routing. CSRD-compatible reporting export. Every coefficient carries its provenance —
+`vendor-published`, `modelled` (with its source and read-date) or **excluded from
+scope** for self-hosted inference, which the gateway cannot meter and therefore never
+reports as a bare `0 gCO2` (see
+[limitations](docs/functional/limitations.md#carbon-figures-are-directional-not-audited)
+and [the coefficient table](docs/technical/green-accounting.md#the-coefficients-and-where-they-come-from)).
 
 ## Documentation
 

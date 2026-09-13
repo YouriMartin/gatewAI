@@ -7,6 +7,51 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot C — C.4 (a sourced energy estimate)
+
+- **The scalar became a value object, not three loose fields.** `ModelDefinition`
+  now holds an `EnergyProfile` (prefill, decode, fixed, source, overhead flag), which
+  is where the C.1 invariant moved: an unaccounted profile with any non-zero
+  coefficient throws, a negative coefficient throws, and an omitted source is derived
+  from the coefficients. Config follows the same shape — C.1's flat `energy-source`
+  became `energy.source` — so the five settings that belong together bind together.
+  `EvalConfig`'s registry parser had to switch from `lastIndexOf('.')` to
+  `indexOf('.')`, since the property path is now nested.
+- **A fifth field earned its place: `energy.includes-datacenter-overhead`.** Google's
+  published figure is full-stack (accelerator + host + idle + datacenter overhead),
+  EcoLogits' parametric one is GPU-level. Multiplying the first by PUE counts cooling
+  twice; not multiplying the second understates it. Deriving the answer from
+  `EnergySource` was tempting and wrong — a vendor is free to publish an IT-only
+  number — so the boundary is declared, defaults to `false` (PUE applies, the
+  overstating direction), and is verified live: a `pue=1.5` provider serving a
+  full-stack entry still books exactly 0.00024 kWh.
+- **`DEFAULT_PUE = 1.2` rather than 1.0.** C.2 deliberately left an undeclared PUE
+  null; C.4 had to decide what null costs. 1.0 would claim a datacenter with zero
+  overhead — the C.1 mistake in a new place — so the default is the top of
+  EcoLogits' published 1.09–1.20 per-provider range, cited in the constant's javadoc.
+- **`account(...)` takes two `ModelSite`s and a `TokenUsage` instead of eight
+  scalars.** The honest signature after C.3 + C.4 would have been (used, baseline,
+  promptTokens, completionTokens, usedIntensity, baselineIntensity, usedPue,
+  baselinePue, cacheHit). Grouping "a model and the conditions it ran under" is what
+  the domain actually means, and it is what C.5 will persist per row.
+- **`fixed` is 0 for the modelled example, on purpose.** EcoLogits' only non-token
+  term is proportional to generation latency (~2 % of the GPU term at 10 s), so there
+  is no latency-free constant to put there. Inventing a reference latency to fill the
+  field would be false precision; the field exists for vendor per-prompt figures,
+  where it is the entire number.
+- **Mistral's LCA is cited and deliberately unused.** 1.14 gCO2e per 400-token
+  response (ADEME + Carbone 4, ISO 14040/44) is *emissions*, not energy, and includes
+  embodied impacts that sit outside lot C's location-based Scope 2 boundary.
+  Back-converting it to kWh through an assumed grid intensity would be arithmetic
+  laundering, so `green-accounting.md` explains why it is not a coefficient.
+- **Two findings from reading the sources rather than recalling them.** EcoLogits'
+  *current* fit is per-output-token on an H100 at batch 64 with an exponential batch
+  term (α 1.17e-6, β −1.12e-2, γ 4.05e-5) — not the 0.4-era A100 linear fit — and its
+  request energy multiplies per-GPU token energy by the **number of GPUs the model's
+  memory requires** (60 for ~2T parameters at 16 bits). That multiplier is why the
+  shipped modelled figure lands ~10× above Google's measured median-prompt number,
+  which the doc states rather than hides.
+
 ## v3 lot C — C.3 (resolve the intensity per request)
 
 - **The avoided figure's baseline is now priced at its own grid, which the batch did

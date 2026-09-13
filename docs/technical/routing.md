@@ -23,8 +23,10 @@ The defaults are **local-first since Phase 8**: three Qwen sizes on the bundled
 Ollama, zero API keys. Cloud entries (`claude-opus`, `gpt-…`) ship commented in
 `application.properties` — repoint a tier's registry entry to opt in.
 
-> The energy intensities are **placeholders** (see
-> [`green-accounting.md`](green-accounting.md)). The model ids are configurable.
+> Energy coefficients are **sourced estimates, not measurements**, and every one has
+> its source and read-date in
+> [`green-accounting.md`](green-accounting.md#the-coefficients-and-where-they-come-from);
+> the local defaults are excluded from scope entirely. The model ids are configurable.
 
 `ModelRegistry` (out port) offers `findByTier`, `findByModelId`, `findByKey`,
 `allModels`.
@@ -345,7 +347,10 @@ bilingual EN/FR examples are defined in `ClassifierProperties`).
 instance runs, for carbon attribution (see
 [`green-accounting.md`](green-accounting.md#where-a-provider-runs-v3-lot-c2)).
 `gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
-`model-id` (unique), `cost-per-1k-tokens`, `energy-intensity`, `energy-source`
+`model-id` (unique), `cost-per-1k-tokens`, `tier`, and the `energy.*` group:
+`prefill-kwh-per-1k-prompt-tokens`, `decode-kwh-per-1k-completion-tokens`,
+`fixed-kwh-per-request`, `includes-datacenter-overhead`, and `source`
 (`not-accounted`|`vendor-published`|`modelled`; omitted → derived from the
-coefficient, and `not-accounted` on the local defaults — see
-[`green-accounting.md`](green-accounting.md#the-scope-boundary-v3-lot-c1)), `tier`.
+coefficients, and `not-accounted` on the local defaults). Sources and read-dates for
+every coefficient:
+[`green-accounting.md`](green-accounting.md#the-coefficients-and-where-they-come-from).

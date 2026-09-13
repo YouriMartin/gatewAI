@@ -8,21 +8,121 @@ and `GreenReportService`.
 
 ## The carbon model
 
-`CarbonCalculator.estimate(model, tokens, gridIntensity)` is pure domain logic:
+`CarbonCalculator.estimate(site, usage)` is pure domain logic:
 
 ```
-energyKwh = (tokens / 1000) × model.energyIntensity   // kWh per 1k tokens
-gramsCo2  = energyKwh × gridIntensityGramsPerKwh
+kWh      = prefill × promptTokens/1000          // compute-bound, batched
+         + decode  × completionTokens/1000      // bandwidth-bound, sequential
+         + fixed                                // per prompt, for vendor figures
+kWh      = kWh × PUE                            // unless the figure already includes it
+gramsCo2 = kWh × gridIntensityGramsPerKwh
 ```
 
-Returns a `CarbonFootprint(energyKwh, gramsCo2)`. The grid intensity is **supplied
-by the caller**, so the same class works with a static constant today or a live
-value from `CarbonIntensityProvider` (Phase 4.2) with no change.
+A `ModelSite` carries the model **plus the conditions it ran under** — the grid
+intensity (lot C.3) and the datacenter's PUE (lot C.2) — so the same class prices a
+request at the grid that actually served it without knowing where that came from.
+`TokenUsage` carries prompt, completion and total: energy uses the two phases, cost
+uses the total the provider billed.
 
-> **Honesty:** the `energyIntensity` coefficients of cloud entries are
-> placeholders, so absolute energy/CO2 are directional. Grid-intensity reliability
-> (average vs marginal, geo accounting) is covered in
+**Why the split (v3 lot C.4).** Prefill processes the whole prompt in parallel and
+saturates the GPU's arithmetic units; decode emits one token at a time, re-reading
+every weight, and is limited by memory bandwidth. Per token the two differ by more
+than an order of magnitude. With one scalar per 1k tokens, a 10k-token prompt with a
+50-token answer and its mirror image produced *identical* figures. `RequestLog` had
+persisted the two counts separately since Phase 4.3; only the model threw them away.
+
+> **Honesty:** nothing here is measured. Cloud coefficients are **sourced and
+> labelled** estimates — see [the coefficient table](#the-coefficients-and-where-they-come-from)
+> — and self-hosted egress is excluded from scope entirely (lot C.1).
+> Grid-intensity reliability (average vs marginal, geo accounting) is covered in
 > [`carbon-intensity-reliability.md`](carbon-intensity-reliability.md).
+
+## The coefficients, and where they come from
+
+Every figure below was read from its source on **2026-09-13**, and the arithmetic
+that turns it into a coefficient is written out. A number recalled from memory is not
+a citation.
+
+### PUE
+
+| Value | Applies when | Source |
+|---|---|---|
+| the provider's `pue` | declared on the instance (lot C.2) | operator |
+| **1.2** (`CarbonCalculator.DEFAULT_PUE`) | no `pue` declared | EcoLogits' methodology default; its per-provider table spans 1.09–1.20, so the top of that range never flatters an unknown datacenter — [ecologits.ai](https://ecologits.ai/latest/methodology/llm_inference/) |
+| **not applied** | `energy.includes-datacenter-overhead=true` | a full-stack vendor figure already carries cooling and conversion; multiplying again would count it twice |
+
+### `MODELLED` — the Claude-Opus-class example
+
+The parametric route is EcoLogits' (the EU-published, ISO-14044-framed LLM inference
+method). Inputs, all quoted:
+
+| Input | Value | Source |
+|---|---|---|
+| GPU energy per output token | `f(P) = α·e^(βB)·P + γ`, α = 1.17×10⁻⁶, β = −1.12×10⁻², γ = 4.05×10⁻⁵ (Wh/token, P in **billions** of active parameters, batch B) | [EcoLogits LLM inference methodology](https://ecologits.ai/latest/methodology/llm_inference/) |
+| Batch size | 64 (their fixed serving assumption) | idem |
+| Reference GPU | NVIDIA H100 80 GB, 16-bit weights | idem |
+| GPUs needed | `⌈(P_total × bits/8 × 1.2) / 80 GB⌉` → **60** for a ~2T-parameter model | [EcoLogits 0.4 methodology](https://ecologits.ai/0.4/methodology/llm_inference/) |
+| Active parameters | **200–600 B**, ~2 T total, for the Claude Opus class | [EcoLogits proprietary-model estimates](https://ecologits.ai/latest/methodology/proprietary_models/) — reasoned from benchmark parity with GPT-4, treated as a sparse MoE |
+| Forward-pass compute | ≈ 2 FLOPs per parameter per token | standard scaling-law accounting (Kaplan et al. 2020 give ≈ 6N per token for training, i.e. 2N forward) |
+| H100 dense BF16 throughput | 989 TFLOPS (half the 1,979 TFLOPS NVIDIA quotes *with sparsity*), 700 W TDP | [NVIDIA H100 product page](https://www.nvidia.com/en-us/data-center/h100/) |
+| Achieved prefill utilisation | **40 %** — an assumption, stated as one | — |
+
+Arithmetic at the midpoint assumption (400 B active, 2 T total):
+
+```
+decode  = (1.17e-6 × e^(-0.0112×64) × 400 + 4.05e-5) Wh/token × 60 GPUs
+        = 2.690e-4 × 60 = 1.614e-2 Wh/token → 0.0161 kWh per 1k completion tokens
+prefill = 2 × 400e9 FLOPs / (0.40 × 989e12 FLOPS) × 700 W
+        = 1.415 J/token → 0.000393 kWh per 1k prompt tokens
+fixed   = 0
+```
+
+The 200–600 B range gives decode **0.0093–0.0230** and prefill
+**0.000197–0.000590**. Only the midpoint is stored: propagating an interval through
+`CarbonFootprint` → `GreenMetrics` → the schema touches every report surface and is
+post-v3. The range is documented instead, which is the honest half-measure.
+
+Three things this number is not:
+
+- **Not measured.** It is a published parametric fit, extrapolated to a model whose
+  parameter count nobody outside Anthropic knows.
+- **Not conservative in the flattering direction.** Multiplying per-GPU token energy
+  by all 60 GPUs assumes every one of them is busy for the whole generation, and the
+  implied throughput (~11 tokens/s per stream at batch 64) is lower than frontier
+  APIs actually stream. If real throughput is 3× that, the true figure is ~3× lower.
+- **Not comparable to a vendor figure.** It lands ~10× above Google's measured
+  median-prompt number below. Different model, different silicon, different stack —
+  which is exactly why the `EnergySource` label travels with the number.
+- **`fixed = 0`, deliberately.** EcoLogits' only non-token term is proportional to
+  generation latency (≈2 % of the GPU term at a 10 s generation), so there is no
+  honest constant to put there; inventing a reference latency would add false
+  precision.
+
+### `VENDOR_PUBLISHED` — the Gemini example
+
+| Coefficient | Value | Source |
+|---|---|---|
+| `fixed-kwh-per-request` | **0.00024** kWh (0.24 Wh) | ["Measuring the environmental impact of delivering AI at Google Scale", arXiv:2508.15734, 21 Aug 2025](https://arxiv.org/abs/2508.15734) — median Gemini Apps **text prompt** |
+| `includes-datacenter-overhead` | `true` | the paper's scope: "active AI accelerator power, host system energy, idle machine capacity, and data center energy overhead" |
+
+A vendor figure published *per prompt* is exactly what the `fixed` term is for — and
+its scope is why PUE must not be applied on top. Stated caveat: 0.24 Wh is a **median
+over a request mix**, not a per-model API figure, so using it for one model id is an
+approximation the label does not excuse.
+
+### A published figure deliberately **not** used
+
+Mistral's LCA of Mistral Large 2 (with ADEME and Carbone 4, ISO 14040/44, July 2025)
+reports **1.14 gCO2e per 400-token response**. It is not in the table because it is
+*emissions*, not energy: converting it back to kWh would need their grid intensity,
+and it includes embodied impacts, which are outside lot C's location-based Scope 2
+boundary. Citing it as an energy coefficient would be arithmetic laundering.
+
+### Self-hosted
+
+All three local entries stay at zero with `energy.source=not-accounted` — see [the
+scope boundary](#the-scope-boundary-v3-lot-c1). No coefficient is owed for a model
+the gateway cannot meter.
 
 ## The scope boundary (v3 lot C.1)
 
@@ -30,23 +130,24 @@ A coefficient of zero and *no coefficient at all* are different statements, and
 before C.1 the reports could not tell them apart. `ModelDefinition` now carries an
 `EnergySource`:
 
-| `energy-source` | Meaning | Rendered as |
+| `energy.source` | Meaning | Rendered as |
 |---|---|---|
 | `NOT_ACCOUNTED` | no coefficient; booked at zero; outside the reported totals | **"excluded from scope"** |
 | `VENDOR_PUBLISHED` | a figure published by the model vendor | "vendor-published estimate" |
-| `MODELLED` | a parametric estimate (to be sourced in lot C.4) | "modelled estimate" |
+| `MODELLED` | a sourced parametric estimate ([table](#the-coefficients-and-where-they-come-from)) | "modelled estimate" |
 
 **Self-hosted (local) egress is `NOT_ACCOUNTED` for v3** — the gateway cannot meter
 a model running next to it; that needs host counters (RAPL / NVML) and a per-model
 calibration, which is a later lot. So the three shipped Ollama entries declare
-`energy-intensity=0` with `energy-source=not-accounted`.
+`energy.source=not-accounted` and no coefficients.
 
-Two invariants keep the label and the number consistent, in the domain record
-itself:
+Two invariants keep the label and the numbers consistent, in the domain value object
+(`EnergyProfile`) itself:
 
-- a `NOT_ACCOUNTED` entry with a non-zero coefficient **fails fast at startup** —
-  an unaccounted model is booked at zero, not at a leftover number;
-- omitting `energy-source` derives it: `0` → `NOT_ACCOUNTED`, otherwise `MODELLED`.
+- a `NOT_ACCOUNTED` entry with **any** non-zero coefficient **fails fast at
+  startup** — an unaccounted model is booked at zero, not at a leftover number;
+- omitting `energy.source` derives it: all-zero → `NOT_ACCOUNTED`, otherwise
+  `MODELLED`. A negative coefficient is refused outright.
 
 **Consequence on the default all-local setup**: cost, CO2 *and avoided CO2* all read
 zero, because the premium baseline the avoided figure is measured against is itself

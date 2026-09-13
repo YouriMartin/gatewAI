@@ -18,6 +18,7 @@ import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -433,14 +434,14 @@ class RoutingAdvisorTest {
   private static ModelDefinition premiumModel() {
     return new ModelDefinition(
         "claude-sonnet", "anthropic",
-        "claude-sonnet-4-20250514", 0.015, 0.6, EnergySource.MODELLED,
+        "claude-sonnet-4-20250514", 0.015, new EnergyProfile(0.0, 0.6, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_PREMIUM);
   }
 
   private static ModelDefinition entryModel() {
     return new ModelDefinition(
         "claude-haiku", "anthropic",
-        "claude-haiku-4-20250506", 0.002, 0.15, EnergySource.MODELLED,
+        "claude-haiku-4-20250506", 0.002, new EnergyProfile(0.0, 0.15, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_ENTRY);
   }
 }

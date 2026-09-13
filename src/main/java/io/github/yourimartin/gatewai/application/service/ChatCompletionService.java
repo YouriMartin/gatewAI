@@ -18,11 +18,13 @@ import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.ModelSite;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.ResolvedCarbonZone;
+import io.github.yourimartin.gatewai.domain.model.TokenUsage;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
@@ -121,8 +123,9 @@ class ChatCompletionService
     }
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-    GreenMetrics green =
-        accountGreen(last.model(), last.totalTokens(), last.cacheHit());
+    GreenMetrics green = accountGreen(last.model(), new TokenUsage(
+        last.promptTokens(), last.completionTokens(), last.totalTokens()),
+        last.cacheHit());
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
@@ -143,7 +146,8 @@ class ChatCompletionService
   }
 
   private GreenMetrics accountGreen(LlmResponse response) {
-    return accountGreen(response.model(), response.totalTokens(), response.cacheHit());
+    return accountGreen(response.model(), new TokenUsage(response.promptTokens(),
+        response.completionTokens(), response.totalTokens()), response.cacheHit());
   }
 
   /**
@@ -152,28 +156,34 @@ class ChatCompletionService
    * they may sit behind providers in different regions, and the baseline is a
    * counterfactual about the baseline's datacenter, not about this one.
    */
-  private GreenMetrics accountGreen(String model, int totalTokens, boolean cacheHit) {
+  private GreenMetrics accountGreen(String model, TokenUsage usage, boolean cacheHit) {
     ModelDefinition used = modelRegistry.findByModelId(model).orElse(null);
     ModelDefinition premiumBaseline =
         modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
             .findFirst()
             .orElse(null);
 
-    return greenAccountant.account(used, premiumBaseline, totalTokens,
-        intensityFor(used), intensityFor(premiumBaseline), cacheHit);
+    return greenAccountant.account(
+        siteOf(used), siteOf(premiumBaseline), usage, cacheHit);
   }
 
   /**
-   * Grid intensity where {@code model} runs: the dispatch-chosen zone when the
-   * operator controls that provider, else the provider's declared region, else the
-   * gateway's own default. {@code null} for the zone means the last case — the
-   * intensity provider owns its default, and naming it here would change the value.
+   * Where {@code model} ran: the grid it drew from and the efficiency of the
+   * datacenter that hosted it (v3 lots C.2–C.4). A {@code null} zone means the
+   * gateway's own default — the intensity provider owns that value, and naming a
+   * zone here would change what it returns.
    */
-  private double intensityFor(ModelDefinition model) {
-    ResolvedCarbonZone resolved = resolveZone(model);
-    return resolved.zone() == null
+  private ModelSite siteOf(ModelDefinition model) {
+    if (model == null) {
+      return null;
+    }
+    ProviderRegion provider =
+        providerRegions.findByProvider(model.provider()).orElse(null);
+    ResolvedCarbonZone resolved = resolveZone(provider);
+    double intensity = resolved.zone() == null
         ? carbonIntensityProvider.gramsCo2PerKwh()
         : carbonIntensityProvider.gramsCo2PerKwh(resolved.zone());
+    return new ModelSite(model, intensity, provider == null ? null : provider.pue());
   }
 
   /**
@@ -182,10 +192,13 @@ class ChatCompletionService
    * distinction lot C.5 will persist.
    */
   ResolvedCarbonZone resolveZone(ModelDefinition model) {
+    return resolveZone(model == null ? null
+        : providerRegions.findByProvider(model.provider()).orElse(null));
+  }
+
+  private ResolvedCarbonZone resolveZone(ProviderRegion provider) {
     String dispatchZone = CarbonZoneContext.CURRENT.isBound()
         ? CarbonZoneContext.CURRENT.get() : null;
-    ProviderRegion provider = model == null
-        ? null : providerRegions.findByProvider(model.provider()).orElse(null);
     String providerZone = provider == null || !provider.isDeclared()
         ? null : cloudRegionZones.zoneFor(provider.region()).orElse(null);
     return carbonZoneResolver.resolve(provider, providerZone, dispatchZone);

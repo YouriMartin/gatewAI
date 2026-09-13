@@ -13,10 +13,13 @@ real traffic. Where relevant, the technical rationale is linked.
   and on an all-local setup the "CO2 avoided" figure is zero for the same reason:
   the premium baseline it compares against is itself unaccounted. Metering it needs
   host counters (RAPL / NVML) plus a per-model calibration, which is a later lot.
-- **Per-model energy coefficients are placeholders where they exist at all.** The
-  kWh-per-token values for cloud entries are rough estimates, not measured, and are
-  labelled `modelled` in every report. Absolute energy/CO2 numbers should be read as
-  **directional**, not exact.
+- **Cloud energy coefficients are sourced, not measured.** Each one is a
+  prefill/decode pair derived from a published method (EcoLogits' parametric model,
+  NVIDIA's H100 figures) or taken from a vendor's own measurement, with the source
+  and read-date recorded; reports label them `modelled` or `vendor-published`. Two
+  limits remain: for a closed model the active-parameter count is itself an estimate,
+  so the honest output is a **range** of which only the midpoint is stored; and
+  nothing here is metered at the GPU. Read absolute energy/CO2 as **directional**.
 - **Average vs marginal intensity.** Real-time intensity (when enabled) uses the
   grid **average**, while an *additional* load is actually served by the
   **marginal** plant. The greenest-zone *ranking* is reliable; the absolute gCO2
@@ -283,5 +286,6 @@ worker will queue them without execution.
 gatewAI convincingly demonstrates the *architecture and direction* of a green LLM
 gateway. The **savings logic, caching, routing and reporting are real**, and the
 runtime **runs as a cluster** (v3 lot B — one setting to change, one compose file
-to prove it); the **absolute carbon numbers are placeholders** and the **provider
+to prove it); the **absolute carbon numbers are sourced estimates rather than
+measurements** — labelled as such, per region and per provider — and the **provider
 matrix is minimal by default**. Plan accordingly.

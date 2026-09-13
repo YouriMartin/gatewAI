@@ -6,7 +6,9 @@ import io.github.yourimartin.gatewai.domain.model.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.CarbonFootprint;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.ModelSite;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.TokenUsage;
 
 /**
  * What the routing decisions would have saved against an all-premium baseline
@@ -61,14 +63,15 @@ final class SavingsEstimator {
     int unaccountedRequests = 0;
 
     for (RoutingEvaluator.Prediction prediction : predictions) {
-      long tokens = tokensFor(prediction.promptChars());
+      TokenUsage usage = usageFor(prediction.promptChars());
+      long tokens = usage.totalTokens();
       ModelDefinition routedModel = config.modelFor(prediction.tier());
 
       totalTokens += tokens;
       routedCost += cost(routedModel, tokens);
       baselineCost += cost(baselineModel, tokens);
-      routedGrams += footprint(routedModel, tokens, gridIntensity).gramsCo2();
-      baselineGrams += footprint(baselineModel, tokens, gridIntensity).gramsCo2();
+      routedGrams += footprint(routedModel, usage, gridIntensity).gramsCo2();
+      baselineGrams += footprint(baselineModel, usage, gridIntensity).gramsCo2();
       if (!routedModel.energySource().accounted()) {
         unaccountedRequests++;
       }
@@ -79,17 +82,28 @@ final class SavingsEstimator {
         routedCost, baselineCost, routedGrams, baselineGrams, unaccountedRequests);
   }
 
-  private static long tokensFor(int promptChars) {
-    return Math.round(promptChars / CHARS_PER_TOKEN) + ASSUMED_COMPLETION_TOKENS;
+  /**
+   * Prompt tokens from characters, plus the fixed completion length. Since v3 lot
+   * C.4 the two phases are priced separately, so the split has to be carried
+   * through rather than summed away.
+   */
+  private static TokenUsage usageFor(int promptChars) {
+    return TokenUsage.of((int) Math.round(promptChars / CHARS_PER_TOKEN),
+        ASSUMED_COMPLETION_TOKENS);
   }
 
   private static double cost(ModelDefinition model, long tokens) {
     return tokens / 1000.0 * model.costPer1kTokens();
   }
 
-  private static CarbonFootprint footprint(ModelDefinition model, long tokens,
+  /**
+   * The harness has no provider regions and no PUE — it scores routing, not
+   * geography — so every model is priced at the configured default intensity with
+   * the documented default PUE.
+   */
+  private static CarbonFootprint footprint(ModelDefinition model, TokenUsage usage,
                                            double gridIntensity) {
-    return CALCULATOR.estimate(model, tokens, gridIntensity);
+    return CALCULATOR.estimate(ModelSite.at(model, gridIntensity), usage);
   }
 
   /**

@@ -87,9 +87,10 @@ API and dashboard can aggregate them.
 > **Honesty note:** **self-hosted inference is excluded from scope** — its energy is
 > not metered, so it is booked at zero and *rendered as excluded*, never as
 > `0 gCO2`; on the all-local default that also makes "CO2 avoided" zero, because the
-> baseline is unaccounted too. The cloud coefficients are **placeholders**, labelled
-> as modelled estimates, and the geographic figures are *accounting*, not physical
-> relocation. Treat the absolute carbon numbers as directional. Full discussion:
+> baseline is unaccounted too. Cloud coefficients are **sourced estimates, not
+> measurements** — each one cites its method, its URL and the date it was read — and
+> the geographic figures are *accounting*, not physical relocation. Treat the
+> absolute carbon numbers as directional. Full discussion:
 > [`../technical/carbon-intensity-reliability.md`](../technical/carbon-intensity-reliability.md)
 > and [`limitations.md`](limitations.md).
 

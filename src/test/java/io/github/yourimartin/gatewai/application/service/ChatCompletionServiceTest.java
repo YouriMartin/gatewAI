@@ -19,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.TokenUsage;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
@@ -166,8 +167,7 @@ class ChatCompletionServiceTest {
     GreenMetrics metrics = new GreenMetrics(0.04, 0.00004, 0.0092, 0.01, 0.092);
 
     when(llmClient.call(request)).thenReturn(response);
-    when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
-    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(230.0), eq(false)))
+    when(greenAccountant.account(any(), any(), eq(TokenUsage.of(12, 8)), eq(false)))
         .thenReturn(metrics);
     doNothing().when(requestLogRepository).save(any());
 
@@ -186,8 +186,7 @@ class ChatCompletionServiceTest {
     GreenMetrics metrics = new GreenMetrics(0.0, 0.0, 0.0, 0.015, 0.69);
 
     when(llmClient.call(request)).thenReturn(cached);
-    when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
-    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(230.0), eq(true)))
+    when(greenAccountant.account(any(), any(), eq(TokenUsage.of(12, 8)), eq(true)))
         .thenReturn(metrics);
     doNothing().when(requestLogRepository).save(any());
 

@@ -55,8 +55,7 @@ class PropertiesModelRegistry implements ModelRegistry {
         e.getProvider(),
         e.getModelId(),
         e.getCostPer1kTokens(),
-        e.getEnergyIntensity(),
-        e.getEnergySource(),
+        e.getEnergy().toProfile(),
         e.getTier()
     );
   }
