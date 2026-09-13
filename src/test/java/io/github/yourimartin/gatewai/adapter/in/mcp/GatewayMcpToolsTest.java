@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
@@ -49,7 +50,9 @@ class GatewayMcpToolsTest {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     GreenReport report = new GreenReport(
-        from, to, 10, 4, 1.5, 0.5, 0.02, 3.0, 1.0, Map.of("haiku", 10L), Map.of());
+        from, to, 10, 4, 1.5, 0.5, 0.02, 3.0, 1.0, Map.of("haiku", 10L), Map.of(),
+        new EmissionsBreakdown(Map.of("US-MIDA-PJM", 3.0), Map.of("anthropic", 3.0),
+            List.of("US-MIDA-PJM")));
     when(greenReportUseCase.generate(from, to)).thenReturn(report);
 
     GreenReportToolResult result = tools.greenReport(
@@ -61,6 +64,12 @@ class GatewayMcpToolsTest {
     assertEquals(Map.of("haiku", 10L), result.modelMix());
     assertEquals("ALL_ACCOUNTED", result.emissionsScope());
     assertEquals(0L, result.excludedRequests());
+    // An assistant is told what basis the numbers are on, and where they came from.
+    assertTrue(result.scopeBasis().contains("Location-based Scope 2 only"),
+        result.scopeBasis());
+    assertEquals(Map.of("US-MIDA-PJM", 3.0), result.gramsCo2ByRegion());
+    assertEquals(Map.of("anthropic", 3.0), result.gramsCo2ByProvider());
+    assertEquals(List.of("US-MIDA-PJM"), result.assumedRegions());
   }
 
   @Test
@@ -69,7 +78,7 @@ class GatewayMcpToolsTest {
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     when(greenReportUseCase.generate(from, to)).thenReturn(new GreenReport(
         from, to, 5, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Map.of("qwen2.5:3b", 5L), Map.of("qwen2.5:3b", 4L)));
+        Map.of("qwen2.5:3b", 5L), Map.of("qwen2.5:3b", 4L), EmissionsBreakdown.EMPTY));
 
     GreenReportToolResult result = tools.greenReport(
         "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
@@ -84,7 +93,7 @@ class GatewayMcpToolsTest {
   @Test
   void greenReportDefaultsToTrailingThirtyDayWindow() {
     when(greenReportUseCase.generate(any(), any())).thenReturn(new GreenReport(
-        Instant.EPOCH, Instant.EPOCH, 0, 0, 0, 0, 0, 0, 0, Map.of(), Map.of()));
+        Instant.EPOCH, Instant.EPOCH, 0, 0, 0, 0, 0, 0, 0, Map.of(), Map.of(), EmissionsBreakdown.EMPTY));
 
     tools.greenReport(null, null);
 

@@ -783,7 +783,7 @@ Two tiers of knowledge, and the config must distinguish them:
   `CarbonFootprint` → `GreenMetrics` → the schema. Mistral's LCA is cited but **not**
   used as a coefficient (it is gCO2e including embodied impacts, not kWh).
 
-## C.5 — Self-describing rows, region and provider reporting
+## C.5 — Self-describing rows, region and provider reporting — ✅ done
 
 - `RequestLog` / `GreenMetrics`, the entity, and Flyway `V9__green_provenance.sql`
   gain `grid_zone`, `grid_intensity_g_per_kwh`, `energy_source`.
@@ -793,11 +793,29 @@ Two tiers of knowledge, and the config must distinguish them:
   regions were assumed rather than known.
 - Dashboard panel for the same breakdown.
 
-**Acceptance.**
-- A stored row can be re-derived from its own columns without consulting the
-  current configuration.
-- Editing a coefficient changes new rows and leaves history untouched, asserted.
-- An export naming an `ASSUMED` region says so on its face.
+**Acceptance** — all three met, `./mvnw -o verify` green (**690 tests**), and the
+whole path re-checked on a real Postgres with `V9` applied by Flyway:
+- Emissions re-derive on the row: `grams_co2 = energy_kwh x grid_intensity_g_per_kwh`,
+  asserted after an entity round-trip and on a live row
+  (0.00023925776 x 350 = 0.083740216). **Stated limit:** energy does *not* re-derive
+  from the token counts — that needs a per-row coefficient snapshot, which is three
+  more columns and is not in this batch. Written up rather than implied.
+- `editingACoefficientChangesNewRowsAndLeavesHistoryAlone`: with the decode
+  coefficient doubled between two requests, row 1 keeps 5.2e-5 kWh and its own stored
+  intensity while row 2 reads 9.2e-5. History is immutable because the *output* is
+  stored, not the model.
+- Every export names an assumed region on its face: CSV header row + per-zone note,
+  PDF basis-of-preparation bullet + section 5 confidence column, JSON/MCP
+  `assumed_regions` + `assumed_region_note`, dashboard chip. Live: `US-MIDA-PJM`
+  flagged ASSUMED next to `FR` flagged KNOWN, in the same report.
+- Live rows, three providers in one run: `anthropic`/`US-MIDA-PJM`/350/ASSUMED/
+  MODELLED/PUE 1.12, `vllm`/`FR` (mapped from `eu-west-3`)/56/KNOWN/PUE 1.15, and
+  `ollama` with no zone at 230 and `NOT_ACCOUNTED`. The report split them by region
+  and by provider, and `scope_basis` states location-based Scope 2 only.
+- Beyond the plan: five extra columns (each tied to an acceptance criterion — see
+  [`../decisions.md`](../decisions.md)), and a defect caught by reading the generated
+  PDF rather than the tests: the `unattributed` bucket was being labelled "known"
+  instead of "no region attributed".
 
 ## C.6 — ADRs, docs, and the honesty pass
 

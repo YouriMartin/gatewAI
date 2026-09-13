@@ -8,6 +8,7 @@ import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 
 /**
@@ -22,6 +23,10 @@ import io.github.yourimartin.gatewai.domain.model.GreenReport;
  * <p>Emissions excluded from scope (v3 lot C.1) are never rendered as a bare
  * zero: the emission metrics carry a scope suffix, the report header states what
  * the totals cover, and every excluded model gets its own row.
+ *
+ * <p>Since v3 lot C.5 the header also states the GHG accounting basis
+ * (location-based Scope 2 only) and names any region that was <b>assumed</b> rather
+ * than known, and two sections break the emissions down by region and by provider.
  */
 final class GreenReportCsvWriter {
 
@@ -39,8 +44,12 @@ final class GreenReportCsvWriter {
     row(csv, "Report", "Report generated", STAMP.format(Instant.now()), "", "");
     row(csv, "Report", "Basis of preparation",
         "Estimated; location-based; GWP-100; not externally assured", "", "");
+    row(csv, "Report", "GHG accounting basis", GreenReport.SCOPE_BASIS, "", "ESRS E1-6");
     row(csv, "Report", "Emissions scope", report.emissionsScope().name(), "", "");
     row(csv, "Report", "Emissions scope note", report.scopeNote(), "", "");
+    if (report.breakdown().hasAssumedRegions()) {
+      row(csv, "Report", "Assumed regions", report.assumedRegionNote(), "", "");
+    }
 
     // Energy consumption (ESRS E1-5)
     row(csv, "Energy consumption", "Total energy consumed",
@@ -89,6 +98,18 @@ final class GreenReportCsvWriter {
           EnergySource.NOT_ACCOUNTED.label());
     }
 
+    // Emissions by region and by provider, from what each row stored about itself
+    for (Map.Entry<String, Double> entry
+        : report.breakdown().gramsCo2ByRegion().entrySet()) {
+      row(csv, "GHG emissions by region", entry.getKey(),
+          num(entry.getValue() / 1000.0, 6), "kg CO2e", regionNote(report, entry.getKey()));
+    }
+    for (Map.Entry<String, Double> entry
+        : report.breakdown().gramsCo2ByProvider().entrySet()) {
+      row(csv, "GHG emissions by provider", entry.getKey(),
+          num(entry.getValue() / 1000.0, 6), "kg CO2e", "");
+    }
+
     // Activity breakdown — model mix, each row labelled with its energy scope
     for (Map.Entry<String, Long> entry : report.modelMix().entrySet()) {
       String label = report.excludedModelMix().containsKey(entry.getKey())
@@ -98,6 +119,18 @@ final class GreenReportCsvWriter {
     }
 
     return csv.toString();
+  }
+
+  /**
+   * Attribution note for one zone row. The unattributed bucket says so rather than
+   * borrowing the confidence of a real zone.
+   */
+  private static String regionNote(GreenReport report, String zone) {
+    if (GreenProvenance.UNATTRIBUTED_ZONE.equals(zone)) {
+      return "no region attributed";
+    }
+    return report.breakdown().assumedRegions().contains(zone)
+        ? "region assumed, not known" : "";
   }
 
   /**

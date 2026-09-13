@@ -22,6 +22,13 @@ export interface GreenReport {
   excluded_model_mix: Record<string, number>;
   excluded_models: string[];
   avoided_basis_note: string | null;
+  // Attribution (v3 lot C.5): read off what each row stored, so a report of an old
+  // period still describes that period rather than today's configuration.
+  scope_basis: string;
+  grams_co2_by_region: Record<string, number>;
+  grams_co2_by_provider: Record<string, number>;
+  assumed_regions: string[];
+  assumed_region_note: string | null;
 }
 
 export interface ApiClientView {

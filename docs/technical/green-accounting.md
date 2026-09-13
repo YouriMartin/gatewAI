@@ -366,10 +366,66 @@ to)` and delegates to the aggregator, resolving the label through the
 Aggregation is in-memory — fine for an MVP; a very large range would warrant a SQL
 `GROUP BY`.
 
-> **Known limit until lot C.5:** the label is read from the **current** registry, so
-> a model that has since left it resolves to accounted (never silently dropped from
-> the totals). C.5 stores `energy_source` on the row so history stops depending on
-> today's configuration.
+> **Note on the scope label:** the exclusion count is derived from the **current**
+> registry, so a model that has since left it resolves to accounted (never silently
+> dropped from the totals). Each row also stores its own `energy_source` since lot
+> C.5, which is what the regional breakdown and the export labels read.
+
+## Rows that explain themselves (v3 lot C.5)
+
+Until C.5 a report could only be read against the registry as it stood when the report
+ran: edit a coefficient or a provider region and every historical row silently changed
+meaning — the stored gCO2 stayed put while the explanation of it moved. `RequestLog`
+now carries a `GreenProvenance` (Flyway `V9__green_provenance.sql`):
+
+| Column | What it answers |
+|---|---|
+| `provider` | by-provider attribution without resolving a model id against today's registry |
+| `grid_zone` | which grid the emissions were booked at (`NULL` = the gateway's own default) |
+| `grid_intensity_g_per_kwh` | the intensity actually applied, so `grams_co2 = energy_kwh × intensity` is checkable on the row |
+| `grid_zone_source` | which step of the C.3 chain supplied the zone |
+| `dispatch_zone` | what carbon-aware dispatch chose. Set, with `grid_zone_source ≠ DISPATCH`, means **recorded and not applied** — the C.3 distinction, now in the data |
+| `region_provenance` | whether that region was a fact or an operator declaration |
+| `energy_source` | what kind of estimate the energy was |
+| `pue` | the datacenter overhead already inside `energy_kwh` |
+
+Every column is nullable, and rows written before V9 keep their NULLs: they come back
+as `GreenProvenance.UNKNOWN` and aggregate under `unattributed` / `unknown` rather
+than as a fabricated attribution.
+
+**What is deliberately not stored: the coefficient set.** `energy_kwh` is the output of
+the model in force at the time, so history is immutable by construction and editing a
+coefficient only moves new rows — asserted in `ChatCompletionServiceCarbonZoneTest`.
+But re-deriving kWh *from the token counts* would need a per-row snapshot of
+prefill/decode/fixed. That is the next step, not this one, and until it exists a row
+proves its emissions arithmetic but not its energy arithmetic.
+
+### What the reports gained
+
+`EmissionsBreakdown` (built by `ReportAggregator` from the stored rows, never from the
+live registry) carries gCO2 **by grid zone** and **by provider**, plus the zones whose
+region was only *assumed*. Every surface states the accounting basis
+(`GreenReport.SCOPE_BASIS` — location-based Scope 2 only, market-based not computed)
+and names assumed regions on its face:
+
+| Surface | Where it shows |
+|---|---|
+| JSON / MCP | `scope_basis`, `grams_co2_by_region`, `grams_co2_by_provider`, `assumed_regions`, `assumed_region_note` |
+| CSV | `Report,GHG accounting basis` and `Report,Assumed regions` header rows; `GHG emissions by region` / `by provider` sections, each zone row noting `region assumed, not known` or `no region attributed` |
+| PDF | the basis of preparation states the basis and the assumed regions; section 5 attributes emissions by zone and provider with a per-zone confidence column |
+| Dashboard | an "Emissions attribution" panel: gCO₂ by zone and by provider, with a chip on assumed or unattributed zones |
+
+A zone that emitted **nothing** still appears in the breakdown — local egress served
+traffic even though its energy is out of scope, and dropping it would make the report
+look like that traffic never happened.
+
+Measured on a real run (mock egress, three providers, `V9` applied by Flyway):
+
+| Row | Attribution | Check |
+|---|---|---|
+| `claude-opus-4-8` | `anthropic` / `US-MIDA-PJM` / 350 / **ASSUMED** / `MODELLED` / PUE 1.12 | 0.00023925776 kWh × 350 = 0.083740216 gCO2 ✓ |
+| `mistral-large` | `vllm` / **FR** (from `eu-west-3`) / 56 / **KNOWN** / `MODELLED` / PUE 1.15 | 6.9e-5 × 56 = 0.003864 ✓ |
+| `qwen2.5:0.5b` | `ollama` / no zone / 230 (gateway default) / `NOT_ACCOUNTED` | 0, excluded from scope |
 
 ## Exposure
 

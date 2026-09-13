@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -29,7 +30,7 @@ class MicrometerMetricsRecorderTest {
   private static RequestLog log(String model, int tokens, boolean cacheHit,
                                 GreenMetrics green) {
     return new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(), model,
-        "hash", 1, 1, tokens, 42L, "client", green, cacheHit);
+        "hash", 1, 1, tokens, 42L, "client", green, GreenProvenance.UNKNOWN, cacheHit);
   }
 
   @Test
@@ -61,7 +62,7 @@ class MicrometerMetricsRecorderTest {
   @Test
   void handlesNullModelAndMissingGreenMetrics() {
     recorder.record(new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(),
-        null, "hash", 0, 0, 0, 0L, "client", null, false));
+        null, "hash", 0, 0, 0, 0L, "client", null, GreenProvenance.UNKNOWN, false));
 
     assertEquals(1.0, registry.get("gatewai.requests")
         .tags("model", "unknown", "cache_hit", "false").counter().count(), DELTA);

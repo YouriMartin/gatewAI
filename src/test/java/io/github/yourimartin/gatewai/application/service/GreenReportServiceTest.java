@@ -13,6 +13,7 @@ import java.util.UUID;
 import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
@@ -49,7 +50,7 @@ class GreenReportServiceTest {
   void generatesReportFromRepositoryRows() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.now(), "haiku", "hash", 1, 1, 2, 0L,
-        "client", new GreenMetrics(0.002, 0.001, 0.46, 0.013, 0.69), false);
+        "client", new GreenMetrics(0.002, 0.001, 0.46, 0.013, 0.69), GreenProvenance.UNKNOWN, false);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
 
     GreenReport report = service.generate(FROM, TO);
@@ -64,7 +65,7 @@ class GreenReportServiceTest {
   void marksRequestsServedByUnaccountedModelsAsExcludedFromScope() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-2", Instant.now(), "qwen2.5:3b", "hash", 1, 1, 2, 0L,
-        "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0), false);
+        "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0), GreenProvenance.UNKNOWN, false);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
     when(modelRegistry.findByModelId("qwen2.5:3b")).thenReturn(Optional.of(
         new ModelDefinition("local-large", "ollama", "qwen2.5:3b", 0.0,
@@ -80,7 +81,7 @@ class GreenReportServiceTest {
   void treatsAModelMissingFromTheRegistryAsAccountedRatherThanDroppingIt() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-3", Instant.now(), "retired-model", "hash", 1, 1, 2,
-        0L, "client", new GreenMetrics(0.002, 0.001, 0.46, 0.0, 0.0), false);
+        0L, "client", new GreenMetrics(0.002, 0.001, 0.46, 0.0, 0.0), GreenProvenance.UNKNOWN, false);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
     when(modelRegistry.findByModelId("retired-model")).thenReturn(Optional.empty());
 

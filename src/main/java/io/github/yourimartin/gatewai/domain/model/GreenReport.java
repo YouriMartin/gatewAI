@@ -25,6 +25,8 @@ import java.util.Map;
  * @param modelMix             model id → number of requests it served
  * @param excludedModelMix     model id → requests served by models excluded from
  *                             scope (subset of {@code modelMix}, cache hits aside)
+ * @param breakdown            emissions by region and by provider, from what each
+ *                             row stored about itself (v3 lot C.5)
  */
 public record GreenReport(
     Instant from,
@@ -37,8 +39,20 @@ public record GreenReport(
     double totalGramsCo2,
     double totalGramsCo2Avoided,
     Map<String, Long> modelMix,
-    Map<String, Long> excludedModelMix
+    Map<String, Long> excludedModelMix,
+    EmissionsBreakdown breakdown
 ) {
+
+  /**
+   * What the emission figures are, in GHG-Protocol terms. Stated in every export:
+   * hyperscalers report location-based and market-based figures that differ by an
+   * order of magnitude, and publishing one without saying which is the same class of
+   * error as omitting the region.
+   */
+  public static final String SCOPE_BASIS =
+      "Location-based Scope 2 only (the physical grid that served each request). "
+          + "Market-based accounting — net of renewable energy certificates and PPAs "
+          + "— is not computed.";
 
   /**
    * Footnote required when emissions excluded from scope are shown next to a
@@ -53,6 +67,7 @@ public record GreenReport(
     modelMix = modelMix == null ? Map.of() : Map.copyOf(modelMix);
     excludedModelMix =
         excludedModelMix == null ? Map.of() : Map.copyOf(excludedModelMix);
+    breakdown = breakdown == null ? EmissionsBreakdown.EMPTY : breakdown;
   }
 
   /** Share of requests served from cache, in {@code [0, 1]}. */
@@ -118,6 +133,20 @@ public record GreenReport(
   /** Whether {@link #AVOIDED_BASIS_NOTE} must be shown alongside the figures. */
   public boolean avoidedBasisDiffers() {
     return excludedRequests() > 0 && totalGramsCo2Avoided > 0.0;
+  }
+
+  /**
+   * One sentence naming the regions that were assumed rather than known, or empty
+   * when every region in the report is a fact (v3 lot C.5).
+   */
+  public String assumedRegionNote() {
+    if (!breakdown.hasAssumedRegions()) {
+      return "";
+    }
+    return "Region assumed, not known, for: "
+        + String.join(", ", breakdown.assumedRegions())
+        + ". The provider does not disclose which datacenter served each request; "
+        + "these emissions are attributed to a grid the operator declared.";
   }
 
   private String joinExcluded() {

@@ -14,6 +14,7 @@ import io.github.yourimartin.gatewai.domain.model.CarbonZoneContext;
 import io.github.yourimartin.gatewai.domain.model.CarbonZoneResolver;
 import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
@@ -78,7 +79,9 @@ class ChatCompletionService
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     String promptHash = hashPrompt(request);
     String clientId = resolveClientId();
-    GreenMetrics green = accountGreen(response);
+    Accounted accounted = accountGreen(response.model(), new TokenUsage(
+        response.promptTokens(), response.completionTokens(), response.totalTokens()),
+        response.cacheHit());
 
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
@@ -91,7 +94,8 @@ class ChatCompletionService
         response.totalTokens(),
         latencyMs,
         clientId,
-        green,
+        accounted.metrics(),
+        accounted.provenance(),
         response.cacheHit()
     );
     requestLogRepository.save(log);
@@ -123,7 +127,7 @@ class ChatCompletionService
     }
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-    GreenMetrics green = accountGreen(last.model(), new TokenUsage(
+    Accounted accounted = accountGreen(last.model(), new TokenUsage(
         last.promptTokens(), last.completionTokens(), last.totalTokens()),
         last.cacheHit());
 
@@ -138,16 +142,16 @@ class ChatCompletionService
         last.totalTokens(),
         latencyMs,
         clientId,
-        green,
+        accounted.metrics(),
+        accounted.provenance(),
         last.cacheHit()
     );
     requestLogRepository.save(log);
     metricsRecorder.record(log);
   }
 
-  private GreenMetrics accountGreen(LlmResponse response) {
-    return accountGreen(response.model(), new TokenUsage(response.promptTokens(),
-        response.completionTokens(), response.totalTokens()), response.cacheHit());
+  /** The metrics of one request and the provenance that explains them (lot C.5). */
+  private record Accounted(GreenMetrics metrics, GreenProvenance provenance) {
   }
 
   /**
@@ -155,27 +159,34 @@ class ChatCompletionService
    * C.3). The served model and the premium baseline are priced <b>separately</b>:
    * they may sit behind providers in different regions, and the baseline is a
    * counterfactual about the baseline's datacenter, not about this one.
+   *
+   * <p>The served model's provenance travels back with the metrics so the row can
+   * be stored self-describing (lot C.5).
    */
-  private GreenMetrics accountGreen(String model, TokenUsage usage, boolean cacheHit) {
+  private Accounted accountGreen(String model, TokenUsage usage, boolean cacheHit) {
     ModelDefinition used = modelRegistry.findByModelId(model).orElse(null);
     ModelDefinition premiumBaseline =
         modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
             .findFirst()
             .orElse(null);
 
-    return greenAccountant.account(
-        siteOf(used), siteOf(premiumBaseline), usage, cacheHit);
+    GreenProvenance usedProvenance = provenanceOf(used);
+    GreenMetrics metrics = greenAccountant.account(
+        siteOf(used, usedProvenance),
+        siteOf(premiumBaseline, provenanceOf(premiumBaseline)),
+        usage, cacheHit);
+    return new Accounted(metrics, usedProvenance);
   }
 
   /**
-   * Where {@code model} ran: the grid it drew from and the efficiency of the
-   * datacenter that hosted it (v3 lots C.2–C.4). A {@code null} zone means the
-   * gateway's own default — the intensity provider owns that value, and naming a
+   * Where {@code model} ran and how that was decided (v3 lots C.2–C.5): the grid, the
+   * datacenter efficiency, the labels and the assumptions. A {@code null} zone means
+   * the gateway's own default — the intensity provider owns that value, and naming a
    * zone here would change what it returns.
    */
-  private ModelSite siteOf(ModelDefinition model) {
+  private GreenProvenance provenanceOf(ModelDefinition model) {
     if (model == null) {
-      return null;
+      return GreenProvenance.UNKNOWN;
     }
     ProviderRegion provider =
         providerRegions.findByProvider(model.provider()).orElse(null);
@@ -183,7 +194,21 @@ class ChatCompletionService
     double intensity = resolved.zone() == null
         ? carbonIntensityProvider.gramsCo2PerKwh()
         : carbonIntensityProvider.gramsCo2PerKwh(resolved.zone());
-    return new ModelSite(model, intensity, provider == null ? null : provider.pue());
+    return new GreenProvenance(
+        model.provider(),
+        resolved.zone(),
+        intensity,
+        resolved.source(),
+        resolved.dispatchZone(),
+        provider == null || !provider.isDeclared() ? null : provider.provenance(),
+        model.energySource(),
+        provider == null ? null : provider.pue());
+  }
+
+  /** The site view of a provenance: what the carbon model needs to price a call. */
+  private static ModelSite siteOf(ModelDefinition model, GreenProvenance provenance) {
+    return model == null ? null : new ModelSite(
+        model, provenance.gridIntensityGramsPerKwh(), provenance.pue());
   }
 
   /**

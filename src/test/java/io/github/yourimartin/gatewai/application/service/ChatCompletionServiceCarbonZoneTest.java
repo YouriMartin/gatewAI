@@ -19,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.model.CarbonZoneSource;
 import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.LlmResponse;
@@ -258,5 +259,52 @@ class ChatCompletionServiceCarbonZoneTest {
     ArgumentCaptor<RequestLog> captor = ArgumentCaptor.forClass(RequestLog.class);
     verify(requestLogRepository, times(expected)).save(captor.capture());
     return captor.getAllValues();
+  }
+
+  @Test
+  void eachRowStoresTheProvenanceThatExplainsItsOwnFigure() {
+    when(llmClient.call(any())).thenReturn(response("claude-opus-4-8", false));
+
+    ScopedValue.where(CarbonZoneContext.CURRENT, "SE").run(() -> service.complete(request()));
+
+    RequestLog log = savedLogs(1).getFirst();
+    GreenProvenance provenance = log.provenance();
+
+    assertEquals("anthropic", provenance.provider());
+    assertEquals("US-MIDA-PJM", provenance.gridZone());
+    assertEquals(US_INTENSITY, provenance.gridIntensityGramsPerKwh());
+    assertEquals(CarbonZoneSource.PROVIDER_REGION, provenance.gridZoneSource());
+    assertEquals(RegionProvenance.ASSUMED, provenance.regionProvenance());
+    assertEquals(EnergySource.MODELLED, provenance.energySource());
+    assertEquals(1.0, provenance.pue());
+    // Recorded, not applied — the C.3 distinction, now on the row (C.5).
+    assertEquals("SE", provenance.dispatchZone());
+    assertTrue(provenance.dispatchRecordedOnly());
+    // And the stored figure checks out against the stored intensity.
+    assertEquals(log.green().gramsCo2(),
+        log.green().energyKwh() * provenance.gridIntensityGramsPerKwh(), 1e-12);
+  }
+
+  @Test
+  void editingACoefficientChangesNewRowsAndLeavesHistoryAlone() {
+    when(llmClient.call(any())).thenReturn(response("claude-opus-4-8", false));
+    service.complete(request());
+
+    // The operator sources a better decode figure and doubles it.
+    ModelDefinition rebased = new ModelDefinition(
+        "claude-premium", "anthropic", "claude-opus-4-8", 0.015,
+        new EnergyProfile(0.001, 0.010, 0.0, EnergySource.MODELLED, false),
+        ModelTier.CLOUD_PREMIUM);
+    when(modelRegistry.findByModelId("claude-opus-4-8")).thenReturn(Optional.of(rebased));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM)).thenReturn(List.of(rebased));
+    service.complete(request());
+
+    List<RequestLog> logs = savedLogs(2);
+    // 12 x 0.001 + 8 x 0.005 = 5.2e-5 kWh, then 12 x 0.001 + 8 x 0.010 = 9.2e-5.
+    assertEquals(5.2e-5, logs.get(0).green().energyKwh(), 1e-12);
+    assertEquals(9.2e-5, logs.get(1).green().energyKwh(), 1e-12);
+    // History is untouched: the old row keeps its own number AND its own explanation.
+    assertEquals(5.2e-5 * US_INTENSITY, logs.get(0).green().gramsCo2(), 1e-12);
+    assertEquals(US_INTENSITY, logs.get(0).provenance().gridIntensityGramsPerKwh());
   }
 }

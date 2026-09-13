@@ -29,6 +29,12 @@ import io.github.yourimartin.gatewai.domain.model.GreenReport;
  *                             assistant never reports a zero as measured
  * @param excludedRequests     inferences served by models excluded from scope
  * @param excludedModels       the model ids behind those requests
+ * @param scopeBasis           what the figures are in GHG-Protocol terms
+ *                             (location-based Scope 2 only), so an assistant cannot
+ *                             present them as something broader
+ * @param gramsCo2ByRegion     grid zone → gCO2 (v3 lot C.5)
+ * @param gramsCo2ByProvider   provider instance → gCO2
+ * @param assumedRegions       zones whose region was declared, not known
  */
 record GreenReportToolResult(
     String from,
@@ -45,7 +51,11 @@ record GreenReportToolResult(
     String emissionsScope,
     String emissionsScopeNote,
     long excludedRequests,
-    List<String> excludedModels) {
+    List<String> excludedModels,
+    String scopeBasis,
+    Map<String, Double> gramsCo2ByRegion,
+    Map<String, Double> gramsCo2ByProvider,
+    List<String> assumedRegions) {
 
   static GreenReportToolResult from(GreenReport report) {
     return new GreenReportToolResult(
@@ -63,6 +73,10 @@ record GreenReportToolResult(
         report.emissionsScope().name(),
         report.scopeNote(),
         report.excludedRequests(),
-        report.excludedModels());
+        report.excludedModels(),
+        GreenReport.SCOPE_BASIS,
+        report.breakdown().gramsCo2ByRegion(),
+        report.breakdown().gramsCo2ByProvider(),
+        report.breakdown().assumedRegions());
   }
 }

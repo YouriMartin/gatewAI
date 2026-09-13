@@ -79,6 +79,16 @@ function barWidth(count: number): number {
   return (count / max) * 100;
 }
 
+/** Share of the largest bar in a gCO2 breakdown; 0 when nothing was emitted. */
+function co2BarWidth(grams: number, values: Record<string, number>): number {
+  const max = Math.max(...Object.values(values), 0);
+  return max <= 0 ? 0 : (grams / max) * 100;
+}
+
+function co2Label(grams: number): string {
+  return grams === 0 ? '0' : grams.toFixed(3);
+}
+
 async function download(format: 'csv' | 'pdf') {
   exportError = '';
   try {
@@ -364,6 +374,57 @@ async function revoke(id: string) {
               color="#58a6ff"
             />
           </div>
+        </div>
+      </section>
+    {/if}
+
+    {#if Object.keys(report.grams_co2_by_region).length > 0}
+      <section class="trends">
+        <h2>Emissions attribution</h2>
+        <p class="scope-note">{report.scope_basis}</p>
+        {#if report.assumed_region_note}
+          <p class="scope-note">{report.assumed_region_note}</p>
+        {/if}
+        <h3 class="sub">gCO₂ by grid zone</h3>
+        <div class="mix">
+          {#each Object.entries(report.grams_co2_by_region) as [zone, grams] (zone)}
+            <div class="mix-row">
+              <span class="mix-name">
+                {zone}
+                {#if zone === 'unattributed'}
+                  <span class="chip" title="These rows carried no region at all"
+                    >no region attributed</span
+                  >
+                {:else if report.assumed_regions.includes(zone)}
+                  <span class="chip" title="Declared by the operator, not disclosed by the provider"
+                    >region assumed</span
+                  >
+                {/if}
+              </span>
+              <div class="mix-bar">
+                <div
+                  class="mix-fill"
+                  style={`width: ${co2BarWidth(grams, report.grams_co2_by_region)}%`}
+                ></div>
+              </div>
+              <span class="mix-count">{co2Label(grams)}</span>
+            </div>
+          {/each}
+        </div>
+        <h3 class="sub">gCO₂ by provider</h3>
+        <div class="mix">
+          {#each Object.entries(report.grams_co2_by_provider) as [provider, grams] (provider)}
+            <div class="mix-row">
+              <span class="mix-name">{provider}</span>
+              <div class="mix-bar">
+                <div
+                  class="mix-fill"
+                  style={`width: ${co2BarWidth(grams, report.grams_co2_by_provider)}%`}
+                ></div>
+              </div>
+              <span class="mix-count">{co2Label(grams)}</span>
+            </div>
+          {/each}
         </div>
       </section>
     {/if}

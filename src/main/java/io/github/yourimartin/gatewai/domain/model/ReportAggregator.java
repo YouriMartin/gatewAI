@@ -5,9 +5,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Aggregates persisted {@link RequestLog} rows into a {@link GreenReport}
@@ -18,6 +20,10 @@ import java.util.Objects;
  * counted separately, so a report can state that its zero means "excluded"
  * rather than "measured zero". Cache hits are never counted as excluded — no
  * inference ran, which is a genuine zero.
+ *
+ * <p>It also splits emissions <b>by region and by provider</b> (v3 lot C.5) from what
+ * each row stored about itself — never from the registry as it stands now, which is
+ * what lets a report of last quarter still describe last quarter.
  */
 public final class ReportAggregator {
 
@@ -47,6 +53,9 @@ public final class ReportAggregator {
     double gramsCo2Avoided = 0.0;
     Map<String, Long> modelMix = new LinkedHashMap<>();
     Map<String, Long> excludedModelMix = new LinkedHashMap<>();
+    Map<String, Double> co2ByRegion = new LinkedHashMap<>();
+    Map<String, Double> co2ByProvider = new LinkedHashMap<>();
+    Set<String> assumedRegions = new LinkedHashSet<>();
 
     for (RequestLog log : logs) {
       if (log.cacheHit()) {
@@ -66,11 +75,31 @@ public final class ReportAggregator {
           excludedModelMix.merge(log.model(), 1L, Long::sum);
         }
       }
+      accumulateBreakdown(log, co2ByRegion, co2ByProvider, assumedRegions);
     }
 
     return new GreenReport(from, to, logs.size(), cacheHits,
         costEur, costAvoidedEur, energyKwh, gramsCo2, gramsCo2Avoided, modelMix,
-        excludedModelMix);
+        excludedModelMix, new EmissionsBreakdown(
+            co2ByRegion, co2ByProvider, List.copyOf(assumedRegions)));
+  }
+
+  /**
+   * Adds one row to the regional and per-provider split. A row that emitted nothing
+   * still registers its zone and provider — a zone that served traffic belongs in the
+   * breakdown even when its share is zero, which is exactly the local-egress case.
+   */
+  private static void accumulateBreakdown(RequestLog log,
+                                          Map<String, Double> co2ByRegion,
+                                          Map<String, Double> co2ByProvider,
+                                          Set<String> assumedRegions) {
+    GreenProvenance provenance = log.provenance();
+    double gramsCo2 = log.green() == null ? 0.0 : log.green().gramsCo2();
+    co2ByRegion.merge(provenance.reportingZone(), gramsCo2, Double::sum);
+    co2ByProvider.merge(provenance.reportingProvider(), gramsCo2, Double::sum);
+    if (provenance.regionAssumed()) {
+      assumedRegions.add(provenance.gridZone());
+    }
   }
 
   /**

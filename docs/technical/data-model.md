@@ -32,10 +32,25 @@ Persisted once per served request by `ChatCompletionService`
 | `cost_avoided_eur` | double | saved vs premium baseline |
 | `grams_co2_avoided` | double | saved vs premium baseline |
 | `cache_hit` | boolean | served from cache |
+| `provider` | text | provider instance that served it (v3 lot C.5), indexed, nullable |
+| `grid_zone` | varchar(64) | grid zone the emissions were booked at; `NULL` = the gateway's own default, indexed |
+| `grid_intensity_g_per_kwh` | double | the intensity actually applied, so `grams_co2 = energy_kwh × intensity` re-derives on the row |
+| `grid_zone_source` | varchar(32) | `DISPATCH` / `PROVIDER_REGION` / `GATEWAY_DEFAULT` — which step of the C.3 chain gave the zone |
+| `dispatch_zone` | varchar(64) | what carbon-aware dispatch chose; set while `grid_zone_source ≠ DISPATCH` means **recorded, not applied** |
+| `region_provenance` | varchar(16) | `KNOWN` / `ASSUMED` — was that region a fact or a declaration |
+| `energy_source` | varchar(32) | `NOT_ACCOUNTED` / `VENDOR_PUBLISHED` / `MODELLED` |
+| `pue` | double | datacenter overhead already inside `energy_kwh` |
 
-The green columns flatten the `GreenMetrics` value object. Rows are effectively
-immutable (`updatable = false`). Reporting reads them via
-`findBetween(from, to)` and aggregates in memory (`ReportAggregator`).
+The green columns flatten the `GreenMetrics` value object; the eight provenance
+columns flatten `GreenProvenance` (v3 lot C.5) and are **all nullable** — a row written
+before `V9` keeps NULLs and comes back as `GreenProvenance.UNKNOWN`, aggregating under
+`unattributed` / `unknown` rather than as a fabricated attribution. What is
+deliberately absent is the coefficient set: `energy_kwh` is the output of the model in
+force at the time, so history is immutable and a coefficient edit only moves new rows,
+but re-deriving kWh from the token counts would need a per-row snapshot of
+prefill/decode/fixed. Rows are effectively immutable (`updatable = false`). Reporting
+reads them via `findBetween(from, to)` and aggregates in memory (`ReportAggregator`),
+which is also where the by-region and by-provider splits come from.
 
 `correlation_id` comes from `CorrelationIdFilter`, which honours an inbound
 `X-Request-Id` (or generates a UUID) and always echoes it back on the response.
@@ -270,6 +285,7 @@ startup instead of silently altering a table.
 | `V6__routing_config.sql` | `routing_config`, the single-row live routing rules |
 | `V7__deferred_job.sql` | `deferred_job`, the carbon-aware queue + its claim index |
 | `V8__rate_limit_bucket.sql` | `rate_limit_bucket`, the shared Bucket4j buckets |
+| `V9__green_provenance.sql` | eight provenance columns on `request_log` + indexes on `grid_zone` and `provider` |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

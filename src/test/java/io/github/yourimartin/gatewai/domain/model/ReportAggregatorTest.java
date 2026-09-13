@@ -26,12 +26,25 @@ class ReportAggregatorTest {
         cacheHit);
   }
 
+  /** A row that records where it ran, the way the service writes it since C.5. */
+  private static RequestLog attributedLog(String model, String provider, String zone,
+                                          double co2, RegionProvenance regionProvenance) {
+    return new RequestLog(
+        UUID.randomUUID(), "corr-agg", Instant.now(), model, "hash", 10, 10, 20, 0L,
+        "client", new GreenMetrics(0.0, 0.001, co2, 0.0, 0.0),
+        new GreenProvenance(provider, zone, 350.0,
+            zone == null ? CarbonZoneSource.GATEWAY_DEFAULT
+                : CarbonZoneSource.PROVIDER_REGION,
+            null, regionProvenance, EnergySource.MODELLED, null),
+        false);
+  }
+
   private static RequestLog logAt(Instant timestamp, String model, double cost,
                                   double costAvoided, double co2,
                                   double co2Avoided, boolean cacheHit) {
     return new RequestLog(
         UUID.randomUUID(), "corr-agg", timestamp, model, "hash", 1, 1, 2, 0L, "client",
-        new GreenMetrics(cost, 0.001, co2, costAvoided, co2Avoided), cacheHit);
+        new GreenMetrics(cost, 0.001, co2, costAvoided, co2Avoided), GreenProvenance.UNKNOWN, cacheHit);
   }
 
   @Test
@@ -89,6 +102,53 @@ class ReportAggregatorTest {
     assertEquals(1, report.excludedRequests());
     assertEquals(0, report.accountedRequests());
     assertEquals(EmissionsScope.ALL_EXCLUDED, report.emissionsScope());
+  }
+
+  @Test
+  void splitsEmissionsByRegionAndByProvider() {
+    List<RequestLog> logs = List.of(
+        attributedLog("claude-opus-4-8", "anthropic", "US-MIDA-PJM", 2.0,
+            RegionProvenance.ASSUMED),
+        attributedLog("claude-opus-4-8", "anthropic", "US-MIDA-PJM", 1.0,
+            RegionProvenance.ASSUMED),
+        attributedLog("mistral-large", "vllm", "FR", 0.5, RegionProvenance.KNOWN));
+
+    GreenReport report = aggregator.aggregate(logs, FROM, TO);
+
+    assertEquals(Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
+        report.breakdown().gramsCo2ByRegion());
+    assertEquals(Map.of("anthropic", 3.0, "vllm", 0.5),
+        report.breakdown().gramsCo2ByProvider());
+    // Only the zone whose region was declared rather than known is flagged.
+    assertEquals(List.of("US-MIDA-PJM"), report.breakdown().assumedRegions());
+    assertTrue(report.assumedRegionNote().contains("US-MIDA-PJM"));
+  }
+
+  @Test
+  void aZoneThatEmittedNothingStillAppearsInTheBreakdown() {
+    // Local egress is excluded from scope, but it did serve traffic: leaving it out
+    // of the split would make the report look like it had no local activity at all.
+    GreenReport report = aggregator.aggregate(List.of(
+        attributedLog("qwen2.5:3b", "ollama", null, 0.0, null)), FROM, TO);
+
+    assertEquals(Map.of(GreenProvenance.UNATTRIBUTED_ZONE, 0.0),
+        report.breakdown().gramsCo2ByRegion());
+    assertEquals(Map.of("ollama", 0.0), report.breakdown().gramsCo2ByProvider());
+    assertTrue(report.breakdown().assumedRegions().isEmpty());
+    assertEquals("", report.assumedRegionNote());
+  }
+
+  @Test
+  void rowsWrittenBeforeLotC5AggregateWithoutAttribution() {
+    GreenReport report = aggregator.aggregate(List.of(
+        log("haiku", 0.002, 0.0, 0.46, 0.0, false)), FROM, TO);
+
+    // GreenProvenance.UNKNOWN: the emissions are counted, the attribution is not
+    // invented.
+    assertEquals(0.46, report.totalGramsCo2(), DELTA);
+    assertEquals(Map.of(GreenProvenance.UNATTRIBUTED_ZONE, 0.46),
+        report.breakdown().gramsCo2ByRegion());
+    assertEquals(Map.of("unknown", 0.46), report.breakdown().gramsCo2ByProvider());
   }
 
   @Test

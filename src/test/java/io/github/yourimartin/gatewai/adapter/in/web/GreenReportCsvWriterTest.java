@@ -8,7 +8,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +21,7 @@ class GreenReportCsvWriterTest {
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
         3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
-        Map.of("haiku", 1L, "sonnet", 2L), Map.of());
+        Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
   }
 
   /** All-local default: nothing accounted, and the report must say so. */
@@ -28,7 +30,7 @@ class GreenReportCsvWriterTest {
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
         4, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L));
+        Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L), EmissionsBreakdown.EMPTY);
   }
 
   @Test
@@ -88,7 +90,7 @@ class GreenReportCsvWriterTest {
         Instant.parse("2026-06-30T00:00:00Z"),
         4, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
         Map.of("claude-opus-4-8", 2L, "qwen2.5:3b", 2L),
-        Map.of("qwen2.5:3b", 2L));
+        Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY);
 
     String csv = GreenReportCsvWriter.toCsv(mixed);
 
@@ -98,6 +100,75 @@ class GreenReportCsvWriterTest {
     // Avoided sits next to an excluded actual: the basis note is mandatory.
     assertTrue(csv.contains("Avoided emissions basis"), csv);
     assertTrue(csv.contains("not on the same basis"), csv);
+  }
+
+  @Test
+  void statesTheGhgAccountingBasisSoNobodyReadsItAsMarketBased() {
+    String csv = GreenReportCsvWriter.toCsv(report());
+
+    assertTrue(csv.contains("GHG accounting basis"), csv);
+    assertTrue(csv.contains("Location-based Scope 2 only"), csv);
+    assertTrue(csv.contains("Market-based accounting"), csv);
+  }
+
+  @Test
+  void breaksEmissionsDownByRegionAndProviderAndFlagsAssumedRegions() {
+    GreenReport attributed = new GreenReport(
+        Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"),
+        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        Map.of("claude-opus-4-8", 2L, "mistral-large", 1L), Map.of(),
+        new EmissionsBreakdown(
+            Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
+            Map.of("anthropic", 3.0, "vllm", 0.5),
+            List.of("US-MIDA-PJM")));
+
+    String csv = GreenReportCsvWriter.toCsv(attributed);
+
+    assertTrue(csv.contains(
+        "GHG emissions by region,US-MIDA-PJM,0.003000,kg CO2e,\"region assumed, not known\"\n"),
+        csv);
+    assertTrue(csv.contains("GHG emissions by region,FR,0.000500,kg CO2e,\n"), csv);
+    assertTrue(csv.contains("GHG emissions by provider,anthropic,0.003000,kg CO2e,\n"),
+        csv);
+    assertTrue(csv.contains("GHG emissions by provider,vllm,0.000500,kg CO2e,\n"), csv);
+    // On its face, in the header, not only in a column note.
+    assertTrue(csv.contains("Report,Assumed regions,"), csv);
+    assertTrue(csv.contains("Region assumed, not known, for: US-MIDA-PJM"), csv);
+  }
+
+  @Test
+  void aReportWithNoAssumedRegionSaysNothingAboutOne() {
+    GreenReport known = new GreenReport(
+        Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"),
+        1, 0, 0.01, 0.0, 0.001, 0.5, 0.0,
+        Map.of("mistral-large", 1L), Map.of(),
+        new EmissionsBreakdown(Map.of("FR", 0.5), Map.of("vllm", 0.5), List.of()));
+
+    String csv = GreenReportCsvWriter.toCsv(known);
+
+    assertFalse(csv.contains("Assumed regions"), csv);
+    assertFalse(csv.contains("region assumed"), csv);
+  }
+
+  @Test
+  void anUnattributedRowIsReportedAsSuchRatherThanDropped() {
+    GreenReport local = new GreenReport(
+        Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"),
+        1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Map.of("qwen2.5:3b", 1L), Map.of("qwen2.5:3b", 1L),
+        new EmissionsBreakdown(Map.of(GreenProvenance.UNATTRIBUTED_ZONE, 0.0),
+            Map.of("ollama", 0.0), List.of()));
+
+    String csv = GreenReportCsvWriter.toCsv(local);
+
+    // "known" would be a false claim about a row that had no region at all.
+    assertTrue(csv.contains(
+        "GHG emissions by region,unattributed,0.000000,kg CO2e,no region attributed\n"),
+        csv);
+    assertTrue(csv.contains("GHG emissions by provider,ollama,0.000000,kg CO2e,\n"), csv);
   }
 
   /** Rows whose unit is a CO2 measure — the ones that must never read bare. */

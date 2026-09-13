@@ -22,7 +22,7 @@ class RequestLogTest {
     Instant timestamp = Instant.now();
     RequestLog log = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "abc123", 10, 5, 15, 42L,
-        "client-1", GREEN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
 
     assertEquals(id, log.id());
     assertEquals("corr-1", log.correlationId());
@@ -43,7 +43,7 @@ class RequestLogTest {
   void cacheHitIsCarried() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, "client-1", GREEN, true);
+        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, true);
 
     assertTrue(log.cacheHit());
   }
@@ -52,7 +52,7 @@ class RequestLogTest {
   void clientIdCanBeNull() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, null, GreenMetrics.ZERO, false);
+        10, 5, 15, 42L, null, GreenMetrics.ZERO, GreenProvenance.UNKNOWN, false);
 
     assertNull(log.clientId());
   }
@@ -63,7 +63,7 @@ class RequestLogTest {
     // calls, tests) have no correlation id; the log must still be valid.
     RequestLog log = new RequestLog(
         UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, "client-1", GREEN, false);
+        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, false);
 
     assertNull(log.correlationId());
   }
@@ -74,10 +74,10 @@ class RequestLogTest {
     Instant timestamp = Instant.parse("2026-01-01T00:00:00Z");
     RequestLog log1 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
-        "client-1", GREEN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
     RequestLog log2 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
-        "client-1", GREEN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
 
     assertEquals(log1, log2);
     assertEquals(log1.hashCode(), log2.hashCode());
@@ -89,10 +89,10 @@ class RequestLogTest {
     Instant timestamp = Instant.now();
     RequestLog log1 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash1", 10, 5, 15, 100L,
-        "client-1", GREEN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
     RequestLog log2 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash2", 10, 5, 15, 100L,
-        "client-1", GREEN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
 
     assertNotEquals(log1, log2);
   }

@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 
 import com.lowagie.text.pdf.PdfReader;
@@ -24,7 +26,7 @@ class GreenReportPdfWriterTest {
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
         3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
-        Map.of("haiku", 1L, "sonnet", 2L), Map.of());
+        Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
 
     byte[] pdf = GreenReportPdfWriter.toPdf(report);
 
@@ -40,7 +42,7 @@ class GreenReportPdfWriterTest {
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
         4, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L));
+        Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L), EmissionsBreakdown.EMPTY);
 
     String text = text(GreenReportPdfWriter.toPdf(report));
 
@@ -63,7 +65,7 @@ class GreenReportPdfWriterTest {
         Instant.parse("2026-06-30T00:00:00Z"),
         4, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
         Map.of("claude-opus-4-8", 2L, "qwen2.5:3b", 2L),
-        Map.of("qwen2.5:3b", 2L));
+        Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY);
 
     String text = text(GreenReportPdfWriter.toPdf(report));
 
@@ -77,13 +79,54 @@ class GreenReportPdfWriterTest {
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
         2, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
-        Map.of("claude-opus-4-8", 2L), Map.of());
+        Map.of("claude-opus-4-8", 2L), Map.of(), EmissionsBreakdown.EMPTY);
 
     String text = text(GreenReportPdfWriter.toPdf(report));
 
     assertTrue(text.contains("All inference in this period was served by "
         + "energy-accounted models"), text);
     assertFalse(text.contains("not on the same basis"), text);
+  }
+
+  @Test
+  void attributesEmissionsByRegionAndProviderAndNamesAssumedRegions()
+      throws IOException {
+    GreenReport report = new GreenReport(
+        Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"),
+        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        Map.of("claude-opus-4-8", 2L, "mistral-large", 1L), Map.of(),
+        new EmissionsBreakdown(
+            Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
+            Map.of("anthropic", 3.0, "vllm", 0.5),
+            List.of("US-MIDA-PJM")));
+
+    String text = text(GreenReportPdfWriter.toPdf(report));
+
+    assertTrue(text.contains("Emissions attribution"), text);
+    assertTrue(text.contains("US-MIDA-PJM"), text);
+    assertTrue(text.contains("assumed, not known"), text);
+    assertTrue(text.contains("anthropic"), text);
+    assertTrue(text.contains("vllm"), text);
+    // The accounting basis is on the document, not implied.
+    assertTrue(text.contains("Location-based Scope 2 only"), text);
+    assertTrue(text.contains("Region assumed, not known, for: US-MIDA-PJM"), text);
+  }
+
+  @Test
+  void anUnattributedZoneIsNotPresentedAsAKnownRegion() throws IOException {
+    GreenReport report = new GreenReport(
+        Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"),
+        1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Map.of("qwen2.5:3b", 1L), Map.of("qwen2.5:3b", 1L),
+        new EmissionsBreakdown(Map.of("unattributed", 0.0), Map.of("ollama", 0.0),
+            List.of()));
+
+    String text = text(GreenReportPdfWriter.toPdf(report));
+
+    assertTrue(text.contains("no region attributed"), text);
+    assertFalse(text.contains("unattributed 0.000000 known"), text);
   }
 
   private static String text(byte[] pdf) throws IOException {

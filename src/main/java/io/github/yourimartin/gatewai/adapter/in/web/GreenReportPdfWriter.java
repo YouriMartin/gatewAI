@@ -10,6 +10,7 @@ import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 
 import com.lowagie.text.Document;
@@ -37,6 +38,10 @@ import com.lowagie.text.pdf.PdfWriter;
  * {@link EnergySource#NOT_ACCOUNTED} are reported as <b>excluded from scope</b> —
  * in the basis of preparation, next to the emission figures and in the model mix
  * — so a zero is never presented as a measured zero.
+ *
+ * <p>Since v3 lot C.5 the basis of preparation states the GHG accounting basis
+ * (location-based Scope 2 only) and names any <b>assumed</b> region, and section 5
+ * attributes the emissions by grid zone and by provider.
  */
 final class GreenReportPdfWriter {
 
@@ -75,6 +80,7 @@ final class GreenReportPdfWriter {
       energySection(document, report);
       emissionsSection(document, report);
       efficiencySection(document, report);
+      attributionSection(document, report);
       modelMixSection(document, report);
       footer(document);
 
@@ -116,7 +122,9 @@ final class GreenReportPdfWriter {
         + "services) when served via a third-party API — classify per your "
         + "deployment."));
     doc.add(bullet("Emission factor: location-based electricity-grid carbon intensity "
-        + "(gCO2e/kWh). Greenhouse gases expressed as CO2-equivalent (GWP-100)."));
+        + "(gCO2e/kWh), taken from the grid that served each request. Greenhouse "
+        + "gases expressed as CO2-equivalent (GWP-100)."));
+    doc.add(bullet("GHG accounting basis: " + GreenReport.SCOPE_BASIS));
     doc.add(bullet("Estimation basis: energy = tokens x per-model energy intensity "
         + "(estimated coefficients); emissions = energy x grid intensity."));
     doc.add(bullet("Scope boundary: self-hosted (local) inference is EXCLUDED FROM "
@@ -124,6 +132,9 @@ final class GreenReportPdfWriter {
         + "estimated at all. Excluded activity is reported as such, never as a "
         + "measured zero."));
     doc.add(bullet("Emissions scope for this period: " + report.scopeNote()));
+    if (report.breakdown().hasAssumedRegions()) {
+      doc.add(bullet("Region attribution: " + report.assumedRegionNote()));
+    }
     doc.add(bullet("Limitations: figures are estimates from indicative coefficients, "
         + "not externally assured. They are directional and intended to support, "
         + "not replace, an audited disclosure."));
@@ -205,8 +216,67 @@ final class GreenReportPdfWriter {
     }
   }
 
+  /**
+   * Where the emissions were produced and by whom (v3 lot C.5), read off the stored
+   * rows rather than recomputed, so an export of an old period stays true to it.
+   */
+  private static void attributionSection(Document doc, GreenReport r)
+      throws DocumentException {
+    heading(doc, "5. Emissions attribution — region and provider");
+    if (r.breakdown().gramsCo2ByRegion().isEmpty()) {
+      doc.add(note("No attributed activity in this period."));
+      return;
+    }
+    PdfPTable regions = new PdfPTable(new float[]{2.4f, 1.4f, 2.2f});
+    regions.setWidthPercentage(100);
+    regions.setSpacingBefore(4);
+    regions.addCell(th("Grid zone"));
+    regions.addCell(th("kg CO2e"));
+    regions.addCell(th("Region attribution"));
+    boolean zebra = false;
+    for (Map.Entry<String, Double> entry : r.breakdown().gramsCo2ByRegion().entrySet()) {
+      String attribution = regionAttribution(r, entry.getKey());
+      regions.addCell(td(entry.getKey(), LABEL_FONT, Element.ALIGN_LEFT, zebra));
+      regions.addCell(td(fmt(entry.getValue() / 1000.0, 6), VALUE_FONT,
+          Element.ALIGN_RIGHT, zebra));
+      regions.addCell(td(attribution, LABEL_FONT, Element.ALIGN_LEFT, zebra));
+      zebra = !zebra;
+    }
+    doc.add(regions);
+
+    PdfPTable providers = new PdfPTable(new float[]{2.4f, 1.4f});
+    providers.setWidthPercentage(100);
+    providers.setSpacingBefore(8);
+    providers.addCell(th("Provider"));
+    providers.addCell(th("kg CO2e"));
+    zebra = false;
+    for (Map.Entry<String, Double> entry
+        : r.breakdown().gramsCo2ByProvider().entrySet()) {
+      providers.addCell(td(entry.getKey(), LABEL_FONT, Element.ALIGN_LEFT, zebra));
+      providers.addCell(td(fmt(entry.getValue() / 1000.0, 6), VALUE_FONT,
+          Element.ALIGN_RIGHT, zebra));
+      zebra = !zebra;
+    }
+    doc.add(providers);
+    if (r.breakdown().hasAssumedRegions()) {
+      doc.add(note(r.assumedRegionNote()));
+    }
+  }
+
+  /**
+   * How well a zone is known. The unattributed bucket is neither known nor assumed —
+   * calling it "known" would be the false claim this lot exists to prevent.
+   */
+  private static String regionAttribution(GreenReport r, String zone) {
+    if (GreenProvenance.UNATTRIBUTED_ZONE.equals(zone)) {
+      return "no region attributed";
+    }
+    return r.breakdown().assumedRegions().contains(zone)
+        ? "assumed, not known" : "known";
+  }
+
   private static void modelMixSection(Document doc, GreenReport r) throws DocumentException {
-    heading(doc, "5. Activity breakdown — model mix");
+    heading(doc, "6. Activity breakdown — model mix");
     PdfPTable t = new PdfPTable(new float[]{3f, 1.2f, 1.2f, 2f});
     t.setWidthPercentage(100);
     t.setSpacingBefore(4);

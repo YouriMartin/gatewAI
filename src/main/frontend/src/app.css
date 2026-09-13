@@ -148,6 +148,13 @@ button:disabled {
   white-space: nowrap;
 }
 
+.trends h3.sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+}
+
 /* Scope boundary (v3 lot C.1): an unaccounted zero must never look measured. */
 .scope-note {
   background: var(--panel);

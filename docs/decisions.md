@@ -7,6 +7,43 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot C — C.5 (self-describing rows, region reporting)
+
+- **Eight provenance columns, not the three the plan named.** `grid_zone`,
+  `grid_intensity_g_per_kwh` and `energy_source` were the plan's list; the other five
+  each answer an acceptance criterion the plan also set. `provider` makes the
+  by-provider breakdown possible without resolving a model id against today's
+  registry; `region_provenance` is how an export can say *for the data it is showing*
+  which regions were assumed; `grid_zone_source` and `dispatch_zone` are where C.3's
+  promised recorded-versus-applied distinction actually lands; `pue` names the
+  overhead already inside `energy_kwh`. All nullable, so pre-`V9` rows stay readable.
+- **The coefficient set is deliberately not stored.** "A row re-derives its own
+  number" is satisfied for emissions (`grams_co2 = energy_kwh x
+  grid_intensity_g_per_kwh`, asserted after a round-trip) and for immutability (a
+  coefficient edit moves new rows only, asserted). It is *not* satisfied for energy:
+  re-deriving kWh from the two token counts would need a per-row snapshot of
+  prefill/decode/fixed, which is three more columns on every request. The limit is
+  stated in `green-accounting.md` and `data-model.md` rather than quietly implied.
+- **A pre-C.5 row comes back `UNKNOWN`, not "gateway default".** The entity only
+  builds a `GreenProvenance` when at least one column is present; otherwise the row
+  aggregates under `unattributed` / `unknown`. Defaulting it to the gateway's zone
+  would have back-dated an attribution onto history that never had one.
+- **Zones that emitted nothing stay in the breakdown.** Local egress is out of scope,
+  but it served traffic; dropping its bucket would make a report look like that
+  traffic never happened. It appears with 0 gCO2 under `unattributed` / `ollama`.
+- **Found by reading the real PDF, not the test: the unattributed bucket was labelled
+  "known".** The first implementation's region column was a binary
+  assumed-or-known, so rows with *no region at all* were presented as known — the
+  exact class of false claim this lot exists to remove. Now "no region attributed", in
+  the PDF, the CSV and the dashboard chip, with a test per surface.
+- **`EmissionsBreakdown.assumedRegions` is wrapped in `List.copyOf` on top of the
+  stream's own list.** SpotBugs' `EI_EXPOSE_REP` does not recognise
+  `stream().toList()` as a defensive copy, and a record accessor hands it straight
+  out. One redundant copy of a list of at most a handful of zone ids.
+- **No new Micrometer tags.** Region and provider would be tempting as metric
+  dimensions, but zone cardinality is operator-controlled and a bad config would
+  multiply every `gatewai_*` series. Reporting reads the table instead.
+
 ## v3 lot C — C.4 (a sourced energy estimate)
 
 - **The scalar became a value object, not three loose fields.** `ModelDefinition`

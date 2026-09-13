@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 import io.github.yourimartin.gatewai.domain.port.in.GenerateGreenReportUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
@@ -48,7 +49,7 @@ class GreenReportControllerTest {
     return new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
         3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
-        Map.of("haiku", 1L, "sonnet", 2L), Map.of());
+        Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
   }
 
   @Test
@@ -72,7 +73,7 @@ class GreenReportControllerTest {
     when(useCase.generate(any(), any())).thenReturn(new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
         3, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Map.of("qwen2.5:3b", 3L), Map.of("qwen2.5:3b", 2L)));
+        Map.of("qwen2.5:3b", 3L), Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY));
 
     mockMvc.perform(get("/v1/reports/green")
             .param("from", FROM).param("to", TO)
@@ -140,5 +141,29 @@ class GreenReportControllerTest {
             .param("from", FROM).param("to", TO)
             .with(authentication(auth())))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void jsonReportCarriesTheRegionalAttributionAndTheAccountingBasis() throws Exception {
+    when(useCase.generate(any(), any())).thenReturn(new GreenReport(
+        Instant.parse(FROM), Instant.parse(TO),
+        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        Map.of("claude-opus-4-8", 2L), Map.of(),
+        new EmissionsBreakdown(
+            Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
+            Map.of("anthropic", 3.0, "vllm", 0.5),
+            List.of("US-MIDA-PJM"))));
+
+    mockMvc.perform(get("/v1/reports/green")
+            .param("from", FROM).param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.grams_co2_by_region['US-MIDA-PJM']").value(3.0))
+        .andExpect(jsonPath("$.grams_co2_by_provider.anthropic").value(3.0))
+        .andExpect(jsonPath("$.assumed_regions[0]").value("US-MIDA-PJM"))
+        .andExpect(jsonPath("$.scope_basis")
+            .value(org.hamcrest.Matchers.containsString("Location-based Scope 2 only")))
+        .andExpect(jsonPath("$.assumed_region_note")
+            .value(org.hamcrest.Matchers.containsString("US-MIDA-PJM")));
   }
 }

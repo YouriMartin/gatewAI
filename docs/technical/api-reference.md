@@ -110,7 +110,12 @@ stored in clear text until the job is deleted.
   "accounted_requests": 750, "excluded_requests": 120,
   "excluded_model_mix": {"qwen2.5:3b": 120},
   "excluded_models": ["qwen2.5:3b"],
-  "avoided_basis_note": "Avoided emissions are computed against the premium baseline, while …"
+  "avoided_basis_note": "Avoided emissions are computed against the premium baseline, while …",
+  "scope_basis": "Location-based Scope 2 only (the physical grid that served each request). Market-based accounting — net of renewable energy certificates and PPAs — is not computed.",
+  "grams_co2_by_region": {"US-MIDA-PJM": 180.4, "FR": 12.8, "unattributed": 0.0},
+  "grams_co2_by_provider": {"anthropic": 180.4, "vllm": 12.8, "ollama": 0.0},
+  "assumed_regions": ["US-MIDA-PJM"],
+  "assumed_region_note": "Region assumed, not known, for: US-MIDA-PJM. …"
 }
 ```
 
@@ -123,10 +128,19 @@ is never read as a measured zero: `NO_ACTIVITY` | `ALL_ACCOUNTED` |
 non-zero avoided figure. See
 [`green-accounting.md`](green-accounting.md#the-scope-boundary-v3-lot-c1).
 
+The attribution block (v3 lot C.5) is built from what each row **stored about
+itself**, not from the current registry, so a report of an old period still describes
+that period. `grams_co2_by_region` keys are grid zones, with rows that carried no
+region at all under `unattributed`; `assumed_regions` lists the zones whose region was
+an operator declaration rather than a fact (the direct Anthropic and OpenAI APIs do not
+disclose one). `scope_basis` is always present: these are **location-based Scope 2**
+figures only.
+
 `csv`/`pdf` return a downloadable file (`Content-Disposition: attachment`); both
-state the scope boundary on their face — the CSV in `Report,Emissions scope` rows
-and a `Scope exclusions` section, the PDF in its basis of preparation and next to
-the E1-6 figures. Bad date → `400`.
+state the scope boundary and the accounting basis on their face — the CSV in
+`Report,…` header rows plus `Scope exclusions` and `GHG emissions by region` /
+`by provider` sections, the PDF in its basis of preparation and in section 5
+("Emissions attribution"). Bad date → `400`.
 
 ### `GET /v1/reports/green/series?from=<iso>&to=<iso>`
 Returns an array of `GreenReportResponse`, **one per UTC day** (empty days
