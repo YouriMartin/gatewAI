@@ -52,6 +52,101 @@ itself:
 zero, because the premium baseline the avoided figure is measured against is itself
 unaccounted. That is the honest answer — see the rendering rules below.
 
+## Where a provider runs (v3 lot C.2)
+
+Region belongs to the **provider instance**, not to the model: every model behind
+`gatewai.providers.anthropic` runs wherever Anthropic runs. Three properties per
+instance:
+
+```properties
+gatewai.providers.vllm.type=openai-compatible
+gatewai.providers.vllm.region=eu-west-3          # cloud region id OR grid zone id
+gatewai.providers.vllm.region-provenance=known   # known | assumed (default: assumed)
+gatewai.providers.vllm.pue=1.15                  # >= 1.0; carried now, applied in C.4
+```
+
+Two tiers of knowledge, and the config keeps them apart because a report must:
+
+| | Region is | Examples |
+|---|---|---|
+| `KNOWN` | a fact — the operator picked it | Bedrock, Azure OpenAI, a vLLM box, any `openai-compatible` endpoint you host |
+| `ASSUMED` | an operator declaration | the direct Anthropic and OpenAI APIs, which do not say which datacenter served a call |
+
+Omitting `region-provenance` yields **`ASSUMED`**: a region only becomes a fact when
+someone says it is. `ProviderRegion` (domain) carries the three values, and the
+`ProviderRegions` out port exposes them — `PropertiesProviderRegions` reads the
+properties and logs the declared set at startup.
+
+**Failure modes, deliberately asymmetric:**
+
+- a referenced non-Ollama instance with **no region** → `WARN` at startup, boot
+  continues. It is then booked at the gateway's own zone, which is the defect lot C
+  exists to fix; but refusing to boot over a carbon-accounting detail would break the
+  zero-config promise. The default all-Ollama setup declares no region and warns
+  about nothing — local egress is out of carbon scope entirely (C.1);
+- `pue < 1.0` → **fails the context**, naming the property. That is not a missing
+  value, it is an impossible one: a datacenter cannot deliver more energy to its
+  servers than it draws.
+
+### Cloud region → grid zone
+
+`CloudRegionZones` (out port) translates `us-east-1` into `US-MIDA-PJM`. Resolution
+order, first hit wins:
+
+1. `gatewai.carbon.region-zones.<region>` — the operator's own mapping, and how a
+   region no release knows about gets attributed;
+2. the built-in table (below);
+3. the input itself when it already **looks like** a zone id (`FR`,
+   `US-MIDA-PJM`) — the `region` property accepts either form;
+4. nothing: an unrecognised region is logged **once** and resolves to empty, so the
+   caller falls back to the gateway's default zone. Never an exception.
+
+The built-in table, with the balancing authority that predominantly serves each
+region's known datacenter sites. **Every zone id was verified against the
+ElectricityMaps zone list** (`GET /v3/zones`, 350 zones) on **2026-09-13**:
+
+| Cloud region | Grid zone | Cloud region | Grid zone |
+|---|---|---|---|
+| `us-east-1`, `us-east-2` (AWS) | `US-MIDA-PJM` | `us-central1` (GCP) | `US-MIDW-MISO` |
+| `us-west-1` | `US-CAL-CISO` | `us-east4` | `US-MIDA-PJM` |
+| `us-west-2` | `US-NW-PACW` | `us-west1` | `US-NW-PACW` |
+| `ca-central-1` | `CA-QC` | `europe-west1` | `BE` |
+| `eu-west-1` | `IE` | `europe-west2` | `GB` |
+| `eu-west-2` | `GB` | `europe-west3` | `DE` |
+| `eu-west-3` | `FR` | `europe-west4` | `NL` |
+| `eu-central-1` | `DE` | `europe-west9` | `FR` |
+| `eu-north-1` | `SE-SE3` | `europe-north1` | `FI` |
+| `ap-northeast-1` | `JP-TK` | `asia-northeast1` | `JP-TK` |
+| `ap-southeast-1` | `SG` | `asia-southeast1` | `SG` |
+| `ap-southeast-2` | `AU-NSW` | `eastus`, `eastus2` (Azure) | `US-MIDA-PJM` |
+| `ap-south-1` | `IN-WE` | `westus2` | `US-NW-BPAT` |
+| `sa-east-1` | `BR-CS` | `northeurope` / `westeurope` | `IE` / `NL` |
+| | | `uksouth` | `GB` |
+| | | `francecentral` | `FR` |
+| | | `germanywestcentral` | `DE` |
+| | | `swedencentral` | `SE-SE3` |
+| | | `japaneast` | `JP-TK` |
+| | | `australiaeast` | `AU-NSW` |
+
+**Two limits worth naming.** A cloud region is a metro area and a grid zone is a
+balancing authority, so each row is an approximation an operator can override — not
+a published fact. And the pass-through in step 3 means a *mistyped* zone id is
+indistinguishable from one the gateway has not heard of: it is taken at face value,
+and the grid-intensity provider falls back to its default for an id it cannot price.
+Storing the resolved zone on the row (lot C.5) is what makes a wrong one visible
+afterwards.
+
+The shipped `anthropic` / `openai` instances declare `region=US-MIDA-PJM` with
+`provenance=assumed`. Neither vendor publishes which datacenter served a request;
+PJM is where the largest concentration of US-East cloud capacity sits. The
+country-level zone `US` would read as more honest but is an *aggregate* zone with no
+live data tier in ElectricityMaps (checked 2026-09-13), so it cannot be priced live
+at all.
+
+> Nothing **consumes** the region yet: lot C.3 is the resolution chain
+> (dispatch zone → provider region → gateway default) and lot C.4 is what applies
+> the PUE. C.2 is the declaration and the mapping.
+
 ## Per-request accounting
 
 `GreenAccountant.account(used, premiumBaseline, totalTokens, gridIntensity,

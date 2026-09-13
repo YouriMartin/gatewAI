@@ -340,7 +340,10 @@ embedding model's scale, not a universal constant),
 `routes[n].name` / `routes[n].tier` / `routes[n].examples[m]` (defaults with
 bilingual EN/FR examples are defined in `ClassifierProperties`).
 `gatewai.providers.<name>.*`: `type` (`anthropic`|`openai`|`openai-compatible`|`ollama`),
-`api-key`, `base-url`, `pull-model-strategy` (ollama only).
+`api-key`, `base-url`, `pull-model-strategy` (ollama only), `region`,
+`region-provenance` (`known`|`assumed`, default `assumed`) and `pue` — where the
+instance runs, for carbon attribution (see
+[`green-accounting.md`](green-accounting.md#where-a-provider-runs-v3-lot-c2)).
 `gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
 `model-id` (unique), `cost-per-1k-tokens`, `energy-intensity`, `energy-source`
 (`not-accounted`|`vendor-published`|`modelled`; omitted → derived from the

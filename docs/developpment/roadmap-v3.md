@@ -623,7 +623,7 @@ Checkstyle + SpotBugs):
   reads zero, because the premium baseline is itself unaccounted. The honest
   rendering of that is "excluded from scope", not a saving.
 
-## C.2 — Region and PUE on the provider instance
+## C.2 — Region and PUE on the provider instance — ✅ done
 
 Region belongs to the **provider instance**, not the model: every model behind
 `gatewai.providers.anthropic` runs wherever Anthropic runs.
@@ -650,11 +650,33 @@ Two tiers of knowledge, and the config must distinguish them:
 - Extend the existing fail-fast provider validation with a *warning* (not an error)
   when a non-Ollama instance declares no region.
 
-**Acceptance.**
-- Zone ids verified against the ElectricityMaps zone list on the day the table is
-  written, with that date recorded in the doc. Do not carry over a remembered id.
-- An unknown region logs once, falls back, and does not throw.
-- Boot with no region configured anywhere still succeeds.
+**Acceptance** — all three met, `./mvnw -o verify` green (**639 tests**):
+- The table's 37 regions and every zone id were checked against a live
+  `GET https://api.electricitymap.org/v3/zones` (350 zones) on **2026-09-13**, and
+  that date is recorded in `green-accounting.md` and in the adapter's javadoc. Two
+  findings changed the code: São Paulo maps to `BR-CS` (there is no `BR-SE`), and
+  the country-level `US` is an *aggregate* zone with `tier: null`, so it cannot be
+  priced live — which is why the shipped assumed region is `US-MIDA-PJM` (`TIER_A`)
+  rather than the plan's `US`. See [`../decisions.md`](../decisions.md).
+- `PropertiesCloudRegionZonesTest` pins the failure mode: an unknown region returns
+  empty, logs **exactly one** WARN naming `gatewai.carbon.region-zones`, dedupes
+  across casing/whitespace, and never throws. A config override beats the built-in
+  table and extends it to regions no release knows.
+- Boot verified on a real Postgres, four ways: shipped config (local-only registry →
+  `region <none>`, no warning, `Provider regions declared: …(assumed, no PUE)`); a
+  referenced `openai-compatible` instance with no region (**one** WARN naming
+  `gatewai.providers.vllm.region`, boot continues); the same with
+  `region=eu-west-3 / region-provenance=known / pue=1.15` (logged as
+  `region eu-west-3 (known, PUE 1.15)`, no warning — which is also the only check of
+  Spring's relaxed binding for the new enum and `Double`); and every region blanked
+  (`No egress provider declares a region…`, boot fine).
+- `pue=0.8` fails the context with `…physically impossible… Fix
+  gatewai.providers.anthropic.pue`, verified on the same boot harness. A missing
+  region warns, an impossible PUE refuses — the asymmetry is deliberate and
+  documented.
+- Beyond the plan: the `ProviderRegions` and `CloudRegionZones` **out ports** ship
+  here rather than in C.3, so the new properties are read by something and the
+  acceptance is testable. C.3 is left with the resolution chain only.
 
 ## C.3 — Resolve the intensity per request, not per gateway
 

@@ -25,6 +25,14 @@ class CarbonProperties {
    */
   private Map<String, Double> zoneIntensities = new LinkedHashMap<>();
 
+  /**
+   * Cloud region → grid zone overrides (v3 lot C.2), e.g.
+   * {@code gatewai.carbon.region-zones.us-east-1=US-MIDA-PJM}. Takes precedence
+   * over the built-in table, and is how an unmapped region gets attributed
+   * without waiting for a release.
+   */
+  private Map<String, String> regionZones = new LinkedHashMap<>();
+
   private ElectricityMaps electricityMaps = new ElectricityMaps();
 
   double getGridIntensityGramsPerKwh() {
@@ -41,6 +49,14 @@ class CarbonProperties {
 
   void setZoneIntensities(Map<String, Double> zoneIntensities) {
     this.zoneIntensities = zoneIntensities;
+  }
+
+  Map<String, String> getRegionZones() {
+    return regionZones;
+  }
+
+  void setRegionZones(Map<String, String> regionZones) {
+    this.regionZones = regionZones;
   }
 
   ElectricityMaps getElectricityMaps() {

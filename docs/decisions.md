@@ -7,6 +7,44 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot C — C.2 (region and PUE on the provider instance)
+
+- **The two out ports landed in C.2, not C.3.** The batch as planned only adds
+  properties; properties nothing reads are dead config, and the acceptance criteria
+  ("an unknown region logs once, falls back") are not testable without a consumer.
+  So `ProviderRegions` and `CloudRegionZones` (domain out ports) plus their adapters
+  ship here, and C.3 is left with what it is actually about: the resolution chain and
+  the recorded-versus-applied distinction. `ArchitectureTest` needed no new package —
+  both adapters live in already-declared ones (`infrastructure/llm`,
+  `infrastructure/carbon`).
+- **The shipped `region` for Anthropic and OpenAI is `US-MIDA-PJM`, not `US`.** The
+  plan's example used `region=US`, which reads as more honest at the right
+  granularity — but `US` is an *aggregate* zone in ElectricityMaps with
+  `tier: null` and 60 subzones, so it has no live intensity to fetch (checked against
+  `/v3/zones` on 2026-09-13). A region that cannot be priced live would quietly
+  disable the live provider for every cloud call. PJM is where the largest
+  concentration of US-East cloud capacity sits, it is `TIER_A`, and the provenance
+  label says `assumed` out loud. `gatewai.carbon.zone-intensities.US-MIDA-PJM=350`
+  ships with it so the offline default is not Europe's number.
+- **A value already shaped like a zone id is passed through verbatim**, which is what
+  makes `region=FR` and `region=US-MIDA-PJM` work without a mapping entry. The cost
+  is a limit stated in `green-accounting.md` and pinned by a test: a *mistyped* zone
+  id is indistinguishable from one the gateway has not heard of, so it is taken at
+  face value and the intensity provider falls back for an id it cannot price. C.5's
+  stored zone is what makes a wrong one visible after the fact.
+- **Asymmetric failure modes, on purpose.** A missing region only **warns** (the
+  zero-config promise: boot must not depend on carbon configuration), while
+  `pue < 1.0` **fails the context** naming the property — that is not a missing value
+  but an impossible one. Both verified on a real boot.
+- **PUE is carried, not applied, and a missing one stays `null` rather than becoming
+  1.0.** Defaulting to 1.0 would silently claim a datacenter with zero overhead,
+  which is the C.1 mistake in a different place. What an absent PUE costs is C.4's
+  decision, where the energy figure is actually computed.
+- **The built-in table is deliberately small (37 regions) and does not include
+  Bedrock/Azure OpenAI model-region aliases.** Those endpoints are configured as
+  `openai-compatible` instances with the operator's own region, which is `KNOWN` —
+  the case that needs no table.
+
 ## v3 lot C — C.1 (local egress out of scope)
 
 - **The harness's carbon-savings baseline was made conditional instead of being

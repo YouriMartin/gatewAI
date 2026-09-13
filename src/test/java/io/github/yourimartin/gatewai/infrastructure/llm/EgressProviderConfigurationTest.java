@@ -4,13 +4,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.micrometer.observation.ObservationRegistry;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.ollama.management.PullModelStrategy;
 
@@ -161,6 +169,99 @@ class EgressProviderConfigurationTest {
         localOnlyRegistry(), tools, observations))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("gatewai.providers.ollama.type");
+  }
+
+  @Test
+  void warnsButBootsWhenACloudInstanceDeclaresNoRegion() {
+    ListAppender<ILoggingEvent> logs = capture();
+    ProviderProperties providers = providers(Map.of(
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null),
+        "anthropic", entry(ProviderProperties.ProviderType.ANTHROPIC, "sk-test", null)));
+    ModelRegistry registry = registry(
+        model("ollama", "qwen2.5:0.5b", ModelTier.LOCAL),
+        model("ollama", "qwen2.5:1.5b", ModelTier.CLOUD_ENTRY),
+        model("anthropic", "claude-opus-4-8", ModelTier.CLOUD_PREMIUM));
+
+    try {
+      assertThat(configuration.create(providers, registry, tools, observations)
+          .find("anthropic")).isPresent();
+
+      List<String> warnings = warnings(logs);
+      assertThat(warnings).hasSize(1);
+      assertThat(warnings.getFirst())
+          .contains("anthropic")
+          .contains("declares no region")
+          .contains("gatewai.providers.anthropic.region");
+    } finally {
+      release(logs);
+    }
+  }
+
+  @Test
+  void aLocalOnlyGatewayWithNoRegionAnywhereBootsSilently() {
+    ListAppender<ILoggingEvent> logs = capture();
+    try {
+      // The zero-config default: local egress has no region to declare, since its
+      // energy is out of carbon scope entirely (lot C.1).
+      assertThat(configuration.create(
+          providers(Map.of("ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null))),
+          localOnlyRegistry(), tools, observations).find("ollama")).isPresent();
+
+      assertThat(warnings(logs)).isEmpty();
+    } finally {
+      release(logs);
+    }
+  }
+
+  @Test
+  void logsTheRegionAndItsProvenanceForADeclaredInstance() {
+    ListAppender<ILoggingEvent> logs = capture();
+    ProviderProperties.ProviderEntry vllm =
+        entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, null, "http://gpu:8000/v1");
+    vllm.setRegion("eu-west-3");
+    vllm.setRegionProvenance(RegionProvenance.KNOWN);
+    vllm.setPue(1.15);
+    ModelRegistry registry = registry(
+        model("ollama", "qwen2.5:0.5b", ModelTier.LOCAL),
+        model("ollama", "qwen2.5:1.5b", ModelTier.CLOUD_ENTRY),
+        model("vllm", "mistral-large", ModelTier.CLOUD_PREMIUM));
+
+    try {
+      configuration.create(providers(Map.of(
+          "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null),
+          "vllm", vllm)), registry, tools, observations);
+
+      assertThat(logs.list.stream().map(ILoggingEvent::getFormattedMessage).toList())
+          .anySatisfy(message -> assertThat(message)
+              .contains("region eu-west-3 (known, PUE 1.15)"));
+      assertThat(warnings(logs)).isEmpty();
+    } finally {
+      release(logs);
+    }
+  }
+
+  private static ListAppender<ILoggingEvent> capture() {
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger().addAppender(appender);
+    return appender;
+  }
+
+  private static void release(ListAppender<ILoggingEvent> appender) {
+    logger().detachAppender(appender);
+    appender.stop();
+  }
+
+  private static ch.qos.logback.classic.Logger logger() {
+    return ((LoggerContext) LoggerFactory.getILoggerFactory())
+        .getLogger(EgressProviderConfiguration.class);
+  }
+
+  private static List<String> warnings(ListAppender<ILoggingEvent> appender) {
+    return appender.list.stream()
+        .filter(event -> event.getLevel() == Level.WARN)
+        .map(ILoggingEvent::getFormattedMessage)
+        .toList();
   }
 
   private static ProviderProperties providers(

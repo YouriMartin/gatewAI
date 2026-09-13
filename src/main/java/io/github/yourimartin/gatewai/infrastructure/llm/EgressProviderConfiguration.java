@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.micrometer.observation.ObservationRegistry;
 
@@ -53,6 +54,11 @@ import org.springframework.context.annotation.Profile;
  *   <li>every registry entry references a declared provider instance;</li>
  *   <li>referenced instances have the credentials their type requires.</li>
  * </ul>
+ *
+ * <p>One check is a <b>warning</b>, not a failure: a referenced non-Ollama instance
+ * that declares no {@code region} (v3 lot C.2). It would be booked at the gateway's
+ * own grid zone, which is the defect lot C exists to fix — but refusing to boot over
+ * a carbon-accounting detail would break the zero-config promise.
  */
 @Configuration
 @Profile("!mock")
@@ -101,7 +107,9 @@ class EgressProviderConfiguration {
       }
       instances.put(name, new ProviderChatModels.ProviderInstance(
           entry.getType(), build(name, entry, models, tools, observations)));
-      LOG.info("Egress provider '{}' ({}) serves models {}", name, entry.getType(), keysOf(models));
+      LOG.info("Egress provider '{}' ({}) serves models {} in region {}",
+          name, entry.getType(), keysOf(models), regionSummary(entry));
+      warnOnMissingRegion(name, entry);
     });
 
     declared.keySet().stream()
@@ -110,6 +118,36 @@ class EgressProviderConfiguration {
             "Egress provider '{}' is declared but referenced by no registry entry — not built", name));
 
     return new ProviderChatModels(instances);
+  }
+
+  /**
+   * A cloud instance with no declared region is booked at the gateway's own zone
+   * (lot C.3), which is the defect lot C exists to fix — so it is reported, loudly.
+   * It stays a <b>warning</b>: zero-config boot must keep working, and the default
+   * all-Ollama setup has no region to declare (local egress is out of carbon scope
+   * entirely, see lot C.1).
+   */
+  private static void warnOnMissingRegion(String name, ProviderProperties.ProviderEntry entry) {
+    if (entry.getType() == ProviderProperties.ProviderType.OLLAMA
+        || hasText(entry.getRegion())) {
+      return;
+    }
+    LOG.warn("Egress provider '{}' ({}) declares no region: its emissions will be booked at"
+        + " the gateway's default grid zone, which is almost certainly not where it runs."
+        + " Set gatewai.providers.{}.region=<cloud region or grid zone> and"
+        + " gatewai.providers.{}.region-provenance=(known|assumed).",
+        name, entry.getType(), name, name);
+  }
+
+  /** Region, provenance and PUE as one log fragment; {@code <none>} when undeclared. */
+  private static String regionSummary(ProviderProperties.ProviderEntry entry) {
+    if (!hasText(entry.getRegion())) {
+      return "<none>";
+    }
+    RegionProvenance provenance = entry.getRegionProvenance() == null
+        ? RegionProvenance.ASSUMED : entry.getRegionProvenance();
+    String pue = entry.getPue() == null ? "no PUE declared" : "PUE " + entry.getPue();
+    return entry.getRegion() + " (" + provenance.label() + ", " + pue + ")";
   }
 
   private static void validateRegistry(ModelRegistry modelRegistry) {
