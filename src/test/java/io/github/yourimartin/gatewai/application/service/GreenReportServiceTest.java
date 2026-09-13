@@ -7,11 +7,17 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,11 +35,14 @@ class GreenReportServiceTest {
   @Mock
   private RequestLogRepository requestLogRepository;
 
+  @Mock
+  private ModelRegistry modelRegistry;
+
   private GreenReportService service;
 
   @BeforeEach
   void setUp() {
-    service = new GreenReportService(requestLogRepository);
+    service = new GreenReportService(requestLogRepository, modelRegistry);
   }
 
   @Test
@@ -49,6 +58,36 @@ class GreenReportServiceTest {
     assertEquals(FROM, report.from());
     assertEquals(0.013, report.totalCostAvoidedEur(), 1e-9);
     verify(requestLogRepository).findBetween(FROM, TO);
+  }
+
+  @Test
+  void marksRequestsServedByUnaccountedModelsAsExcludedFromScope() {
+    RequestLog log = new RequestLog(
+        UUID.randomUUID(), "corr-2", Instant.now(), "qwen2.5:3b", "hash", 1, 1, 2, 0L,
+        "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0), false);
+    when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
+    when(modelRegistry.findByModelId("qwen2.5:3b")).thenReturn(Optional.of(
+        new ModelDefinition("local-large", "ollama", "qwen2.5:3b", 0.0, 0.0,
+            EnergySource.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
+
+    GreenReport report = service.generate(FROM, TO);
+
+    assertEquals(1, report.excludedRequests());
+    assertEquals(EmissionsScope.ALL_EXCLUDED, report.emissionsScope());
+  }
+
+  @Test
+  void treatsAModelMissingFromTheRegistryAsAccountedRatherThanDroppingIt() {
+    RequestLog log = new RequestLog(
+        UUID.randomUUID(), "corr-3", Instant.now(), "retired-model", "hash", 1, 1, 2,
+        0L, "client", new GreenMetrics(0.002, 0.001, 0.46, 0.0, 0.0), false);
+    when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
+    when(modelRegistry.findByModelId("retired-model")).thenReturn(Optional.empty());
+
+    GreenReport report = service.generate(FROM, TO);
+
+    assertEquals(0, report.excludedRequests());
+    assertEquals(EmissionsScope.ALL_ACCOUNTED, report.emissionsScope());
   }
 
   @Test

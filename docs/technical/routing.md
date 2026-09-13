@@ -342,4 +342,7 @@ bilingual EN/FR examples are defined in `ClassifierProperties`).
 `gatewai.providers.<name>.*`: `type` (`anthropic`|`openai`|`openai-compatible`|`ollama`),
 `api-key`, `base-url`, `pull-model-strategy` (ollama only).
 `gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
-`model-id` (unique), `cost-per-1k-tokens`, `energy-intensity`, `tier`.
+`model-id` (unique), `cost-per-1k-tokens`, `energy-intensity`, `energy-source`
+(`not-accounted`|`vendor-published`|`modelled`; omitted → derived from the
+coefficient, and `not-accounted` on the local defaults — see
+[`green-accounting.md`](green-accounting.md#the-scope-boundary-v3-lot-c1)), `tier`.

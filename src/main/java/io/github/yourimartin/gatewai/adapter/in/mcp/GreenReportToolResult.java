@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.adapter.in.mcp;
 
+import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
@@ -20,6 +21,14 @@ import io.github.yourimartin.gatewai.domain.model.GreenReport;
  * @param totalGramsCo2        total estimated emissions actually produced
  * @param totalGramsCo2Avoided total emissions avoided vs a premium baseline
  * @param modelMix             model id → number of requests it served
+ * @param emissionsScope       how much of the period the CO2 totals cover
+ *                             (v3 lot C.1): {@code NO_ACTIVITY},
+ *                             {@code ALL_ACCOUNTED}, {@code PARTIALLY_EXCLUDED}
+ *                             or {@code ALL_EXCLUDED}
+ * @param emissionsScopeNote   one sentence stating what the totals cover, so an
+ *                             assistant never reports a zero as measured
+ * @param excludedRequests     inferences served by models excluded from scope
+ * @param excludedModels       the model ids behind those requests
  */
 record GreenReportToolResult(
     String from,
@@ -32,7 +41,11 @@ record GreenReportToolResult(
     double totalEnergyKwh,
     double totalGramsCo2,
     double totalGramsCo2Avoided,
-    Map<String, Long> modelMix) {
+    Map<String, Long> modelMix,
+    String emissionsScope,
+    String emissionsScopeNote,
+    long excludedRequests,
+    List<String> excludedModels) {
 
   static GreenReportToolResult from(GreenReport report) {
     return new GreenReportToolResult(
@@ -46,6 +59,10 @@ record GreenReportToolResult(
         report.totalEnergyKwh(),
         report.totalGramsCo2(),
         report.totalGramsCo2Avoided(),
-        report.modelMix());
+        report.modelMix(),
+        report.emissionsScope().name(),
+        report.scopeNote(),
+        report.excludedRequests(),
+        report.excludedModels());
   }
 }

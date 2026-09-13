@@ -156,7 +156,7 @@ batch 4 all six are measured.
 |---|---|
 | Routing accuracy | measured (per tier, tag and language, plus a confusion matrix) |
 | Cache accuracy | measured (false-positive / false-negative rates + a threshold sweep) |
-| Estimated savings | measured (€ and gCO2 vs an all-premium baseline) |
+| Estimated savings | measured (€ and gCO2 vs an all-premium baseline) — **not determinable on the shipped local-first registry since v3 lot C.1**, and printed as such |
 | Decision latency p50/p95 | recorded live at fixture time |
 | Escalation rate | measured since v2 batch 4 (see below) |
 | Conformal coverage | measured since v2 batch 3 (see below) |
@@ -182,6 +182,17 @@ and a constant 400 completion tokens per request whichever tier serves it
 (holding it constant is what isolates the routing decision). It runs through the
 production `CarbonCalculator` and the shipped registry coefficients, so it moves
 when they move.
+
+**Since v3 lot C.1 it also moves when the *scope* moves.** The shipped registry is
+local-first and every local entry is `NOT_ACCOUNTED`, so on the default
+configuration there is no carbon to save and none is claimed: the report prints
+`not determinable` with the reason, and `gramsCo2SavedRatioMin` is asserted only
+when the registry actually accounts its models. That guard matters beyond the
+default — with a *mixed* registry (accounted premium baseline, unaccounted local
+tiers) the naive ratio would read **100 % carbon saved** purely because the cheap
+tier is unmetered, which is exactly the false claim C.1 exists to prevent. The
+baseline value in `baselines.json` is unchanged, so a cloud-configured registry is
+still held to it.
 
 ### Escalation rate (v2 batch 4)
 
@@ -250,7 +261,9 @@ Three things the v3 run changed, and one it did not:
   both halves of that trade.
 - **The savings caveat is unchanged in kind**: 38.4 % CO2 saved comes with 7
   under-routed requests out of 100. The number is real and so is the caveat; they
-  belong in the same sentence.
+  belong in the same sentence. (That figure is from the pre-C.1 registry, which
+  gave the local tiers placeholder coefficients. On the shipped registry the same
+  run now reports the carbon saving as *not determinable* — see above.)
 
 ### What the v2 run found, and why it still matters
 

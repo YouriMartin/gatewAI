@@ -6,9 +6,17 @@ real traffic. Where relevant, the technical rationale is linked.
 
 ## Carbon figures are directional, not audited
 
-- **Per-model energy coefficients are placeholders.** The kWh-per-token values in
-  the model registry are rough estimates, not measured. Absolute energy/CO2
-  numbers should be read as **directional**, not exact.
+- **Self-hosted inference is excluded from scope.** The gateway cannot meter the
+  energy of a model running next to it, so the local registry entries — the shipped
+  default — declare `energy-source=not-accounted` and contribute **nothing** to the
+  totals. Every export says *"excluded from scope"* rather than printing `0 gCO2`,
+  and on an all-local setup the "CO2 avoided" figure is zero for the same reason:
+  the premium baseline it compares against is itself unaccounted. Metering it needs
+  host counters (RAPL / NVML) plus a per-model calibration, which is a later lot.
+- **Per-model energy coefficients are placeholders where they exist at all.** The
+  kWh-per-token values for cloud entries are rough estimates, not measured, and are
+  labelled `modelled` in every report. Absolute energy/CO2 numbers should be read as
+  **directional**, not exact.
 - **Average vs marginal intensity.** Real-time intensity (when enabled) uses the
   grid **average**, while an *additional* load is actually served by the
   **marginal** plant. The greenest-zone *ranking* is reliable; the absolute gCO2

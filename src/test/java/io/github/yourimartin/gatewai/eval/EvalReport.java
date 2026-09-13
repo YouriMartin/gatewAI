@@ -188,6 +188,9 @@ final class EvalReport {
     node.put("baselineGramsCo2", round(estimate.baselineGramsCo2()));
     node.put("gramsCo2Saved", round(estimate.gramsCo2Saved()));
     node.put("gramsCo2SavedRatio", round(estimate.gramsCo2SavedRatio()));
+    node.put("carbonAccounted", estimate.carbonAccounted());
+    node.put("baselineEnergySource", estimate.baselineEnergySource().name());
+    node.put("unaccountedRequests", estimate.unaccountedRequests());
 
     markdown.append("## Estimated savings vs an all-premium baseline\n\n")
         .append("Baseline model `").append(estimate.baselineModelId()).append("`, ")
@@ -204,13 +207,26 @@ final class EvalReport {
         .append("| gCO2 | ").append(round(estimate.routedGramsCo2())).append(" | ")
         .append(round(estimate.baselineGramsCo2())).append(" | ")
         .append(round(estimate.gramsCo2Saved())).append(" (")
-        .append(percent(estimate.gramsCo2SavedRatio())).append(") |\n\n")
+        .append(estimate.carbonAccounted()
+            ? percent(estimate.gramsCo2SavedRatio())
+            : "not determinable")
+        .append(") |\n\n")
         .append("Read this next to under-routing: ").append(routing.underRouted())
         .append(" of ").append(routing.total())
         .append(" requests went to a cheaper tier than their label, so part of what ")
         .append("this column calls a saving is answer quality given away rather than ")
         .append("efficiency gained. A gateway can always reach 100% by sending ")
         .append("everything to the smallest model.\n\n");
+
+    if (!estimate.carbonAccounted()) {
+      markdown.append("The carbon saving is **not determinable** on this registry: ")
+          .append("the baseline is ").append(estimate.baselineEnergySource().label())
+          .append(" and ").append(estimate.unaccountedRequests()).append(" of ")
+          .append(estimate.requests())
+          .append(" requests were routed to a model excluded from scope (v3 lot C.1). ")
+          .append("A ratio computed from unaccounted models would read as a saving ")
+          .append("where there is simply no measurement.\n\n");
+    }
   }
 
   void decisionLatency(LatencyStats latency) {

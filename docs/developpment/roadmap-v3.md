@@ -581,7 +581,7 @@ in the report header; dual reporting is post-v3.
   stored on the row, no report can be re-derived and every historical row silently
   changes meaning the moment someone edits a coefficient.
 
-## C.1 — Local egress out of scope, said explicitly
+## C.1 — Local egress out of scope, said explicitly — ✅ done
 
 - `energy-intensity=0` on the three Ollama registry entries.
 - New `EnergySource` enum on `ModelDefinition` (domain, no Spring):
@@ -594,12 +594,34 @@ in the report header; dual reporting is post-v3.
   is still computed against the premium baseline while the actual is *excluded*.
   The arithmetic stays correct but the two must not sit side by side unfootnoted.
 
-**Acceptance.**
-- The default all-local configuration produces a report whose CO2 totals are zero
-  **and** labelled excluded, on every export format.
-- A test asserts no renderer emits a bare zero for a `NOT_ACCOUNTED` model.
-- The avoided-CO2 footnote is present wherever an excluded actual is shown next to
-  a non-zero avoided figure.
+**Acceptance** — all three met, `./mvnw -o verify` green (**620 tests**,
+Checkstyle + SpotBugs):
+- The default all-local configuration books every tier at zero with
+  `energy-source=not-accounted`, and each format states the boundary rather than the
+  number: JSON gains `emissions_scope` / `emissions_scope_note` /
+  `accounted_requests` / `excluded_requests` / `excluded_model_mix` /
+  `excluded_models` / `avoided_basis_note`; the CSV gains `Report,Emissions scope`
+  rows, a `Scope exclusions` section and a scope suffix on every CO2 metric label;
+  the PDF gains a basis-of-preparation bullet, the scope note above the E1-6 table
+  and an "Energy accounting" column in the model mix; the dashboard shows a scope
+  banner, `excluded from scope` in place of the gCO₂ KPI and a chip per excluded
+  model; the MCP tool result carries the scope and the excluded model ids.
+- `GreenReportCsvWriterTest` walks every row whose unit is a CO2 measure in an
+  all-excluded export and fails if one reads as a bare zero;
+  `GreenReportPdfWriterTest` extracts the rendered text (OpenPDF
+  `PdfTextExtractor`) and asserts the same on the PDF.
+- The footnote (`GreenReport.AVOIDED_BASIS_NOTE`) appears exactly when
+  `avoidedBasisDiffers()` — excluded actual next to a non-zero avoided figure —
+  asserted in the CSV, PDF and JSON tests, and ADR 0006 records the interaction.
+- Found while doing it, and fixed: with a **mixed** registry the evaluation
+  harness would have reported a **100 % carbon saving** because the cheap tier is
+  unmetered. `SavingsEstimator` now refuses to publish a ratio it cannot account
+  (`carbonAccounted()`), the baseline in `baselines.json` is unchanged, and the
+  report prints `not determinable` with the reason. See
+  [`../decisions.md`](../decisions.md).
+- Consequence accepted and documented: on the default setup the "CO2 avoided" KPI
+  reads zero, because the premium baseline is itself unaccounted. The honest
+  rendering of that is "excluded from scope", not a saving.
 
 ## C.2 — Region and PUE on the provider instance
 

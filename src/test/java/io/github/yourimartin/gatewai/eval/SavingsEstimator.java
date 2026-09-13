@@ -4,6 +4,7 @@ import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.CarbonFootprint;
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
@@ -27,9 +28,13 @@ import io.github.yourimartin.gatewai.domain.model.ModelTier;
  * </ul>
  *
  * <p>With the local-first default registry every tier costs zero euros, so the
- * euro saving is legitimately zero and only the carbon saving is informative.
- * That is a property of the shipped configuration, not a broken metric: point
- * the registry at a cloud premium tier and the euro column fills in.
+ * euro saving is legitimately zero. Since v3 lot C.1 the same is true of carbon:
+ * local models are {@link EnergySource#NOT_ACCOUNTED}, so a saving against them
+ * is <b>not determinable</b> rather than zero or complete. The estimate says
+ * which of the two it is ({@link Estimate#carbonAccounted()}) instead of
+ * publishing a ratio computed from unaccounted models — a mixed registry would
+ * otherwise report a 100 % carbon saving simply because the cheap tier is
+ * unmetered. Point the registry at a cloud tier and both columns fill in.
  */
 final class SavingsEstimator {
 
@@ -53,6 +58,7 @@ final class SavingsEstimator {
     double baselineCost = 0;
     double routedGrams = 0;
     double baselineGrams = 0;
+    int unaccountedRequests = 0;
 
     for (RoutingEvaluator.Prediction prediction : predictions) {
       long tokens = tokensFor(prediction.promptChars());
@@ -63,11 +69,14 @@ final class SavingsEstimator {
       baselineCost += cost(baselineModel, tokens);
       routedGrams += footprint(routedModel, tokens, gridIntensity).gramsCo2();
       baselineGrams += footprint(baselineModel, tokens, gridIntensity).gramsCo2();
+      if (!routedModel.energySource().accounted()) {
+        unaccountedRequests++;
+      }
     }
 
     return new Estimate(predictions.size(), totalTokens, ASSUMED_COMPLETION_TOKENS,
-        gridIntensity, baselineModel.modelId(),
-        routedCost, baselineCost, routedGrams, baselineGrams);
+        gridIntensity, baselineModel.modelId(), baselineModel.energySource(),
+        routedCost, baselineCost, routedGrams, baselineGrams, unaccountedRequests);
   }
 
   private static long tokensFor(int promptChars) {
@@ -91,15 +100,19 @@ final class SavingsEstimator {
    * @param assumedCompletionTokens  the stated assumption above
    * @param gridIntensityGramsPerKwh grid intensity used, gCO2 per kWh
    * @param baselineModelId          the premium model everything is compared to
+   * @param baselineEnergySource     whether that baseline's energy is accounted
    * @param routedCost               cost of the routed mix
    * @param baselineCost             cost had everything gone to the premium tier
    * @param routedGramsCo2           carbon of the routed mix
    * @param baselineGramsCo2         carbon had everything gone premium
+   * @param unaccountedRequests      requests routed to a model excluded from scope
    */
   record Estimate(int requests, long totalTokens, int assumedCompletionTokens,
                   double gridIntensityGramsPerKwh, String baselineModelId,
+                  EnergySource baselineEnergySource,
                   double routedCost, double baselineCost,
-                  double routedGramsCo2, double baselineGramsCo2) {
+                  double routedGramsCo2, double baselineGramsCo2,
+                  int unaccountedRequests) {
 
     double costSaved() {
       return baselineCost - routedCost;
@@ -115,6 +128,15 @@ final class SavingsEstimator {
 
     double gramsCo2SavedRatio() {
       return baselineGramsCo2 == 0 ? 0 : gramsCo2Saved() / baselineGramsCo2;
+    }
+
+    /**
+     * Whether a carbon saving can be claimed at all: the baseline and every
+     * routed model must have an energy coefficient. Otherwise the ratio compares
+     * a number against a blank and means nothing (v3 lot C.1).
+     */
+    boolean carbonAccounted() {
+      return baselineEnergySource.accounted() && unaccountedRequests == 0;
     }
   }
 }

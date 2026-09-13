@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
@@ -49,7 +50,7 @@ class DelegatingChatModelTest {
 
   private void register(String modelId, String provider) {
     when(registry.findByModelId(modelId)).thenReturn(Optional.of(
-        new ModelDefinition("k", provider, modelId, 0.0, 0.0, ModelTier.CLOUD_PREMIUM)));
+        new ModelDefinition("k", provider, modelId, 0.0, 0.0, EnergySource.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
   }
 
   @Test

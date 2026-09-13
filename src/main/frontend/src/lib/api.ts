@@ -13,6 +13,15 @@ export interface GreenReport {
   total_grams_co2: number;
   total_grams_co2_avoided: number;
   model_mix: Record<string, number>;
+  // Scope boundary (v3 lot C.1): a zero CO2 total may mean "excluded from
+  // scope" rather than "measured zero", and the API says which.
+  emissions_scope: 'NO_ACTIVITY' | 'ALL_ACCOUNTED' | 'PARTIALLY_EXCLUDED' | 'ALL_EXCLUDED';
+  emissions_scope_note: string;
+  accounted_requests: number;
+  excluded_requests: number;
+  excluded_model_mix: Record<string, number>;
+  excluded_models: string[];
+  avoided_basis_note: string | null;
 }
 
 export interface ApiClientView {

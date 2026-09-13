@@ -31,3 +31,12 @@ The premium baseline is the first `CLOUD_PREMIUM` model in the registry.
   assumption must be stated when reporting. See
   [`../green-accounting.md`](../green-accounting.md) and
   [`../carbon-intensity-reliability.md`](../carbon-intensity-reliability.md).
+- **Since v3 lot C.1**, models may be *excluded from scope* (`NOT_ACCOUNTED` —
+  every self-hosted entry by default). The arithmetic above is unchanged and stays
+  correct, but the two figures are then on different bases: the actual is not
+  accounted at all while the baseline is. Wherever an excluded actual is shown next
+  to a non-zero avoided figure, the renderers print
+  `GreenReport.AVOIDED_BASIS_NOTE` — the avoided number must not be netted against
+  an unaccounted one. With the all-local default the baseline is itself unaccounted,
+  so the avoided figure is legitimately zero and rendered as excluded rather than
+  as a saving.

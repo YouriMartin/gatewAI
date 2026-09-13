@@ -22,7 +22,7 @@ class CarbonCalculatorTest {
   private static ModelDefinition model(double energyIntensity) {
     return new ModelDefinition(
         "key", "anthropic", "model-id",
-        0.015, energyIntensity, ModelTier.CLOUD_PREMIUM);
+        0.015, energyIntensity, EnergySource.MODELLED, ModelTier.CLOUD_PREMIUM);
   }
 
   @Test

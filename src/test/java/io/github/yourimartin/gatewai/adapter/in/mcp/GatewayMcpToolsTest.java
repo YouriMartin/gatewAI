@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
@@ -48,7 +49,7 @@ class GatewayMcpToolsTest {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     GreenReport report = new GreenReport(
-        from, to, 10, 4, 1.5, 0.5, 0.02, 3.0, 1.0, Map.of("haiku", 10L));
+        from, to, 10, 4, 1.5, 0.5, 0.02, 3.0, 1.0, Map.of("haiku", 10L), Map.of());
     when(greenReportUseCase.generate(from, to)).thenReturn(report);
 
     GreenReportToolResult result = tools.greenReport(
@@ -58,12 +59,32 @@ class GatewayMcpToolsTest {
     assertEquals(0.4, result.cacheHitRate(), 1e-9);
     assertEquals(3.0, result.totalGramsCo2(), 1e-9);
     assertEquals(Map.of("haiku", 10L), result.modelMix());
+    assertEquals("ALL_ACCOUNTED", result.emissionsScope());
+    assertEquals(0L, result.excludedRequests());
+  }
+
+  @Test
+  void greenReportTellsAnAssistantWhenEmissionsAreExcludedFromScope() {
+    Instant from = Instant.parse("2026-01-01T00:00:00Z");
+    Instant to = Instant.parse("2026-02-01T00:00:00Z");
+    when(greenReportUseCase.generate(from, to)).thenReturn(new GreenReport(
+        from, to, 5, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Map.of("qwen2.5:3b", 5L), Map.of("qwen2.5:3b", 4L)));
+
+    GreenReportToolResult result = tools.greenReport(
+        "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
+
+    assertEquals("ALL_EXCLUDED", result.emissionsScope());
+    assertEquals(4L, result.excludedRequests());
+    assertEquals(List.of("qwen2.5:3b"), result.excludedModels());
+    assertTrue(result.emissionsScopeNote().contains("excluded from scope"),
+        result.emissionsScopeNote());
   }
 
   @Test
   void greenReportDefaultsToTrailingThirtyDayWindow() {
     when(greenReportUseCase.generate(any(), any())).thenReturn(new GreenReport(
-        Instant.EPOCH, Instant.EPOCH, 0, 0, 0, 0, 0, 0, 0, Map.of()));
+        Instant.EPOCH, Instant.EPOCH, 0, 0, 0, 0, 0, 0, 0, Map.of(), Map.of()));
 
     tools.greenReport(null, null);
 

@@ -84,9 +84,12 @@ versus what actually happened after cache + routing.
 Each request is persisted with its cost, energy and emissions, so the reporting
 API and dashboard can aggregate them.
 
-> **Honesty note:** the per-model energy coefficients are **placeholders** and the
-> geographic figures are *accounting*, not physical relocation. Treat the absolute
-> carbon numbers as directional. Full discussion:
+> **Honesty note:** **self-hosted inference is excluded from scope** — its energy is
+> not metered, so it is booked at zero and *rendered as excluded*, never as
+> `0 gCO2`; on the all-local default that also makes "CO2 avoided" zero, because the
+> baseline is unaccounted too. The cloud coefficients are **placeholders**, labelled
+> as modelled estimates, and the geographic figures are *accounting*, not physical
+> relocation. Treat the absolute carbon numbers as directional. Full discussion:
 > [`../technical/carbon-intensity-reliability.md`](../technical/carbon-intensity-reliability.md)
 > and [`limitations.md`](limitations.md).
 
@@ -105,8 +108,10 @@ queues jobs but the worker only runs when enabled.
 The reporting API aggregates the green figures over a date range:
 
 - `GET /v1/reports/green?from=…&to=…` — totals: requests, cache hits and hit rate,
-  € cost, € avoided, energy (kWh), gCO2, gCO2 avoided, and the per-model request
-  mix. Add `&format=csv` or `&format=pdf` to download a CSRD-friendly file.
+  € cost, € avoided, energy (kWh), gCO2, gCO2 avoided, the per-model request mix,
+  and the **emissions scope** — which models were excluded and how many requests
+  they served. Add `&format=csv` or `&format=pdf` to download a CSRD-friendly file;
+  both state the scope boundary on their face.
 - `GET /v1/reports/green/series?from=…&to=…` — the same figures bucketed **per
   day**, for charts.
 

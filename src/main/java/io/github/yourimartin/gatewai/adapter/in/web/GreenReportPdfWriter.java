@@ -8,6 +8,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.GreenReport;
 
 import com.lowagie.text.Document;
@@ -30,6 +32,11 @@ import com.lowagie.text.pdf.PdfWriter;
  * <p>Honest framing matters for CSRD: the figures are <em>estimates</em>, and
  * "avoided" emissions/cost are reported as a separate efficiency indicator —
  * <b>not</b> deducted from the GHG inventory (consistent with the GHG Protocol).
+ *
+ * <p>Same rule for the scope boundary (v3 lot C.1): models whose energy is
+ * {@link EnergySource#NOT_ACCOUNTED} are reported as <b>excluded from scope</b> —
+ * in the basis of preparation, next to the emission figures and in the model mix
+ * — so a zero is never presented as a measured zero.
  */
 final class GreenReportPdfWriter {
 
@@ -64,7 +71,7 @@ final class GreenReportPdfWriter {
       document.open();
 
       header(document, report);
-      basisOfPreparation(document);
+      basisOfPreparation(document, report);
       energySection(document, report);
       emissionsSection(document, report);
       efficiencySection(document, report);
@@ -98,7 +105,8 @@ final class GreenReportPdfWriter {
     doc.add(meta);
   }
 
-  private static void basisOfPreparation(Document doc) throws DocumentException {
+  private static void basisOfPreparation(Document doc, GreenReport report)
+      throws DocumentException {
     heading(doc, "1. Basis of preparation");
     doc.add(bullet("Boundary: energy and emissions attributable to LLM inference "
         + "served through the gateway. Requests answered from the semantic cache "
@@ -111,6 +119,11 @@ final class GreenReportPdfWriter {
         + "(gCO2e/kWh). Greenhouse gases expressed as CO2-equivalent (GWP-100)."));
     doc.add(bullet("Estimation basis: energy = tokens x per-model energy intensity "
         + "(estimated coefficients); emissions = energy x grid intensity."));
+    doc.add(bullet("Scope boundary: self-hosted (local) inference is EXCLUDED FROM "
+        + "SCOPE — its energy is not metered by the gateway and is therefore not "
+        + "estimated at all. Excluded activity is reported as such, never as a "
+        + "measured zero."));
+    doc.add(bullet("Emissions scope for this period: " + report.scopeNote()));
     doc.add(bullet("Limitations: figures are estimates from indicative coefficients, "
         + "not externally assured. They are directional and intended to support, "
         + "not replace, an audited disclosure."));
@@ -131,11 +144,45 @@ final class GreenReportPdfWriter {
     double tonnes = r.totalGramsCo2() / 1_000_000.0;
     double perRequest = r.totalRequests() == 0 ? 0.0
         : r.totalGramsCo2() / r.totalRequests();
+    if (r.emissionsScope() != EmissionsScope.ALL_ACCOUNTED) {
+      doc.add(note(r.scopeNote()));
+    }
+    String scope = scopeSuffix(r);
     PdfPTable t = metricTable();
-    metricRow(t, "GHG emissions (location-based)", fmt(kg, 3) + " kg CO2e", false);
-    metricRow(t, "GHG emissions (equiv.)", fmt(tonnes, 6) + " t CO2e", true);
-    metricRow(t, "Emissions intensity", fmt(perRequest, 3) + " g CO2e / request", false);
+    metricRow(t, "GHG emissions (location-based)" + scope,
+        fmt(kg, 3) + " kg CO2e", false);
+    metricRow(t, "GHG emissions (equiv.)" + scope, fmt(tonnes, 6) + " t CO2e", true);
+    metricRow(t, "Emissions intensity" + scope,
+        fmt(perRequest, 3) + " g CO2e / request", false);
+    metricRow(t, "Inferences in scope", String.valueOf(r.accountedRequests()), true);
+    metricRow(t, "Inferences excluded from scope",
+        String.valueOf(r.excludedRequests()), false);
     doc.add(t);
+  }
+
+  /**
+   * Suffix for the avoided figure: it is derived from the same coefficients, so
+   * with part of the activity unaccounted it cannot be read as complete either.
+   */
+  private static String avoidedScopeSuffix(GreenReport r) {
+    EmissionsScope scope = r.emissionsScope();
+    return scope == EmissionsScope.ALL_ACCOUNTED || scope == EmissionsScope.NO_ACTIVITY
+        ? ""
+        : " (basis " + EnergySource.NOT_ACCOUNTED.label() + " for "
+            + r.excludedRequests() + " inference(s))";
+  }
+
+  /**
+   * Suffix that keeps an emission figure from reading as measured when part or
+   * all of the period is out of scope.
+   */
+  private static String scopeSuffix(GreenReport r) {
+    return switch (r.emissionsScope()) {
+      case NO_ACTIVITY, ALL_ACCOUNTED -> "";
+      case ALL_EXCLUDED -> " — " + EnergySource.NOT_ACCOUNTED.label();
+      case PARTIALLY_EXCLUDED -> " — excludes " + r.excludedRequests()
+          + " inference(s) out of scope";
+    };
   }
 
   private static void efficiencySection(Document doc, GreenReport r) throws DocumentException {
@@ -148,33 +195,40 @@ final class GreenReportPdfWriter {
     metricRow(t, "Requests served", String.valueOf(r.totalRequests()), false);
     metricRow(t, "Cache hit rate",
         fmt(r.cacheHitRate() * 100.0, 1) + " %", true);
-    metricRow(t, "Avoided emissions",
+    metricRow(t, "Avoided emissions" + avoidedScopeSuffix(r),
         fmt(r.totalGramsCo2Avoided() / 1000.0, 3) + " kg CO2e", false);
     metricRow(t, "Cost incurred", fmt(r.totalCostEur(), 4) + " EUR", true);
     metricRow(t, "Cost avoided", fmt(r.totalCostAvoidedEur(), 4) + " EUR", false);
     doc.add(t);
+    if (r.avoidedBasisDiffers()) {
+      doc.add(note(GreenReport.AVOIDED_BASIS_NOTE));
+    }
   }
 
   private static void modelMixSection(Document doc, GreenReport r) throws DocumentException {
     heading(doc, "5. Activity breakdown — model mix");
-    PdfPTable t = new PdfPTable(new float[]{3f, 1.2f, 1.2f});
+    PdfPTable t = new PdfPTable(new float[]{3f, 1.2f, 1.2f, 2f});
     t.setWidthPercentage(100);
     t.setSpacingBefore(4);
     t.addCell(th("Model"));
     t.addCell(th("Requests"));
     t.addCell(th("Share"));
+    t.addCell(th("Energy accounting"));
     boolean zebra = false;
     long total = Math.max(1L, r.totalRequests());
     for (Map.Entry<String, Long> e : r.modelMix().entrySet()) {
       double share = (e.getValue() * 100.0) / total;
+      String accounting = r.excludedModelMix().containsKey(e.getKey())
+          ? EnergySource.NOT_ACCOUNTED.label() : "accounted";
       t.addCell(td(e.getKey(), LABEL_FONT, Element.ALIGN_LEFT, zebra));
       t.addCell(td(String.valueOf(e.getValue()), VALUE_FONT, Element.ALIGN_RIGHT, zebra));
       t.addCell(td(fmt(share, 1) + " %", VALUE_FONT, Element.ALIGN_RIGHT, zebra));
+      t.addCell(td(accounting, LABEL_FONT, Element.ALIGN_LEFT, zebra));
       zebra = !zebra;
     }
     if (r.modelMix().isEmpty()) {
       PdfPCell empty = new PdfPCell(new Phrase("No requests in this period.", BODY_FONT));
-      empty.setColspan(3);
+      empty.setColspan(4);
       empty.setPadding(6);
       t.addCell(empty);
     }

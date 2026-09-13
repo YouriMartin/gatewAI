@@ -31,7 +31,7 @@ adapter/in/mcp
 | Tool | Role | Underlying port |
 |---|---|---|
 | `routed_chat` | Completes a prompt through the gateway; returns the answer, **the model actually selected**, the cache hit and the tokens | `ChatCompletionUseCase` |
-| `green_report` | Cost (€) and footprint (gCO2) aggregated over an ISO-8601 range (default 30 days), + avoided cost/CO2, hit rate, model mix | `GenerateGreenReportUseCase` |
+| `green_report` | Cost (€) and footprint (gCO2) aggregated over an ISO-8601 range (default 30 days), + avoided cost/CO2, hit rate, model mix, and the emissions scope (`emissionsScope` / `emissionsScopeNote` / `excludedRequests` / `excludedModels`, so an assistant never reports an unaccounted zero as measured) | `GenerateGreenReportUseCase` |
 | `carbon_intensity` | Current grid carbon intensity (gCO2-eq/kWh) for a zone | `CarbonIntensityProvider` |
 
 ## Configuration

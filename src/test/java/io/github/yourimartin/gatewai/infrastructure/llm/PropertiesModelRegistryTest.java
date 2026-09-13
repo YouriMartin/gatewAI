@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
@@ -48,6 +49,7 @@ class PropertiesModelRegistryTest {
     llama.setModelId("llama3");
     llama.setCostPer1kTokens(0.0);
     llama.setEnergyIntensity(0.05);
+    llama.setEnergySource(EnergySource.MODELLED);
     llama.setTier(ModelTier.LOCAL);
     entries.put("llama3", llama);
 
@@ -133,6 +135,29 @@ class PropertiesModelRegistryTest {
     assertTrue(result.isPresent());
     assertEquals(0.0, result.get().costPer1kTokens());
     assertEquals(0.05, result.get().energyIntensity());
+    assertEquals(EnergySource.MODELLED, result.get().energySource());
+  }
+
+  @Test
+  void anEntryWithoutAnEnergySourceDerivesItFromItsCoefficient() {
+    // The two cloud entries above declare no energy-source: a coefficient makes
+    // them modelled, while a zero would make them excluded from scope.
+    ModelRegistryProperties.ModelEntry local =
+        new ModelRegistryProperties.ModelEntry();
+    local.setProvider("ollama");
+    local.setModelId("qwen2.5:3b");
+    local.setCostPer1kTokens(0.0);
+    local.setEnergyIntensity(0.0);
+    local.setTier(ModelTier.LOCAL);
+    ModelRegistryProperties properties = new ModelRegistryProperties();
+    properties.setRegistry(new LinkedHashMap<>(Map.of("local-large", local)));
+
+    PropertiesModelRegistry localRegistry = new PropertiesModelRegistry(properties);
+
+    assertEquals(EnergySource.MODELLED,
+        registry.findByKey("claude-sonnet").orElseThrow().energySource());
+    assertEquals(EnergySource.NOT_ACCOUNTED,
+        localRegistry.findByKey("local-large").orElseThrow().energySource());
   }
 
   @Test
@@ -141,7 +166,7 @@ class PropertiesModelRegistryTest {
 
     try {
       all.add(new ModelDefinition(
-          "test", "test", "test", 0, 0, ModelTier.LOCAL));
+          "test", "test", "test", 0, 0, EnergySource.NOT_ACCOUNTED, ModelTier.LOCAL));
       // If add succeeds, test fails
       assertTrue(false, "List should be immutable");
     } catch (UnsupportedOperationException expected) {

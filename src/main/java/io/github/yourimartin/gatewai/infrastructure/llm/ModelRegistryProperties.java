@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -26,6 +27,7 @@ class ModelRegistryProperties {
     private String modelId;
     private double costPer1kTokens;
     private double energyIntensity;
+    private EnergySource energySource;
     private ModelTier tier;
 
     String getProvider() {
@@ -58,6 +60,14 @@ class ModelRegistryProperties {
 
     void setEnergyIntensity(double energyIntensity) {
       this.energyIntensity = energyIntensity;
+    }
+
+    EnergySource getEnergySource() {
+      return energySource;
+    }
+
+    void setEnergySource(EnergySource energySource) {
+      this.energySource = energySource;
     }
 
     ModelTier getTier() {

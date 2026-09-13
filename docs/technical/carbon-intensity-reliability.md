@@ -61,9 +61,17 @@ how **it** knows.
 
 1. **No physical relocation**: we choose the *accounting* zone, not a real
    multi-region execution. **Accounting** benefit, not physical.
-2. **Coarse absolute carbon**: grid intensity × `energyIntensity` coefficients
-   (kWh/token) that are **placeholders**. Good grid data does not save an
-   approximate upstream energy estimate.
+2. **Coarse absolute carbon**, and now explicitly scoped (v3 lot C.1). Each
+   registry entry carries an `energy-source` label, and the reports render it:
+   - **`NOT_ACCOUNTED`** — self-hosted (local) egress, the shipped default. Its
+     energy is not metered and not estimated, so it contributes nothing and every
+     export says *"excluded from scope"* rather than printing `0 gCO2`. Metering
+     it (RAPL / NVML host counters + per-model calibration) is a later lot.
+   - **`MODELLED`** — cloud entries, whose `energy-intensity` coefficient is still
+     a **placeholder**: good grid data does not save an approximate upstream
+     energy estimate. Sourcing those coefficients (vendor-published where it
+     exists, EcoLogits / Boavizta parametric otherwise) and splitting them into
+     prefill/decode is lot C.4.
 3. **Temporal** shifting (the `@Scheduled` worker that defers execution) =
    **real**.
 
@@ -73,7 +81,9 @@ how **it** knows.
   method as Google/Microsoft" — owning the limits.
 - **For audited carbon claims (CSRD)**, you would need to:
   - move to **marginal** intensity (WattTime);
-  - use **measured energy factors** (not the kWh/token placeholders);
+  - use **measured energy factors** (not the kWh/token placeholders) — lot C.4
+    makes the cloud figures *sourced and dated*, which is a step short of
+    measured; measuring local inference is later still;
   - have a real **multi-region execution** (regional endpoints);
   - document an auditable methodology (datacenter PUE, Scope 2/3 boundary).
 
@@ -83,4 +93,4 @@ how **it** knows.
 |---|---|
 | Do we know which zone is greenest? | Yes — the **ranking** is reliable. |
 | Are the **absolute numbers** reliable? | Moderately (marginal ≠ average, uncertain factors, revisions). |
-| Is our implementation "real"? | Temporal is real; geo = accounting; energy = placeholders. |
+| Is our implementation "real"? | Temporal is real; geo = accounting; cloud energy = labelled placeholders; local energy = **not accounted at all**, and said so. |

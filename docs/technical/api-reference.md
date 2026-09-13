@@ -104,12 +104,29 @@ stored in clear text until the job is deleted.
   "total_cost_eur": 3.91, "total_cost_avoided_eur": 5.12,
   "total_energy_kwh": 0.84, "total_grams_co2": 193.2,
   "total_grams_co2_avoided": 256.7,
-  "model_mix": {"claude-haiku-4-5": 900, "claude-opus-4-8": 380}
+  "model_mix": {"claude-haiku-4-5": 900, "claude-opus-4-8": 380},
+  "emissions_scope": "PARTIALLY_EXCLUDED",
+  "emissions_scope_note": "120 of 870 inference(s) were served by models excluded from scope (qwen2.5:3b); their energy and emissions are not included in the totals.",
+  "accounted_requests": 750, "excluded_requests": 120,
+  "excluded_model_mix": {"qwen2.5:3b": 120},
+  "excluded_models": ["qwen2.5:3b"],
+  "avoided_basis_note": "Avoided emissions are computed against the premium baseline, while …"
 }
 ```
 
-`csv`/`pdf` return a downloadable file (`Content-Disposition: attachment`). Bad
-date → `400`.
+The `emissions_scope` block (v3 lot C.1) says what the CO2 totals cover, so a zero
+is never read as a measured zero: `NO_ACTIVITY` | `ALL_ACCOUNTED` |
+`PARTIALLY_EXCLUDED` | `ALL_EXCLUDED`. Models whose `energy-source` is
+`not-accounted` — every self-hosted entry by default — are listed in
+`excluded_model_mix`; cache hits are not counted there, since no inference ran.
+`avoided_basis_note` is non-null only when an excluded actual sits next to a
+non-zero avoided figure. See
+[`green-accounting.md`](green-accounting.md#the-scope-boundary-v3-lot-c1).
+
+`csv`/`pdf` return a downloadable file (`Content-Disposition: attachment`); both
+state the scope boundary on their face — the CSV in `Report,Emissions scope` rows
+and a `Scope exclusions` section, the PDF in its basis of preparation and next to
+the E1-6 figures. Bad date → `400`.
 
 ### `GET /v1/reports/green/series?from=<iso>&to=<iso>`
 Returns an array of `GreenReportResponse`, **one per UTC day** (empty days

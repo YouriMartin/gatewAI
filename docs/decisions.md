@@ -7,6 +7,45 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot C — C.1 (local egress out of scope)
+
+- **The harness's carbon-savings baseline was made conditional instead of being
+  lowered.** Booking local egress at zero takes `gramsCo2SavedRatio` to 0 on the
+  shipped registry, which failed `savingsMeetBaseline` (floor 0.35). Lowering the
+  floor would have deleted the guard; so `SavingsEstimator.Estimate` now reports
+  `carbonAccounted()`, the floor is asserted only when it holds, and otherwise the
+  test asserts the opposite — that **no** saving is computed from unaccounted
+  models. The value in `baselines.json` is untouched. The case this protects is not
+  the default but a *mixed* registry: an accounted premium baseline over
+  unaccounted local tiers would have printed a **100 % carbon saving** simply
+  because the cheap tier is unmetered, which is the false claim C.1 exists to stop.
+  `report.md` prints `not determinable` with the reason instead of a percentage.
+- **The avoided figure is labelled too, which the batch did not ask for.** C.1
+  requires a footnote where an excluded actual sits next to a *non-zero* avoided
+  figure. But the avoided number comes from the same coefficients, so when part of
+  the activity is unaccounted it is not complete either — the CSV and PDF therefore
+  suffix the avoided metric as well (`basis excluded from scope for N inference(s)`)
+  and the dashboard replaces the gCO₂ KPI with "excluded from scope" when nothing
+  at all is accounted. A test asserts no CO2-unit row in an all-excluded CSV export
+  reads as a bare zero, and that row was the one that would have.
+- **Exclusion is derived from the current registry, not from the row.**
+  `RequestLog` has no `energy_source` column until C.5, so `GreenReportService`
+  resolves the label per served model id through `ModelRegistry`, and a model that
+  has left the registry resolves to **accounted** (never silently dropped from the
+  totals). Asserted in `GreenReportServiceTest`, documented in
+  `green-accounting.md`, and closed by C.5.
+- **`ReportAggregator` takes a domain `EnergySourceLookup`, not the `ModelRegistry`
+  port.** ArchUnit's onion rule forbids a domain *model* depending on a domain
+  *service* (the ports package), and the aggregator is a model. A one-method domain
+  interface keeps it dependency-free; the lambda that reads the registry lives in
+  the application service, where the port belongs.
+- **The `NOT_ACCOUNTED` + non-zero-coefficient combination fails fast rather than
+  being normalised to zero.** Silently zeroing a configured number hides an
+  operator mistake; `ModelDefinition`'s compact constructor throws with the offending
+  key and value. The mirror case is a convenience and not a claim: omitting
+  `energy-source` derives it (`0` → `NOT_ACCOUNTED`, else `MODELLED`), so zeroing a
+  coefficient cannot accidentally keep a "modelled" label.
+
 ## v3 lot B — B.5 (prove it, then say it)
 
 - **`NodeIdentity` went into the domain, which needs justifying.** Two adapters

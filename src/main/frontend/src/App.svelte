@@ -328,13 +328,26 @@ async function revoke(id: string) {
       </div>
       <div class="card">
         <span class="label">gCO₂ avoided</span>
-        <strong>{report.total_grams_co2_avoided.toFixed(1)}</strong>
+        {#if report.emissions_scope === 'ALL_EXCLUDED'}
+          <strong class="excluded">excluded from scope</strong>
+        {:else}
+          <strong>{report.total_grams_co2_avoided.toFixed(1)}</strong>
+        {/if}
       </div>
       <div class="card">
         <span class="label">Cache hit rate</span>
         <strong>{(report.cache_hit_rate * 100).toFixed(1)}%</strong>
       </div>
     </section>
+
+    {#if report.emissions_scope !== 'ALL_ACCOUNTED' && report.emissions_scope !== 'NO_ACTIVITY'}
+      <p class="scope-note">
+        <strong>Emissions scope:</strong> {report.emissions_scope_note}
+      </p>
+      {#if report.avoided_basis_note}
+        <p class="scope-note">{report.avoided_basis_note}</p>
+      {/if}
+    {/if}
 
     {#if series.length > 0}
       <section class="trends">
@@ -361,7 +374,14 @@ async function revoke(id: string) {
         <div class="mix">
           {#each Object.entries(report.model_mix) as [model, count] (model)}
             <div class="mix-row">
-              <span class="mix-name">{model}</span>
+              <span class="mix-name">
+                {model}
+                {#if report.excluded_model_mix[model]}
+                  <span class="chip" title="Energy not accounted — see the scope note"
+                    >excluded from scope</span
+                  >
+                {/if}
+              </span>
               <div class="mix-bar">
                 <div class="mix-fill" style={`width: ${barWidth(count)}%`}></div>
               </div>

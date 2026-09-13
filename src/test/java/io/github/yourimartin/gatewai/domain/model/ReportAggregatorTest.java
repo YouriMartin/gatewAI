@@ -16,7 +16,9 @@ class ReportAggregatorTest {
   private static final Instant FROM = Instant.parse("2026-06-01T00:00:00Z");
   private static final Instant TO = Instant.parse("2026-06-30T23:59:59Z");
 
-  private final ReportAggregator aggregator = new ReportAggregator();
+  /** Everything accounted unless a test says otherwise. */
+  private final ReportAggregator aggregator =
+      new ReportAggregator(modelId -> EnergySource.MODELLED);
 
   private static RequestLog log(String model, double cost, double costAvoided,
                                 double co2, double co2Avoided, boolean cacheHit) {
@@ -52,6 +54,41 @@ class ReportAggregatorTest {
     assertEquals(1.61, report.totalGramsCo2(), DELTA);
     assertEquals(1.84, report.totalGramsCo2Avoided(), DELTA);
     assertEquals(Map.of("haiku", 1L, "sonnet", 2L), report.modelMix());
+    assertTrue(report.excludedModelMix().isEmpty());
+    assertEquals(EmissionsScope.ALL_ACCOUNTED, report.emissionsScope());
+  }
+
+  @Test
+  void countsRequestsServedByUnaccountedModelsAsOutOfScope() {
+    ReportAggregator localAggregator = new ReportAggregator(
+        modelId -> modelId.startsWith("qwen")
+            ? EnergySource.NOT_ACCOUNTED : EnergySource.MODELLED);
+    List<RequestLog> logs = List.of(
+        log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false),
+        log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false),
+        log("claude-opus-4-8", 0.015, 0.0, 1.15, 0.0, false));
+
+    GreenReport report = localAggregator.aggregate(logs, FROM, TO);
+
+    assertEquals(Map.of("qwen2.5:3b", 2L), report.excludedModelMix());
+    assertEquals(2, report.excludedRequests());
+    assertEquals(1, report.accountedRequests());
+    assertEquals(EmissionsScope.PARTIALLY_EXCLUDED, report.emissionsScope());
+  }
+
+  @Test
+  void cacheHitsAreNotCountedAsExcludedBecauseNoInferenceRan() {
+    ReportAggregator localAggregator =
+        new ReportAggregator(modelId -> EnergySource.NOT_ACCOUNTED);
+    List<RequestLog> logs = List.of(
+        log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, true),
+        log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false));
+
+    GreenReport report = localAggregator.aggregate(logs, FROM, TO);
+
+    assertEquals(1, report.excludedRequests());
+    assertEquals(0, report.accountedRequests());
+    assertEquals(EmissionsScope.ALL_EXCLUDED, report.emissionsScope());
   }
 
   @Test

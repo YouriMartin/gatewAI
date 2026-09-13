@@ -48,7 +48,7 @@ class GreenReportControllerTest {
     return new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
         3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
-        Map.of("haiku", 1L, "sonnet", 2L));
+        Map.of("haiku", 1L, "sonnet", 2L), Map.of());
   }
 
   @Test
@@ -62,7 +62,28 @@ class GreenReportControllerTest {
         .andExpect(jsonPath("$.total_requests").value(3))
         .andExpect(jsonPath("$.cache_hits").value(1))
         .andExpect(jsonPath("$.total_cost_avoided_eur").value(0.028))
-        .andExpect(jsonPath("$.model_mix.sonnet").value(2));
+        .andExpect(jsonPath("$.model_mix.sonnet").value(2))
+        .andExpect(jsonPath("$.emissions_scope").value("ALL_ACCOUNTED"))
+        .andExpect(jsonPath("$.excluded_requests").value(0));
+  }
+
+  @Test
+  void jsonReportCarriesTheScopeBoundaryWhenModelsAreExcluded() throws Exception {
+    when(useCase.generate(any(), any())).thenReturn(new GreenReport(
+        Instant.parse(FROM), Instant.parse(TO),
+        3, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Map.of("qwen2.5:3b", 3L), Map.of("qwen2.5:3b", 2L)));
+
+    mockMvc.perform(get("/v1/reports/green")
+            .param("from", FROM).param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total_grams_co2").value(0.0))
+        .andExpect(jsonPath("$.emissions_scope").value("ALL_EXCLUDED"))
+        .andExpect(jsonPath("$.excluded_requests").value(2))
+        .andExpect(jsonPath("$.excluded_models[0]").value("qwen2.5:3b"))
+        .andExpect(jsonPath("$.emissions_scope_note")
+            .value(org.hamcrest.Matchers.containsString("excluded from scope")));
   }
 
   @Test

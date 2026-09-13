@@ -327,9 +327,21 @@ class EvaluationHarnessTest {
   }
 
   @Test
-  @DisplayName("routing still saves the carbon it claims to")
+  @DisplayName("routing still saves the carbon it claims to, when carbon is accounted")
   void savingsMeetBaseline() {
-    assertMetric("gramsCo2SavedRatioMin", savings.gramsCo2SavedRatio());
+    if (savings.carbonAccounted()) {
+      assertMetric("gramsCo2SavedRatioMin", savings.gramsCo2SavedRatio());
+      return;
+    }
+    // Local-first default registry: every tier is NOT_ACCOUNTED since v3 lot C.1,
+    // so there is no carbon saving to floor — and none may be claimed either. The
+    // baseline above still guards a registry that accounts its models.
+    assertEquals(0.0, savings.gramsCo2SavedRatio(), 1e-9,
+        "no model in the registry accounts its energy, yet a carbon saving was "
+            + "computed: an unaccounted model must not look like a green one");
+    assertTrue(savings.unaccountedRequests() > 0
+            || !savings.baselineEnergySource().accounted(),
+        "carbonAccounted() is false but nothing is actually excluded from scope");
   }
 
   @Test

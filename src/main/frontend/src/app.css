@@ -148,6 +148,34 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* Scope boundary (v3 lot C.1): an unaccounted zero must never look measured. */
+.scope-note {
+  background: var(--panel);
+  border-left: 3px solid var(--muted);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.card strong.excluded {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.chip {
+  border: 1px solid var(--muted);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
+}
+
 .mix-bar {
   background: #0d1117;
   border-radius: 4px;

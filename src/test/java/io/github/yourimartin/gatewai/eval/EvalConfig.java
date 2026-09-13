@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
+import io.github.yourimartin.gatewai.domain.model.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
@@ -145,8 +146,19 @@ final class EvalConfig {
         entry.getOrDefault("model-id", ""),
         Double.parseDouble(entry.getOrDefault("cost-per-1k-tokens", "0")),
         Double.parseDouble(entry.getOrDefault("energy-intensity", "0")),
+        energySource(entry.get("energy-source")),
         tier(entry.get("tier")))));
     return List.copyOf(models);
+  }
+
+  /**
+   * Parses {@code energy-source}; {@code null} lets {@link ModelDefinition} derive
+   * it from the coefficient, exactly as Spring binding does when it is omitted.
+   */
+  private static EnergySource energySource(String raw) {
+    return raw == null || raw.isBlank()
+        ? null
+        : EnergySource.valueOf(raw.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
   }
 
   /** The model the router would pick for {@code tier}: the first registered. */

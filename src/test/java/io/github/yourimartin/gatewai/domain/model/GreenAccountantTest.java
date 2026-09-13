@@ -21,13 +21,13 @@ class GreenAccountantTest {
 
   private static ModelDefinition premium() {
     return new ModelDefinition(
-        "sonnet", "anthropic", "claude-sonnet", 0.015, 0.005,
+        "sonnet", "anthropic", "claude-sonnet", 0.015, 0.005, EnergySource.MODELLED,
         ModelTier.CLOUD_PREMIUM);
   }
 
   private static ModelDefinition entry() {
     return new ModelDefinition(
-        "haiku", "anthropic", "claude-haiku", 0.002, 0.002,
+        "haiku", "anthropic", "claude-haiku", 0.002, 0.002, EnergySource.MODELLED,
         ModelTier.CLOUD_ENTRY);
   }
 
@@ -67,7 +67,7 @@ class GreenAccountantTest {
   void avoidanceNeverNegativeWhenActualDirtierThanBaseline() {
     // Used model dirtier than the premium baseline -> avoided clamped to 0
     ModelDefinition dirty = new ModelDefinition(
-        "dirty", "x", "dirty", 0.0, 0.01, ModelTier.LOCAL);
+        "dirty", "x", "dirty", 0.0, 0.01, EnergySource.MODELLED, ModelTier.LOCAL);
 
     GreenMetrics metrics =
         accountant.account(dirty, premium(), 1000, GRID, false);
