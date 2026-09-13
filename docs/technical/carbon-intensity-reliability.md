@@ -94,18 +94,22 @@ how **it** knows.
 3. **Temporal** shifting (the `@Scheduled` worker that defers execution) =
    **real**.
 
-## 5. Recommended posture
+## 5. Recommended posture, re-scored after v3 lot C
 
-- **Portfolio presentation**: "carbon-aware routing, directionally correct, same
-  method as Google/Microsoft" — owning the limits.
-- **For audited carbon claims (CSRD)**, you would need to:
-  - move to **marginal** intensity (WattTime);
-  - use **measured energy factors**. Lot C.4 made the cloud figures *sourced,
-    dated and phase-split*, which is a step short of measured: the parametric
-    inputs are published, the parameter counts behind them are not. Measuring
-    local inference is later still;
-  - have a real **multi-region execution** (regional endpoints);
-  - document an auditable methodology (datacenter PUE, Scope 2/3 boundary).
+- **Portfolio presentation**: "location-based Scope 2 for cloud egress, from a
+  cited method, at the grid that served the request, with self-hosted egress
+  excluded and labelled" — owning the limits. That sentence is now literally
+  what the code does, which is the difference lot C bought.
+- **For audited carbon claims (CSRD)** the four requirements below were the
+  original list. Two are done, two are open, and each open one names its owner —
+  the point of re-scoring rather than re-stating:
+
+| Requirement | After lot C | Owner of what remains |
+|---|---|---|
+| **Marginal** rather than average intensity | **Open.** Still the grid average, from ElectricityMaps or the static table. The zone *ranking* is reliable; a marginal figure would change the absolute numbers. | Needs a marginal-data provider (WattTime). The port is already there — `CarbonIntensityProvider` — so this is an adapter plus a contract with a data vendor, not a redesign. **Post-v3.** |
+| **Measured** energy factors | **Partly.** Cloud coefficients are sourced, dated and phase-split (C.4), which is a step short of measured: the parametric inputs are published, the parameter counts behind them are not. Self-hosted energy is not estimated at all — it is **excluded from scope** and rendered as such (C.1). | Metering local inference (RAPL / NVML / amdgpu hwmon + offline per-model calibration + attribution across concurrent requests) is **lot D**, and would add a `MEASURED` label rather than edit a coefficient. Cloud egress stays modelled until vendors publish per-request figures — nobody's roadmap. See [ADR 0013](adr/0013-sourced-and-labelled-not-measured.md). |
+| An auditable **methodology** (PUE, Scope 2/3 boundary) | **Done.** PUE is declared per provider instance and applied — or deliberately not, for a full-stack vendor figure (C.2/C.4). The basis is stated on every export: location-based Scope 2 only. Every coefficient carries a source and a read-date; every row carries the grid, the intensity and the labels it was computed with (C.5). | Market-based dual reporting and embodied (manufacturing) impacts are **post-v3**: both are real parts of an LCA and neither is computed here. |
+| Real **multi-region execution** | **Open, and now honest about it.** Geography is accounting, not placement — which is exactly why a dispatch-chosen zone is no longer applied to a hosted API (C.3, [ADR 0012](adr/0012-region-on-the-provider-instance.md)). | Needs regional endpoints per provider and a router that picks between them. A product decision, not a measurement one. **Post-v3.** |
 
 ## Summary
 

@@ -26,9 +26,11 @@ The premium baseline is the first `CLOUD_PREMIUM` model in the registry.
 - The savings story is **explicit and defensible**: the baseline is named, not a
   vague absolute claim.
 - The cache's value becomes **visible** (it would otherwise leave no cost trace).
-- The figure depends on the baseline choice and on the (placeholder) per-model
-  energy coefficients — so absolute carbon is **directional**, and the baseline
-  assumption must be stated when reporting. See
+- The figure depends on the baseline choice and on the per-model energy
+  coefficients, which are **sourced estimates rather than measurements** since v3
+  lot C.4 ([ADR 0013](0013-sourced-and-labelled-not-measured.md)) — so absolute
+  carbon is **directional**, and the baseline assumption must be stated when
+  reporting. See
   [`../green-accounting.md`](../green-accounting.md) and
   [`../carbon-intensity-reliability.md`](../carbon-intensity-reliability.md).
 - **Since v3 lot C.1**, models may be *excluded from scope* (`NOT_ACCOUNTED` —
@@ -40,3 +42,7 @@ The premium baseline is the first `CLOUD_PREMIUM` model in the registry.
   an unaccounted one. With the all-local default the baseline is itself unaccounted,
   so the avoided figure is legitimately zero and rendered as excluded rather than
   as a saving.
+- **Since v3 lot C.3 each side is priced at its own grid.** The baseline is a
+  counterfactual about the *baseline provider's* datacenter, so pricing it at the
+  grid of whatever actually answered would reintroduce the wrong-grid error inside
+  this very figure ([ADR 0012](0012-region-on-the-provider-instance.md)).

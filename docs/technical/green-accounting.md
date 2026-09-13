@@ -2,9 +2,17 @@
 
 How gatewAI turns token usage into cost, energy and carbon, computes the avoided
 figures, persists them, and aggregates them into reports. Sources:
-`domain/model/CarbonCalculator`, `GreenAccountant`, `GreenMetrics`,
-`CarbonFootprint`, `ReportAggregator`; `application/service/ChatCompletionService`
-and `GreenReportService`.
+`domain/model/CarbonCalculator`, `GreenAccountant`, `EnergyProfile`, `GreenMetrics`,
+`CarbonFootprint`, `GreenProvenance`, `CarbonZoneResolver`, `ReportAggregator`;
+`application/service/ChatCompletionService` and `GreenReportService`.
+
+**The claim this page supports**, and the one it does not: these are *location-based
+Scope 2* figures for cloud egress, from cited methods, at the grid that served each
+request, with self-hosted egress excluded and labelled as such. Nothing here is
+**measured** — see [ADR 0013](adr/0013-sourced-and-labelled-not-measured.md) for why,
+and for exactly what a later lot would change. Region attribution and why a
+dispatch-chosen zone never overrides a hosted API:
+[ADR 0012](adr/0012-region-on-the-provider-instance.md).
 
 ## The carbon model
 

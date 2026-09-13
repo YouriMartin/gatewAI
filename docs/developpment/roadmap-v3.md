@@ -2,10 +2,12 @@
 
 Three lots, sequential. Lot A removes the embedding model's network hop; lot B
 removes the single-instance assumptions; lot C makes the carbon figure for cloud
-egress sourced and region-attributed. B depends on A only in that A changes the
-embedding dimensions and every calibration/fixture with them — doing B first would
-mean redoing part of its test surface. C is independent of both: it touches the
-green-accounting path, which A and B never enter.
+egress sourced and region-attributed. **All three are done.**
+
+B depends on A only in that A changes the embedding dimensions and every
+calibration/fixture with them — doing B first would mean redoing part of its test
+surface. C is independent of both: it touches the green-accounting path, which A and B
+never enter.
 
 Same conventions as v2: each batch is independently mergeable, has explicit
 acceptance criteria, and updates the docs it invalidates in the same commit.
@@ -534,11 +536,12 @@ endpoint) defensible: energy from a cited source rather than a placeholder, grid
 intensity taken from the region that actually served the request, and every stored
 row carrying enough context to re-derive its own number.
 
-**Why now.** Two different defects sit under the same headline figure. The energy
-coefficients are admitted placeholders — `application.properties` says so out loud,
-*"rough placeholders preserving the order premium > entry > local"*, and 0.0005 /
-0.001 / 0.002 kWh per 1k tokens is a made-up geometric sequence. The region is
-worse: it is not approximate, it is **absent**.
+**Why now** (the state when the lot was planned; both defects are closed as of C.6).
+Two different defects sat under the same headline figure. The energy coefficients were
+admitted placeholders — `application.properties` said so out loud, *"rough placeholders
+preserving the order premium > entry > local"*, and 0.0005 / 0.001 / 0.002 kWh per 1k
+tokens was a made-up geometric sequence. The region was worse: it was not approximate,
+it was **absent**.
 `ChatCompletionService.accountGreen` resolved **one** intensity for every request,
 the gateway's own zone (fixed in C.3 — this is the defect as it stood when the lot
 was planned):
@@ -817,7 +820,7 @@ whole path re-checked on a real Postgres with `V9` applied by Flyway:
   PDF rather than the tests: the `unattributed` bucket was being labelled "known"
   instead of "no region attributed".
 
-## C.6 — ADRs, docs, and the honesty pass
+## C.6 — ADRs, docs, and the honesty pass — ✅ done
 
 - **ADR 0012** — region attribution belongs to the provider instance, and why the
   dispatch zone does not override a hosted API.
@@ -829,12 +832,50 @@ whole path re-checked on a real Postgres with `V9` applied by Flyway:
   entries that are still modelled), `api-reference.md`, `data-model.md`.
 - Update the README and the CLAUDE.md status line.
 
-**Acceptance.**
-- No document still calls the energy coefficients "placeholders" without naming
-  *which* ones and *why* they remain so.
-- `carbon-intensity-reliability.md` §5 ("for audited carbon claims you would
-  need…") is re-scored against what C actually delivered — the marginal-intensity
-  and measured-energy rows stay open, and say which lot owns them.
+**Acceptance** — both met:
+- [ADR 0012](../technical/adr/0012-region-on-the-provider-instance.md) and
+  [ADR 0013](../technical/adr/0013-sourced-and-labelled-not-measured.md) written and
+  indexed, each with the alternatives that were real: for 0012, why the region could
+  not live on the model (it makes two entries of one connection disagree) or come from
+  the vendor (the data does not exist); for 0013, why "measure it" and "drop the
+  feature" both lose to labelling, and what a later lot D would change — a `MEASURED`
+  label for local models, not a coefficient edit.
+- A grep for "placeholder" across the docs now returns only three kinds of hit: the
+  *rule* ("a placeholder is labelled as one"), the *correction* ("no longer
+  placeholders but sourced estimates"), and the historical premise of this roadmap.
+  Three stale claims were fixed: ADR 0006 still called the coefficients placeholders
+  (and still priced the avoided baseline at one grid), `roadmap-post-v1.md` still
+  listed the measured-calibration and auditable-methodology items as untouched, and
+  `plan-action-documentation.md` still used them as its honesty example.
+- `carbon-intensity-reliability.md` §5 is now a **scored table** rather than a wish
+  list: *auditable methodology* done, *measured energy factors* partly done with lot D
+  named as owner of the rest, *marginal intensity* and *real multi-region execution*
+  open and post-v3, each saying what it would actually take.
+
+---
+
+## Lot C — done
+
+| Batch | Outcome |
+|---|---|
+| C.1 | Self-hosted egress out of scope, labelled; no renderer prints a bare `0 gCO2` |
+| C.2 | `region` / `region-provenance` / `pue` on the provider instance; 37-region → zone table verified live |
+| C.3 | Intensity resolved per request; dispatch zone recorded-not-applied for hosted APIs; baseline priced at its own grid |
+| C.4 | Prefill/decode split with sourced, dated coefficients; PUE applied, or not, per figure boundary |
+| C.5 | Eight provenance columns (`V9`); reporting by region and by provider; assumed regions on the face of every export |
+| C.6 | ADRs 0012 and 0013; §5 re-scored; three stale "placeholder" claims retired |
+
+What lot C actually bought: the CO2 figure for cloud egress is now **attributed**
+(the grid that served the request, not the gateway's), **sourced** (every coefficient
+with a URL and a read-date), **labelled** (`NOT_ACCOUNTED` / `VENDOR_PUBLISHED` /
+`MODELLED`, printed everywhere) and **self-describing** (each row re-derives its own
+emissions). Measured on a real stack: a Claude call books 0.0805 gCO2 at PJM's 350
+where it used to book 0.0529 at France's 230.
+
+What it cost: the default all-local configuration now reports **zero** CO2 *and* zero
+avoided CO2 — the honest rendering of "not metered" — plus eight columns on
+`request_log`, a fifth energy setting, and an evaluation metric that refuses to
+publish a saving it cannot account.
 
 ---
 

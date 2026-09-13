@@ -13,17 +13,26 @@ decisions — and each says which batch delivered it.
 
 ## Correctness & trustworthy numbers
 
-- **Measured carbon calibration.** Replace the placeholder per-model
-  `energyIntensity` coefficients with values derived from real measurements
-  (GPU profile, datacenter PUE). The carbon model
-  ([`../technical/green-accounting.md`](../technical/green-accounting.md)) is built
-  to accept better inputs without code changes.
+- **Measured carbon calibration.** ~~Replace the placeholder per-model
+  `energyIntensity` coefficients~~ — **half done by v3 lot C.** The scalar is gone:
+  cloud energy is a prefill/decode split whose every input is sourced and dated, PUE
+  is declared per provider instance and applied, and each row stores the labels it
+  was computed with
+  ([`../technical/green-accounting.md`](../technical/green-accounting.md),
+  [ADR 0013](../technical/adr/0013-sourced-and-labelled-not-measured.md)).
+  Still open, and deliberately so: nothing is **measured**. Self-hosted inference is
+  *excluded from scope* rather than estimated, and metering it (RAPL / NVML +
+  per-model calibration) would add a `MEASURED` label — the work a later lot D owns.
 - **Marginal grid intensity.** Move from average intensity (ElectricityMaps) to
   **marginal** intensity (e.g. WattTime) for load-shifting decisions — the correct
   signal per
   [`../technical/carbon-intensity-reliability.md`](../technical/carbon-intensity-reliability.md).
-- **Auditable methodology.** Document Scope 2/3 boundaries and baseline assumptions
-  so the CSRD exports can back audited claims rather than directional ones.
+- **Auditable methodology.** ~~Document Scope 2/3 boundaries and baseline
+  assumptions~~ — **done by v3 lot C**: every export states location-based Scope 2
+  only, names the regions that were assumed rather than known, carries the
+  avoided-vs-inventory distinction, and each row stores the grid and labels behind its
+  own figure. What is still not computed, and is named as such: market-based dual
+  reporting and embodied (manufacturing) impacts.
 
 ## Provider matrix
 

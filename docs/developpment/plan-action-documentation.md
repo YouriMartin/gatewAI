@@ -18,9 +18,11 @@ Three audiences, three intents:
 ## Writing conventions
 
 - **English** across the whole project — docs, code comments, commit messages.
-- **Honesty**: explicitly name the limits, the placeholders (e.g. the
-  per-model energy intensities), the trade-offs and the technical debt. No
-  overselling.
+- **Honesty**: explicitly name the limits, the trade-offs and the technical debt.
+  No overselling. (The original example here was "the placeholder per-model energy
+  intensities"; v3 lot C replaced them with sourced, labelled coefficients and moved
+  self-hosted energy out of scope — so the rule now reads: name what kind of number
+  each number is. See [ADR 0013](../technical/adr/0013-sourced-and-labelled-not-measured.md).)
 - **Code-anchored**: reference the real classes/files (`path:line`), quote short
   snippets. The docs must stay verifiable against the code.
 - **Diagrams**: ASCII diagrams (consistent with the README); Mermaid is fine when
@@ -59,7 +61,7 @@ functional choices, and position the project against vLLM Semantic Router.
 | `functional/getting-started.md` | End-to-end path: deploy (plug & play), get an API key, first request via the OpenAI SDK **and** via MCP, open the dashboard |
 | `functional/features.md` | Features explained *from a usage angle*: semantic cache, routing, green accounting, CSRD reporting, rate limiting, key admin, MCP server |
 | `functional/dashboard-guide.md` | Screen-by-screen tour (KPIs, live metrics, key admin, routing config, reports) |
-| `functional/limitations.md` | **Owned limitations**: carbon estimates = placeholders to calibrate, fallible heuristic classifier, in-memory deferred-job store, single-instance, no streaming (to confirm), embedding scope, etc. |
+| `functional/limitations.md` | **Owned limitations**, as of this plan: carbon estimates to calibrate, fallible heuristic classifier, in-memory deferred-job store, single-instance, no streaming (to confirm), embedding scope, etc. Three of those have since shipped — streaming (Phase 7.5), the persisted job store and multi-instance operation (v3 lot B), and sourced/labelled carbon (v3 lot C) — so read the current [`limitations.md`](../functional/limitations.md) for the live list. |
 | `functional/functional-choices.md` | Functional choices and their *why*: OpenAI ingress as the standard, Claude as the primary egress, 0.92 similarity threshold, "avoided CO2" vs a premium baseline, per-client cache namespacing… |
 | `functional/vllm-semantic-router-comparison.md` | Inspirations drawn from **vLLM Semantic Router**, and our differences (green/CSRD focus, on-premise, multi-provider, thin gateway vs serving, MCP) |
 

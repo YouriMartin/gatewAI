@@ -17,3 +17,5 @@ part that ages well.
 | [0009](0009-occlusion-over-gradient-attribution.md) | Explain a route match by occlusion, not by gradients | Accepted |
 | [0010](0010-trace-cache-decisions-like-routing.md) | Trace cache decisions at the same level as routing decisions | Accepted |
 | [0011](0011-in-process-onnx-embedding.md) | Run the embedding model in-process (ONNX) instead of on a model server | Accepted |
+| [0012](0012-region-on-the-provider-instance.md) | Region attribution belongs to the provider instance (and a dispatch zone never overrides a hosted API) | Accepted |
+| [0013](0013-sourced-and-labelled-not-measured.md) | Energy figures are sourced and labelled, never presented as measured | Accepted |

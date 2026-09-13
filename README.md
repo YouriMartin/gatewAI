@@ -197,6 +197,11 @@ scope** for self-hosted inference, which the gateway cannot meter and therefore 
 reports as a bare `0 gCO2` (see
 [limitations](docs/functional/limitations.md#carbon-figures-are-directional-not-audited)
 and [the coefficient table](docs/technical/green-accounting.md#the-coefficients-and-where-they-come-from)).
+Reports break the emissions down **by grid zone and by provider**, state
+location-based Scope 2 explicitly, and name which regions were *assumed* rather than
+known — the direct vendor APIs do not disclose one
+([ADR 0012](docs/technical/adr/0012-region-on-the-provider-instance.md),
+[ADR 0013](docs/technical/adr/0013-sourced-and-labelled-not-measured.md)).
 
 ## Documentation
 
