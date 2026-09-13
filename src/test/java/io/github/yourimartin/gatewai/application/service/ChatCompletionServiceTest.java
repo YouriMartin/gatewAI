@@ -20,9 +20,11 @@ import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
+import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
+import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 
 import org.junit.jupiter.api.Test;
@@ -53,6 +55,12 @@ class ChatCompletionServiceTest {
 
   @Mock
   private MetricsRecorder metricsRecorder;
+
+  @Mock
+  private ProviderRegions providerRegions;
+
+  @Mock
+  private CloudRegionZones cloudRegionZones;
 
   @InjectMocks
   private ChatCompletionService service;
@@ -159,7 +167,7 @@ class ChatCompletionServiceTest {
 
     when(llmClient.call(request)).thenReturn(response);
     when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
-    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(false)))
+    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(230.0), eq(false)))
         .thenReturn(metrics);
     doNothing().when(requestLogRepository).save(any());
 
@@ -179,7 +187,7 @@ class ChatCompletionServiceTest {
 
     when(llmClient.call(request)).thenReturn(cached);
     when(carbonIntensityProvider.gramsCo2PerKwh()).thenReturn(230.0);
-    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(true)))
+    when(greenAccountant.account(any(), any(), eq(20L), eq(230.0), eq(230.0), eq(true)))
         .thenReturn(metrics);
     doNothing().when(requestLogRepository).save(any());
 

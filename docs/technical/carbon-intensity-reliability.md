@@ -67,7 +67,13 @@ how **it** knows.
    zones (ids verified 2026-09-13; config overrides per region; an unknown region
    warns once and falls back). A hosted API's region is `ASSUMED` by construction —
    neither Anthropic nor OpenAI publishes which datacenter served a call — and
-   every export has to say so. Lot C.3 is what *applies* it per request.
+   every export has to say so.
+   Lot C.3 *applies* it per request: the intensity is resolved per model
+   (dispatch zone for operator-controlled providers → provider region → gateway
+   default), and the premium baseline of the avoided figure is priced at **its**
+   provider's grid rather than the served model's. A dispatch-chosen zone is
+   **recorded and not applied** for a hosted API — the accounting-versus-physical
+   gap above, now a code path instead of a caveat.
 2. **Coarse absolute carbon**, and now explicitly scoped (v3 lot C.1). Each
    registry entry carries an `energy-source` label, and the reports render it:
    - **`NOT_ACCOUNTED`** — self-hosted (local) egress, the shipped default. Its

@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.CarbonZoneContext;
+import io.github.yourimartin.gatewai.domain.model.CarbonZoneResolver;
 import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.LlmRequest;
@@ -18,14 +19,18 @@ import io.github.yourimartin.gatewai.domain.model.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
 import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
 import io.github.yourimartin.gatewai.domain.model.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.ResolvedCarbonZone;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
+import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
+import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 
 import org.springframework.stereotype.Service;
@@ -40,19 +45,26 @@ class ChatCompletionService
   private final CarbonIntensityProvider carbonIntensityProvider;
   private final GreenAccountant greenAccountant;
   private final MetricsRecorder metricsRecorder;
+  private final ProviderRegions providerRegions;
+  private final CloudRegionZones cloudRegionZones;
+  private final CarbonZoneResolver carbonZoneResolver = new CarbonZoneResolver();
 
   ChatCompletionService(LlmClient llmClient,
                         RequestLogRepository requestLogRepository,
                         ModelRegistry modelRegistry,
                         CarbonIntensityProvider carbonIntensityProvider,
                         GreenAccountant greenAccountant,
-                        MetricsRecorder metricsRecorder) {
+                        MetricsRecorder metricsRecorder,
+                        ProviderRegions providerRegions,
+                        CloudRegionZones cloudRegionZones) {
     this.llmClient = llmClient;
     this.requestLogRepository = requestLogRepository;
     this.modelRegistry = modelRegistry;
     this.carbonIntensityProvider = carbonIntensityProvider;
     this.greenAccountant = greenAccountant;
     this.metricsRecorder = metricsRecorder;
+    this.providerRegions = providerRegions;
+    this.cloudRegionZones = cloudRegionZones;
   }
 
   @Override
@@ -134,18 +146,49 @@ class ChatCompletionService
     return accountGreen(response.model(), response.totalTokens(), response.cacheHit());
   }
 
+  /**
+   * Green accounting for one served request, at the grid that served it (v3 lot
+   * C.3). The served model and the premium baseline are priced <b>separately</b>:
+   * they may sit behind providers in different regions, and the baseline is a
+   * counterfactual about the baseline's datacenter, not about this one.
+   */
   private GreenMetrics accountGreen(String model, int totalTokens, boolean cacheHit) {
     ModelDefinition used = modelRegistry.findByModelId(model).orElse(null);
     ModelDefinition premiumBaseline =
         modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM).stream()
             .findFirst()
             .orElse(null);
-    double gridIntensity = CarbonZoneContext.CURRENT.isBound()
-        ? carbonIntensityProvider.gramsCo2PerKwh(CarbonZoneContext.CURRENT.get())
-        : carbonIntensityProvider.gramsCo2PerKwh();
 
-    return greenAccountant.account(
-        used, premiumBaseline, totalTokens, gridIntensity, cacheHit);
+    return greenAccountant.account(used, premiumBaseline, totalTokens,
+        intensityFor(used), intensityFor(premiumBaseline), cacheHit);
+  }
+
+  /**
+   * Grid intensity where {@code model} runs: the dispatch-chosen zone when the
+   * operator controls that provider, else the provider's declared region, else the
+   * gateway's own default. {@code null} for the zone means the last case — the
+   * intensity provider owns its default, and naming it here would change the value.
+   */
+  private double intensityFor(ModelDefinition model) {
+    ResolvedCarbonZone resolved = resolveZone(model);
+    return resolved.zone() == null
+        ? carbonIntensityProvider.gramsCo2PerKwh()
+        : carbonIntensityProvider.gramsCo2PerKwh(resolved.zone());
+  }
+
+  /**
+   * Runs the resolution chain for one model. Package-visible so a test can assert
+   * the zone <em>and</em> the recorded-but-not-applied dispatch zone, which is the
+   * distinction lot C.5 will persist.
+   */
+  ResolvedCarbonZone resolveZone(ModelDefinition model) {
+    String dispatchZone = CarbonZoneContext.CURRENT.isBound()
+        ? CarbonZoneContext.CURRENT.get() : null;
+    ProviderRegion provider = model == null
+        ? null : providerRegions.findByProvider(model.provider()).orElse(null);
+    String providerZone = provider == null || !provider.isDeclared()
+        ? null : cloudRegionZones.zoneFor(provider.region()).orElse(null);
+    return carbonZoneResolver.resolve(provider, providerZone, dispatchZone);
   }
 
   private static String resolveClientId() {

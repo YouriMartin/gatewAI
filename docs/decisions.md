@@ -7,6 +7,49 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v3 lot C — C.3 (resolve the intensity per request)
+
+- **The avoided figure's baseline is now priced at its own grid, which the batch did
+  not ask for.** C.3 as planned fixes the intensity of the *served* model. But
+  `GreenAccountant` used one intensity for both sides, so "what Claude would have
+  emitted" was computed at the grid of the local box that actually answered — the
+  same wrong-grid error, one step removed, and it survives into every avoided-CO2
+  headline. `account(...)` gained a second intensity parameter (the single-intensity
+  overload stays for callers with no region information). Measured live: a local
+  request's avoided figure is 0.0245 gCO2 at Anthropic's 350, not 0.0161 at the
+  gateway's 230.
+- **`operatorControlled` is derived from the provider type, not configured.** The
+  plan says the dispatch zone overrides the region only "for providers the operator
+  controls", without saying how the gateway knows. Adding a fifth property would put
+  the question to the operator twice; instead the adapter derives it — self-hostable
+  type (`ollama`, `openai-compatible`) **and** not an explicitly `assumed` region.
+  That second half is what keeps a hosted OpenAI-compatible endpoint (OpenRouter)
+  out, using config the operator already writes, and declaring nothing keeps the
+  default local setup controlled — which is what carbon-aware dispatch has always
+  assumed. An unknown provider is never controlled.
+- **This widened C.2's `ProviderRegions` port**: `findByProvider` now returns an
+  entry for **every declared instance**, with a null region when none was declared,
+  because `operatorControlled` is meaningful for an instance that declared no region
+  (the zero-config Ollama case). C.2's "absent rather than defaulted" test became
+  "present, but declares no region"; the fallback behaviour it protected is
+  unchanged — `isDeclared()` now carries it.
+- **`GATEWAY_DEFAULT` resolves to a null zone rather than to a zone id.** Naming the
+  gateway's zone (the obvious candidate being
+  `gatewai.carbon.electricity-maps.zone=FR`) would have silently changed every
+  non-attributed request from the flat 230 to `zone-intensities.FR=56`, i.e. a
+  behaviour change smuggled in under a refactor. The resolver says "no attribution"
+  and the caller uses `gramsCo2PerKwh()`, exactly as before. C.5 stores the source,
+  so a row still explains itself.
+- **`CarbonZoneResolver` lives in `domain/model` and takes plain values**, not the
+  two out ports — ArchUnit's onion rule forbids a domain *model* from reaching the
+  ports package (same constraint that shaped `ReportAggregator` in C.1). The service
+  gathers provider + mapped zone + dispatch zone; the domain owns only the
+  precedence. No new adapter package, so `ArchitectureTest` needed no change, which
+  the plan expected it might.
+- **`resolveZone` is package-visible on `ChatCompletionService`** so a test can
+  assert the *recorded-not-applied* dispatch zone. Nothing persists it until C.5, and
+  inventing a metric or a log line for it now would be a second surface to migrate.
+
 ## v3 lot C — C.2 (region and PUE on the provider instance)
 
 - **The two out ports landed in C.2, not C.3.** The batch as planned only adds

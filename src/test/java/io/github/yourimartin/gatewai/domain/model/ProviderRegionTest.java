@@ -13,7 +13,7 @@ class ProviderRegionTest {
   @Test
   void carriesRegionProvenanceAndPue() {
     ProviderRegion region = new ProviderRegion(
-        "bedrock", "us-east-1", RegionProvenance.KNOWN, 1.12);
+        "bedrock", "us-east-1", RegionProvenance.KNOWN, 1.12, false);
 
     assertEquals("bedrock", region.provider());
     assertEquals("us-east-1", region.region());
@@ -24,7 +24,7 @@ class ProviderRegionTest {
 
   @Test
   void anUndeclaredProvenanceIsAssumedRatherThanKnown() {
-    ProviderRegion region = new ProviderRegion("anthropic", "US-MIDA-PJM", null, null);
+    ProviderRegion region = new ProviderRegion("anthropic", "US-MIDA-PJM", null, null, false);
 
     // A region only becomes a fact when the operator says so.
     assertEquals(RegionProvenance.ASSUMED, region.provenance());
@@ -33,7 +33,7 @@ class ProviderRegionTest {
 
   @Test
   void aMissingPueIsCarriedAsUndeclaredNotAsOne() {
-    ProviderRegion region = new ProviderRegion("openai", "US-MIDA-PJM", null, null);
+    ProviderRegion region = new ProviderRegion("openai", "US-MIDA-PJM", null, null, false);
 
     // 1.0 would silently claim a datacenter with zero overhead; null says nothing.
     assertEquals(null, region.pue());
@@ -42,14 +42,23 @@ class ProviderRegionTest {
   @Test
   void aPueBelowOneIsPhysicallyImpossible() {
     IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-        () -> new ProviderRegion("vllm", "eu-west-3", RegionProvenance.KNOWN, 0.9));
+        () -> new ProviderRegion("vllm", "eu-west-3", RegionProvenance.KNOWN, 0.9, true));
 
     assertTrue(error.getMessage().contains("below 1.0"), error.getMessage());
   }
 
   @Test
+  void carriesWhetherTheOperatorPlacesTheWorkload() {
+    // Only then may a dispatch-chosen zone override the region (lot C.3).
+    assertTrue(new ProviderRegion("vllm", "eu-west-3", RegionProvenance.KNOWN, null, true)
+        .operatorControlled());
+    assertFalse(new ProviderRegion("anthropic", "US-MIDA-PJM", null, null, false)
+        .operatorControlled());
+  }
+
+  @Test
   void blankRegionCountsAsUndeclared() {
-    assertFalse(new ProviderRegion("openai", "  ", null, null).isDeclared());
-    assertFalse(new ProviderRegion("openai", null, null, null).isDeclared());
+    assertFalse(new ProviderRegion("openai", "  ", null, null, false).isDeclared());
+    assertFalse(new ProviderRegion("openai", null, null, null, false).isDeclared());
   }
 }

@@ -136,4 +136,37 @@ class GreenAccountantTest {
 
     assertEquals(0.0, metrics.gramsCo2Avoided(), DELTA);
   }
+
+  @Test
+  void theBaselineIsPricedAtItsOwnGridNotAtTheServedModelsGrid() {
+    // The premium baseline is a counterfactual about ANOTHER datacenter: 2000
+    // tokens on a local entry model at France's 56, against the premium model as it
+    // would have run on a US grid at 350.
+    GreenMetrics metrics =
+        accountant.account(entry(), premium(), 2000, 56.0, 350.0, false);
+
+    // actual  = 2 x 0.002 kWh x 56  = 0.224 gCO2
+    // baseline= 2 x 0.005 kWh x 350 = 3.5   gCO2
+    assertEquals(0.224, metrics.gramsCo2(), DELTA);
+    assertEquals(3.5 - 0.224, metrics.gramsCo2Avoided(), DELTA);
+  }
+
+  @Test
+  void aCacheHitCreditsTheBaselineAtTheBaselinesGrid() {
+    GreenMetrics metrics =
+        accountant.account(entry(), premium(), 2000, 56.0, 350.0, true);
+
+    assertEquals(0.0, metrics.gramsCo2(), DELTA);
+    // 2 x 0.005 kWh x 350: the call that did not happen would have happened there.
+    assertEquals(3.5, metrics.gramsCo2Avoided(), DELTA);
+  }
+
+  @Test
+  void oneIntensityStillMeansBothSidesShareIt() {
+    GreenMetrics shared = accountant.account(entry(), premium(), 2000, GRID, false);
+    GreenMetrics explicit =
+        accountant.account(entry(), premium(), 2000, GRID, GRID, false);
+
+    assertEquals(shared, explicit);
+  }
 }

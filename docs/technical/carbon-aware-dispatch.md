@@ -102,9 +102,19 @@ records the result or the failure. It writes no `RUNNING` transition of its own 
 the claim was that write, and repeating it from the application layer would be a
 second, non-atomic path into the same state.
 
-Because the zone is bound as a Scoped Value, green accounting picks up the
+Because the zone is bound as a Scoped Value, green accounting can pick up the
 **zone-specific** grid intensity for that job without any extra parameter passing
-(`ChatCompletionService.accountGreen` reads `CarbonZoneContext.CURRENT`).
+(`ChatCompletionService` reads `CarbonZoneContext.CURRENT`).
+
+**Since v3 lot C.3 the chosen zone is applied only where it means something.** The
+`CarbonZoneResolver` puts it first in the chain for providers the operator
+*controls* — your own Ollama or vLLM box — and for a **hosted API it is recorded and
+not applied**: deferring a job does not move Anthropic's compute, so the call books
+at the provider's declared region instead. Measured on a real deferred run with
+`chosen_zone=SE`: the local tier accounted at Sweden's 30 gCO2/kWh (0.00312 gCO2)
+while the premium tier on `anthropic` accounted at its US region's 350 (0.1015
+gCO2). Details in
+[`green-accounting.md`](green-accounting.md#which-grid-a-request-is-booked-at-v3-lot-c3).
 
 ## What is real vs accounting
 
@@ -112,7 +122,8 @@ Because the zone is bound as a Scoped Value, green accounting picks up the
   chosen zone is greenest.
 - **Geography is accounting, not physical**: selecting a zone changes the
   *intensity used for accounting*, it does not execute the inference in another
-  region. See
+  region — which is precisely why, since C.3, it is no longer applied to a
+  third-party API at all. See
   [`carbon-intensity-reliability.md`](carbon-intensity-reliability.md).
 
 ## Configuration

@@ -539,8 +539,9 @@ coefficients are admitted placeholders — `application.properties` says so out 
 *"rough placeholders preserving the order premium > entry > local"*, and 0.0005 /
 0.001 / 0.002 kWh per 1k tokens is a made-up geometric sequence. The region is
 worse: it is not approximate, it is **absent**.
-`ChatCompletionService.accountGreen` resolves **one** intensity for every request,
-the gateway's own zone:
+`ChatCompletionService.accountGreen` resolved **one** intensity for every request,
+the gateway's own zone (fixed in C.3 — this is the defect as it stood when the lot
+was planned):
 
 ```java
 double gridIntensity = CarbonZoneContext.CURRENT.isBound()
@@ -678,7 +679,7 @@ Two tiers of knowledge, and the config must distinguish them:
   here rather than in C.3, so the new properties are read by something and the
   acceptance is testable. C.3 is left with the resolution chain only.
 
-## C.3 — Resolve the intensity per request, not per gateway
+## C.3 — Resolve the intensity per request, not per gateway — ✅ done
 
 - The application layer needs provider → region. Keep the hexagonal rules: a
   `CarbonZoneResolver` in the domain, an infrastructure adapter reading
@@ -696,12 +697,31 @@ Two tiers of knowledge, and the config must distinguish them:
   taken up front). The recorded-versus-applied distinction lands in the row from
   C.5, so a reader can tell the two apart afterwards.
 
-**Acceptance.**
-- One test in which an Anthropic-tier request accounts at the US zone while a
-  local-tier request in the same run accounts at the gateway zone.
-- The deferred-dispatch path is unchanged for controlled providers.
-- A deferred job against a hosted API stores the chosen zone but accounts at the
-  provider region, asserted.
+**Acceptance** — all three met, `./mvnw -o -DskipFrontend verify` green
+(**657 tests**), and all three re-verified on a real Postgres + real HTTP
+(`mock` egress, premium tier repointed at `anthropic` `region=US-MIDA-PJM` at
+350 gCO2/kWh, gateway default 230):
+- `ChatCompletionServiceCarbonZoneTest` (real `GreenAccountant`, not a mock — the
+  point is the number, not the call): the hosted tier books 0.035 gCO2 while a
+  local-tier request in the same run books zero and the gateway default applies.
+  Live: **0.0805 gCO2** for 46 tokens (0.00023 kWh × 350) where pre-C.3 it was
+  0.0529 (× 230).
+- Deferred dispatch unchanged for controlled providers: with `chosen_zone=SE`, a
+  local-tier job accounted **0.00312 gCO2** (0.000104 kWh × 30) — the dispatch zone
+  still wins on the operator's own box, asserted in the test and observed in
+  `request_log`.
+- Deferred against a hosted API: `deferred_job.chosen_zone = SE` while the row
+  accounts **0.1015 gCO2** (0.00029 kWh × 350, not × 30). `ResolvedCarbonZone` keeps
+  the chosen zone as `dispatchRecordedOnly()`; *persisting* both sides is C.5, which
+  is the only half of "stores the chosen zone" this batch cannot finish.
+- Beyond the plan: the avoided figure's premium baseline is now priced at **its**
+  provider's grid (`GreenAccountant` takes two intensities). Live, a local request's
+  avoided figure reads 0.0245 gCO2 at Anthropic's 350 rather than 0.0161 at the
+  gateway's 230 — the same wrong-grid defect, one step removed. See
+  [`../decisions.md`](../decisions.md).
+- `ArchitectureTest` needed no new package: `CarbonZoneResolver` is pure domain
+  taking plain values (the onion rule forbids a domain model reaching the ports), and
+  C.2 had already placed both adapters in declared packages.
 
 ## C.4 — A sourced energy estimate for cloud models
 

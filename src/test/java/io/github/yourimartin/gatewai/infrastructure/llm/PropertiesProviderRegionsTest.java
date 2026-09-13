@@ -26,21 +26,56 @@ class PropertiesProviderRegionsTest {
     assertThat(vllm.provenance()).isEqualTo(RegionProvenance.KNOWN);
     assertThat(vllm.pue()).isEqualTo(1.15);
     assertThat(regions.all()).hasSize(2);
+    assertThat(regions.all()).allMatch(ProviderRegion::isDeclared);
   }
 
   @Test
-  void anInstanceWithoutARegionIsAbsentRatherThanDefaulted() {
+  void anInstanceWithoutARegionIsPresentButDeclaresNone() {
     PropertiesProviderRegions regions = regions(Map.of(
-        "ollama", entry(null, null, null),
-        "openai", entry("   ", null, null)));
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null, null),
+        "openai", entry(ProviderProperties.ProviderType.OPENAI, "   ", null, null)));
 
-    // Empty lets the caller fall back to the gateway zone (C.3) instead of
-    // inventing a location for a provider that declared none.
-    assertThat(regions.findByProvider("ollama")).isEmpty();
-    assertThat(regions.findByProvider("openai")).isEmpty();
+    // The instance is known — that is what carries operatorControlled (C.3) — but
+    // its region is not, so the caller falls back to the gateway zone instead of
+    // inventing a location.
+    assertThat(regions.findByProvider("ollama").orElseThrow().isDeclared()).isFalse();
+    assertThat(regions.findByProvider("openai").orElseThrow().isDeclared()).isFalse();
     assertThat(regions.findByProvider("nope")).isEmpty();
     assertThat(regions.findByProvider(null)).isEmpty();
-    assertThat(regions.all()).isEmpty();
+  }
+
+  @Test
+  void selfHostableTypesAreOperatorControlledUnlessTheirRegionIsAssumed() {
+    PropertiesProviderRegions regions = regions(Map.of(
+        // The zero-config default: your own box, no region declared.
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null, null),
+        // A region you chose: still yours.
+        "vllm", entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE,
+            "eu-west-3", RegionProvenance.KNOWN, null),
+        // OpenAI-compatible but hosted by someone else (OpenRouter…): declaring the
+        // region as assumed IS the statement "I do not place this workload".
+        "openrouter", entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE,
+            "US-MIDA-PJM", RegionProvenance.ASSUMED, null),
+        // A hosted API is never controlled, whatever it declares.
+        "anthropic", entry(ProviderProperties.ProviderType.ANTHROPIC,
+            "US-MIDA-PJM", RegionProvenance.KNOWN, null)));
+
+    assertThat(controlled(regions, "ollama")).isTrue();
+    assertThat(controlled(regions, "vllm")).isTrue();
+    assertThat(controlled(regions, "openrouter")).isFalse();
+    assertThat(controlled(regions, "anthropic")).isFalse();
+  }
+
+  @Test
+  void anInstanceWithNoTypeIsNotOperatorControlled() {
+    PropertiesProviderRegions regions =
+        regions(Map.of("mystery", entry(null, "FR", RegionProvenance.KNOWN, null)));
+
+    assertThat(controlled(regions, "mystery")).isFalse();
+  }
+
+  private static boolean controlled(PropertiesProviderRegions regions, String name) {
+    return regions.findByProvider(name).orElseThrow().operatorControlled();
   }
 
   @Test
@@ -69,8 +104,15 @@ class PropertiesProviderRegionsTest {
   private static ProviderProperties.ProviderEntry entry(String region,
                                                         RegionProvenance provenance,
                                                         Double pue) {
+    return entry(ProviderProperties.ProviderType.OPENAI, region, provenance, pue);
+  }
+
+  private static ProviderProperties.ProviderEntry entry(ProviderProperties.ProviderType type,
+                                                        String region,
+                                                        RegionProvenance provenance,
+                                                        Double pue) {
     ProviderProperties.ProviderEntry entry = new ProviderProperties.ProviderEntry();
-    entry.setType(ProviderProperties.ProviderType.OPENAI);
+    entry.setType(type);
     entry.setRegion(region);
     entry.setRegionProvenance(provenance);
     entry.setPue(pue);

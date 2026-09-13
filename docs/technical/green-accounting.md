@@ -143,9 +143,62 @@ country-level zone `US` would read as more honest but is an *aggregate* zone wit
 live data tier in ElectricityMaps (checked 2026-09-13), so it cannot be priced live
 at all.
 
-> Nothing **consumes** the region yet: lot C.3 is the resolution chain
-> (dispatch zone → provider region → gateway default) and lot C.4 is what applies
-> the PUE. C.2 is the declaration and the mapping.
+> Lot C.4 is what applies the PUE. C.2 declared the region and the mapping; C.3
+> (below) is what resolves and applies it per request.
+
+## Which grid a request is booked at (v3 lot C.3)
+
+Before C.3, `ChatCompletionService` resolved **one** intensity for every request —
+the gateway's own zone — so a gateway configured for France booked a Claude call,
+US compute, at France's 56 gCO2/kWh. That was the wrong grid applied to the right
+energy, and it is the cheapest error in the carbon path to fix.
+
+`CarbonZoneResolver` (pure domain) owns the precedence; the application service
+gathers the facts. First hit wins:
+
+| Step | Applies when | `CarbonZoneSource` |
+|---|---|---|
+| dispatch-chosen zone | the provider is **operator-controlled** | `DISPATCH` |
+| provider instance region, mapped to a zone | a region is declared and mappable | `PROVIDER_REGION` |
+| the gateway's own default | nothing more specific is known | `GATEWAY_DEFAULT` |
+
+**For a hosted API the dispatch zone is recorded, not applied.** Deferring a job
+does not move Anthropic's compute, so a deferred call still books at the provider's
+grid while `ResolvedCarbonZone.dispatchZone()` keeps what dispatch picked
+(`dispatchRecordedOnly()`). This turns the accounting-versus-physical caveat in
+[`carbon-intensity-reliability.md`](carbon-intensity-reliability.md) §4.1 from a
+footnote into a code path. Persisting both sides is lot C.5.
+
+**Operator-controlled** is derived in the adapter, from the provider type: an
+instance is controlled when it is self-hostable (`ollama`, `openai-compatible`)
+*and* has not declared an `assumed` region — declaring "assumed" for a hosted
+OpenAI-compatible endpoint (OpenRouter, say) is exactly the statement "I do not
+place this workload". An **unknown** provider is never controlled: a dispatch zone
+is only applied to a workload the operator is known to place.
+
+`GATEWAY_DEFAULT` carries a **null zone** on purpose. The gateway's default lives
+behind `CarbonIntensityProvider.gramsCo2PerKwh()`; naming a zone there would change
+the value that method returns (the static provider would start reading
+`zone-intensities`), so the resolver says "no attribution" instead of inventing one.
+
+### The premium baseline is priced at its own grid
+
+`GreenAccountant.account(...)` now takes **two** intensities: one for the served
+model, one for the premium baseline. The baseline is a counterfactual about the
+*baseline provider's* datacenter — pricing "what Claude would have emitted" at the
+grid of the local box that actually answered is the same wrong-grid error, one step
+removed. When both models sit behind the same provider the two values are equal, and
+the single-intensity overload still exists for callers with no region information.
+
+Measured on a real run (`mock` egress, premium tier repointed at `anthropic`
+`region=US-MIDA-PJM` at 350 gCO2/kWh, gateway default 230):
+
+| Request | Row | Reading |
+|---|---|---|
+| premium, sync | 46 tok → 0.00023 kWh → **0.0805 gCO2** | 0.00023 × 350; it was 0.0529 before C.3 |
+| local, sync | 0 kWh → 0 gCO2, **avoided 0.0245** | excluded from scope (C.1); avoided = 14 tok at *Anthropic's* 350 |
+| deferred, `chosen_zone=SE`, local tier | 0.000104 kWh → **0.00312 gCO2** | × 30 — dispatch applies on your own box |
+| deferred, `chosen_zone=SE`, premium tier | 0.00029 kWh → **0.1015 gCO2** | × 350, not × 30 — recorded, not applied |
 
 ## Per-request accounting
 
@@ -165,9 +218,9 @@ gramsCo2Avoided)`:
 Cost = `(totalTokens / 1000) × costPer1kTokens`.
 
 The **premium baseline** is the first `CLOUD_PREMIUM` model in the registry
-(`ChatCompletionService.accountGreen`). The grid intensity comes from
-`CarbonIntensityProvider`, using the zone from `CarbonZoneContext` when bound
-(deferred jobs) or the default zone otherwise.
+(`ChatCompletionService.accountGreen`). Each side's grid intensity comes from
+`CarbonIntensityProvider` at the zone the resolver picked for *that* model — see
+[the resolution chain](#which-grid-a-request-is-booked-at-v3-lot-c3).
 
 ## Wiring in the request path
 

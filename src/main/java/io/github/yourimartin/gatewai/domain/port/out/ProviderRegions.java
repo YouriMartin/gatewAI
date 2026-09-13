@@ -17,13 +17,15 @@ import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
 public interface ProviderRegions {
 
   /**
-   * The region declared for a provider instance.
+   * What is known about where a provider instance runs. Present for every declared
+   * instance, whether or not it declared a region — {@code isDeclared()} answers
+   * that, and {@code operatorControlled()} is meaningful either way (v3 lot C.3).
    *
    * @param provider provider instance name, case-insensitive
-   * @return the region, or empty when the instance is unknown or declared none
+   * @return the instance, or empty when no such instance is declared
    */
   Optional<ProviderRegion> findByProvider(String provider);
 
-  /** Every declared provider region, for startup reporting and diagnostics. */
+  /** Every declared provider instance, for startup reporting and diagnostics. */
   List<ProviderRegion> all();
 }

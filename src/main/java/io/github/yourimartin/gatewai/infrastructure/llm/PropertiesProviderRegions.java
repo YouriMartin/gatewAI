@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
+import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 
 import org.slf4j.Logger;
@@ -17,10 +18,20 @@ import org.springframework.stereotype.Component;
 /**
  * Reads provider regions from {@code gatewai.providers.<name>.*} (v3 lot C.2).
  *
- * <p>Only instances that actually declare a region are exposed: an undeclared one
- * returns empty so the caller falls back to the gateway's default zone rather than
- * to a fabricated location. Provider names are matched case-insensitively, like
- * everywhere else on the egress path.
+ * <p>Every declared instance is exposed, with or without a region:
+ * {@link ProviderRegion#isDeclared()} says which, and an undeclared region leaves
+ * the caller to fall back to the gateway's default zone rather than to a fabricated
+ * location. Provider names are matched case-insensitively, like everywhere else on
+ * the egress path.
+ *
+ * <p><b>Operator-controlled</b> (v3 lot C.3) is derived here, because the provider
+ * type is an infrastructure concept: an instance is controlled when it is
+ * self-hostable ({@code ollama}, {@code openai-compatible}) <em>and</em> has not
+ * declared an {@code assumed} region. The second half matters for a hosted
+ * OpenAI-compatible endpoint — OpenRouter, say: declaring its region as assumed is
+ * exactly the statement "I do not place this workload", and a dispatch-chosen zone
+ * must not override it. Declaring nothing keeps the default local setup controlled,
+ * which is what carbon-aware dispatch has always assumed.
  *
  * <p>Built once at startup, so a PUE below 1 fails the context rather than
  * surfacing on the first request.
@@ -37,15 +48,18 @@ class PropertiesProviderRegions implements ProviderRegions {
   PropertiesProviderRegions(ProviderProperties properties) {
     Map<String, ProviderRegion> declared = new LinkedHashMap<>();
     properties.getProviders().forEach((name, entry) -> {
-      if (entry == null || entry.getRegion() == null || entry.getRegion().isBlank()) {
+      if (entry == null) {
         return;
       }
       validatePue(name, entry.getPue());
+      String region = entry.getRegion() == null || entry.getRegion().isBlank()
+          ? null : entry.getRegion().trim();
       declared.put(name.toLowerCase(Locale.ROOT), new ProviderRegion(
-          name, entry.getRegion().trim(), entry.getRegionProvenance(), entry.getPue()));
+          name, region, entry.getRegionProvenance(), entry.getPue(),
+          operatorControlled(entry, region)));
     });
     this.regions = Map.copyOf(declared);
-    if (regions.isEmpty()) {
+    if (regions.values().stream().noneMatch(ProviderRegion::isDeclared)) {
       LOG.info("No egress provider declares a region — every request is booked at the"
           + " gateway's default grid zone.");
     } else {
@@ -53,9 +67,10 @@ class PropertiesProviderRegions implements ProviderRegions {
     }
   }
 
-  /** {@code name=region (provenance, PUE)} per instance, for the startup line. */
+  /** {@code name=region (provenance, PUE)} per declared region, for the startup line. */
   private String describe() {
     return regions.values().stream()
+        .filter(ProviderRegion::isDeclared)
         .map(region -> region.provider() + "=" + region.region()
             + " (" + region.provenance().label()
             + (region.pue() == null ? ", no PUE" : ", PUE " + region.pue()) + ")")
@@ -72,6 +87,19 @@ class PropertiesProviderRegions implements ProviderRegions {
   @Override
   public List<ProviderRegion> all() {
     return List.copyOf(regions.values());
+  }
+
+  /**
+   * Self-hostable type, minus an explicit {@code assumed} region — see the class
+   * javadoc. A type the gateway does not know (unset) is not controlled.
+   */
+  private static boolean operatorControlled(ProviderProperties.ProviderEntry entry,
+                                            String region) {
+    boolean selfHostable = entry.getType() == ProviderProperties.ProviderType.OLLAMA
+        || entry.getType() == ProviderProperties.ProviderType.OPENAI_COMPATIBLE;
+    boolean declaredAsAssumed = region != null
+        && entry.getRegionProvenance() != RegionProvenance.KNOWN;
+    return selfHostable && !declaredAsAssumed;
   }
 
   private static void validatePue(String name, Double pue) {
