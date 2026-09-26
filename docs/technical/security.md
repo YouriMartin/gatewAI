@@ -176,6 +176,20 @@ an edit under `<dependencies>`. When the parent lags a published fix, override t
 managed property in `<properties>` with a comment saying which advisory forced it
 and when it can be dropped — see the `tomcat.version` pin in `pom.xml`.
 
+**npm findings are different.** `package-lock.json` *is* a lockfile, so the scan
+reads resolved versions rather than resolving a range, and almost every dashboard
+dependency is transitive and `dev`-only (the SPA ships one bundle; nothing runs at
+request time). The fix is therefore usually `npm update <package>` inside
+`src/main/frontend` — that moves the lockfile to a patched release inside the range
+its parent already allows, with no `package.json` edit and no version pin to
+un-pin later. Commit the lockfile: CI builds the front end with `npm ci`, which
+installs exactly what it says. Note that osv-scanner reports dev-only packages
+like any other, so a finding on the build toolchain still fails the job even when
+it cannot reach production — bump it anyway, and record the reasoning in the
+commit rather than suppressing it. (First case: `devalue` 5.8.1 → 5.9.4 for
+GHSA-9rgm-9g3h-6x36, a quadratic-time `parse` reachable only through Svelte's
+SSR path, which this client-only dashboard never builds.)
+
 **When a finding does not apply.** Add an entry to an `osv-scanner.toml` ignore
 file with a reason **and an expiry date**, so a suppression cannot quietly become
 permanent. Do not disable the job.
