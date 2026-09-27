@@ -1,7 +1,7 @@
 package io.github.yourimartin.gatewai.domain.port.in;
 
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 
 public interface ChatCompletionUseCase {
 

@@ -3,9 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
-import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

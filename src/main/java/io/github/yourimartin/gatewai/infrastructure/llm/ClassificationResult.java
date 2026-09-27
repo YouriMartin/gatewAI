@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 /**
  * Structured output (Spring AI {@code entity}) returned by the LLM-based

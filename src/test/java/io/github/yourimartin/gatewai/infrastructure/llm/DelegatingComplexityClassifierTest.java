@@ -10,10 +10,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static io.github.yourimartin.gatewai.infrastructure.llm.ClassificationOutcomeFixtures.outcome;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

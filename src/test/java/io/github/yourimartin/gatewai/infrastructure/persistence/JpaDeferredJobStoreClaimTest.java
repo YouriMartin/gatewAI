@@ -18,10 +18,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import io.github.yourimartin.gatewai.domain.model.DeferredJob;
-import io.github.yourimartin.gatewai.domain.model.DeferredJobStatus;
-import io.github.yourimartin.gatewai.domain.model.LlmMessage;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJobStatus;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.port.out.DeferredJobStore;
 
 import org.junit.jupiter.api.AfterEach;

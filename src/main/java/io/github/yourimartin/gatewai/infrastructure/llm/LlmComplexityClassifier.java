@@ -1,10 +1,10 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.FallbackCause;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 import org.slf4j.Logger;

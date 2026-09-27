@@ -4,11 +4,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.function.DoubleSupplier;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationState;
-import io.github.yourimartin.gatewai.domain.model.CalibrationStatus;
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
-import io.github.yourimartin.gatewai.domain.model.ConformalGuarantee;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 
 /**

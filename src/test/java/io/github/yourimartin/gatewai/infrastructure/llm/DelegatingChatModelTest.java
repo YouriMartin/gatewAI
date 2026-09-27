@@ -11,10 +11,10 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.Test;

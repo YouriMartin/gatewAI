@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.DecisionReason;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

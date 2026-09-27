@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import java.time.Instant;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 public interface RequestLogRepository {
 

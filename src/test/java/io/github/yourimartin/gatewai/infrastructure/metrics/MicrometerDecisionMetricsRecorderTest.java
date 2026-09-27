@@ -13,16 +13,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
-import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
-import io.github.yourimartin.gatewai.domain.model.DecisionReason;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.HeuristicRule;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

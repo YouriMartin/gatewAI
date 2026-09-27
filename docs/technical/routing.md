@@ -6,7 +6,7 @@ registry, and the hot-config plumbing.
 
 ## Tiers and the model registry
 
-Three tiers (`domain/model/ModelTier`): `LOCAL`, `CLOUD_ENTRY`, `CLOUD_PREMIUM`.
+Three tiers (`domain/model/routing/ModelTier`): `LOCAL`, `CLOUD_ENTRY`, `CLOUD_PREMIUM`.
 
 The **model registry** maps configuration to `ModelDefinition`s
 (`PropertiesModelRegistry` over `ModelRegistryProperties`, prefix

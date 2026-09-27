@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.TracedDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.TracedDecision;
 
 /**
  * Reads back the decisions {@link DecisionRecorder} wrote (v2 batch 9).

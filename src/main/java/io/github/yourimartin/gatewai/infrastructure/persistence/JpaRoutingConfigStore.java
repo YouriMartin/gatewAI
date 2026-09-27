@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.StoredRoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.StoredRoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigStore;
 
 import org.slf4j.Logger;

@@ -10,14 +10,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.EmissionsScope;
-import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
-import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
-import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.report.EmissionsScope;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 

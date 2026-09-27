@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
-import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.carbon.ProviderRegion;
+import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 
 import org.slf4j.Logger;

@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
+import io.github.yourimartin.gatewai.domain.model.carbon.ProviderRegion;
 
 /**
  * Reads the declared region of each egress provider instance (v3 lot C.2).

@@ -4,11 +4,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import io.github.yourimartin.gatewai.domain.model.LlmMessage;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
-import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
-import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 
 import org.springframework.ai.chat.client.ChatClient;

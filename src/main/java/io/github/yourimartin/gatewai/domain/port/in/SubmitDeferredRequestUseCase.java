@@ -2,7 +2,7 @@ package io.github.yourimartin.gatewai.domain.port.in;
 
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 
 /** Submits a request for carbon-aware deferred execution. */
 public interface SubmitDeferredRequestUseCase {

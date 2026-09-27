@@ -2,9 +2,9 @@ package io.github.yourimartin.gatewai.domain.port.out;
 
 import java.util.function.Consumer;
 
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
-import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
 
 public interface LlmClient {
 

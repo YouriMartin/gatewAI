@@ -14,11 +14,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.CacheOutcome;
-import io.github.yourimartin.gatewai.domain.model.ConformalStatus;
-import io.github.yourimartin.gatewai.domain.model.PromptHash;
-import io.github.yourimartin.gatewai.domain.model.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 

@@ -3,9 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.EnergyProfile;
-import io.github.yourimartin.gatewai.domain.model.EnergySource;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

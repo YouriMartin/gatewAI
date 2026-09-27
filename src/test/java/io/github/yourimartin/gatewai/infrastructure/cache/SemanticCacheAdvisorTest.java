@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
-import io.github.yourimartin.gatewai.domain.model.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

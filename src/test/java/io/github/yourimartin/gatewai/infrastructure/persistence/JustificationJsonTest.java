@@ -6,13 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.HeuristicRule;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.RouteCandidate;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.FallbackCause;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.HeuristicRule;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.RouteCandidate;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.Test;
 

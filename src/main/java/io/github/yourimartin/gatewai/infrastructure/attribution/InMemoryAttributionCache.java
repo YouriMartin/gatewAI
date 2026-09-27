@@ -5,8 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.AttributionKey;
-import io.github.yourimartin.gatewai.domain.model.AttributionReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionKey;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionReport;
 import io.github.yourimartin.gatewai.domain.port.out.AttributionCache;
 
 import org.springframework.beans.factory.annotation.Value;

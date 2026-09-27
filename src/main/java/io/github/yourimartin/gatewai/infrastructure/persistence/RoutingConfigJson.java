@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

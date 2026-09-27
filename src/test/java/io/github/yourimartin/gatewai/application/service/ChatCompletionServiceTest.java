@@ -12,14 +12,14 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
-import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
-import io.github.yourimartin.gatewai.domain.model.LlmMessage;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
-import io.github.yourimartin.gatewai.domain.model.RequestContext;
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
-import io.github.yourimartin.gatewai.domain.model.TokenUsage;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;

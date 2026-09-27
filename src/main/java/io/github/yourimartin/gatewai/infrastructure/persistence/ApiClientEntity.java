@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

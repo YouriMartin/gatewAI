@@ -4,10 +4,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
-import io.github.yourimartin.gatewai.domain.model.LlmMessage;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.GenerateGreenReportUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;

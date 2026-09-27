@@ -2,7 +2,13 @@
 <FindBugsFilter>
   <!-- HttpSecurity.build() forces throws Exception — Spring Security API constraint -->
   <Match>
-    <Class name="io.github.yourimartin.gatewai.adapter.in.web.SecurityConfig"/>
+    <Class name="io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig"/>
     <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+  </Match>
+  <!-- RateLimitProperties is the Spring-bound singleton, shared on purpose: the filter
+       reads its live values rather than a copy taken at construction -->
+  <Match>
+    <Class name="io.github.yourimartin.gatewai.adapter.in.web.ratelimit.RateLimitFilter"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
 </FindBugsFilter>

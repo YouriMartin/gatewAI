@@ -2,11 +2,11 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.CascadeLevel;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.ConformalPredictionSet;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalPredictionSet;
+import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 

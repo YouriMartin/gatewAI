@@ -5,9 +5,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.DeferredJob;
-import io.github.yourimartin.gatewai.domain.model.DeferredJobStatus;
-import io.github.yourimartin.gatewai.domain.model.NodeIdentity;
+import io.github.yourimartin.gatewai.domain.model.context.NodeIdentity;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJobStatus;
 import io.github.yourimartin.gatewai.domain.port.out.DeferredJobStore;
 
 import org.slf4j.Logger;

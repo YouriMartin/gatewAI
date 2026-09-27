@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.DeferredJob;
-import io.github.yourimartin.gatewai.domain.model.DeferredJobStatus;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJobStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

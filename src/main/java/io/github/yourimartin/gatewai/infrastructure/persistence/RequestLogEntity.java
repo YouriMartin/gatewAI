@@ -3,12 +3,12 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.CarbonZoneSource;
-import io.github.yourimartin.gatewai.domain.model.EnergySource;
-import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
-import io.github.yourimartin.gatewai.domain.model.GreenProvenance;
-import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonZoneSource;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

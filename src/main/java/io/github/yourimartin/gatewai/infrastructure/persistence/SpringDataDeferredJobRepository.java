@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.DeferredJobStatus;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJobStatus;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

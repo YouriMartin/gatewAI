@@ -1,9 +1,10 @@
 # Security
 
 Authentication, authorization, key handling, rate limiting and request-context
-propagation. Sources: `adapter/in/web/{SecurityConfig,
-ApiKeyAuthenticationFilter, ApiKeyAuthentication, RateLimitFilter, RateLimiter}`,
-`domain/model/{ApiKeyHasher, ApiClient, RequestContext}`,
+propagation. Sources: `adapter/in/web/security/{SecurityConfig,
+ApiKeyAuthenticationFilter, ApiKeyAuthentication}`,
+`adapter/in/web/ratelimit/{RateLimitConfiguration, RateLimitFilter, RateLimiter}`,
+`domain/model/client/{ApiKeyHasher, ApiClient}`, `domain/model/context/RequestContext`,
 `application/service/ApiClientAdminService`,
 `infrastructure/persistence/AdminSeedRunner`.
 

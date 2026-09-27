@@ -1,8 +1,8 @@
 package io.github.yourimartin.gatewai.infrastructure.carbon;
 
-import io.github.yourimartin.gatewai.domain.model.CarbonAwareZoneSelector;
-import io.github.yourimartin.gatewai.domain.model.CarbonCalculator;
-import io.github.yourimartin.gatewai.domain.model.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonAwareZoneSelector;
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonCalculator;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.context.annotation.Bean;

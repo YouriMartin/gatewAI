@@ -3,9 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.LlmMessage;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

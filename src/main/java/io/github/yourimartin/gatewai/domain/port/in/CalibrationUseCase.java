@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.domain.port.in;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationState;
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 
 /**
  * Reads and recomputes the conformal calibrations (v2 batch 3).

@@ -2,16 +2,16 @@ package io.github.yourimartin.gatewai.application.service;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.Counterfactual;
-import io.github.yourimartin.gatewai.domain.model.CounterfactualReport;
-import io.github.yourimartin.gatewai.domain.model.CounterfactualStatus;
-import io.github.yourimartin.gatewai.domain.model.Counterfactuals;
-import io.github.yourimartin.gatewai.domain.model.EmbeddedRoute;
-import io.github.yourimartin.gatewai.domain.model.RouteScoring;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.explanation.Counterfactual;
+import io.github.yourimartin.gatewai.domain.model.explanation.CounterfactualReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.CounterfactualStatus;
+import io.github.yourimartin.gatewai.domain.model.explanation.Counterfactuals;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.EmbeddedRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.RouteScoring;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfigVersion;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.in.RouteCounterfactualUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
 import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;

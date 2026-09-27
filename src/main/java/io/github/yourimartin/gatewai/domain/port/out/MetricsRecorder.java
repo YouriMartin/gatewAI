@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.out;
 
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 /**
  * Records per-request observability metrics (tokens, latency, cost, carbon,

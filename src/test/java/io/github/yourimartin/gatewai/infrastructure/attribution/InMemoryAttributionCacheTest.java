@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.AttributionKey;
-import io.github.yourimartin.gatewai.domain.model.AttributionReport;
-import io.github.yourimartin.gatewai.domain.model.AttributionStatus;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.SegmentAttribution;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionKey;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionStatus;
+import io.github.yourimartin.gatewai.domain.model.explanation.SegmentAttribution;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

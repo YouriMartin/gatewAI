@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.DeferredJob;
+import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
 
 /**
  * Stores deferred jobs and hands them out, one at a time, to whichever dispatch

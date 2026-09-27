@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.out;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
 
 /**
  * Reads/applies the live routing configuration. Implemented by the adapter that

@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.metrics;
 
-import io.github.yourimartin.gatewai.domain.model.NodeIdentity;
+import io.github.yourimartin.gatewai.domain.model.context.NodeIdentity;
 
 import io.micrometer.core.instrument.MeterRegistry;
 

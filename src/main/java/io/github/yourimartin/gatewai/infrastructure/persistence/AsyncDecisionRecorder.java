@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
 import io.micrometer.core.instrument.MeterRegistry;

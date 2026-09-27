@@ -2,8 +2,8 @@
 
 How gatewAI turns token usage into cost, energy and carbon, computes the avoided
 figures, persists them, and aggregates them into reports. Sources:
-`domain/model/CarbonCalculator`, `GreenAccountant`, `EnergyProfile`, `GreenMetrics`,
-`CarbonFootprint`, `GreenProvenance`, `CarbonZoneResolver`, `ReportAggregator`;
+`domain/model/carbon/{CarbonCalculator, GreenAccountant, EnergyProfile, GreenMetrics,
+CarbonFootprint, GreenProvenance, CarbonZoneResolver}`, `domain/model/report/ReportAggregator`;
 `application/service/ChatCompletionService` and `GreenReportService`.
 
 **The claim this page supports**, and the one it does not: these are *location-based

@@ -9,8 +9,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;

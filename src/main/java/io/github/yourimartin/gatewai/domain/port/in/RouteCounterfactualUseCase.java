@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.in;
 
-import io.github.yourimartin.gatewai.domain.model.CounterfactualReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.CounterfactualReport;
 
 /**
  * Says where a prompt would have gone instead, and how close it came

@@ -9,9 +9,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.micrometer.observation.ObservationRegistry;
 

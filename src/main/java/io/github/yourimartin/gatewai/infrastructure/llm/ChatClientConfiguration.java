@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;

@@ -3,14 +3,14 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification.FallbackCause;
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.EmbeddedRoute;
-import io.github.yourimartin.gatewai.domain.model.RouteScoring;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.FallbackCause;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.EmbeddedRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.RouteScoring;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 

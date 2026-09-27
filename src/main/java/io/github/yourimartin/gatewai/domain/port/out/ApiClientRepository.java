@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
 
 public interface ApiClientRepository {
 

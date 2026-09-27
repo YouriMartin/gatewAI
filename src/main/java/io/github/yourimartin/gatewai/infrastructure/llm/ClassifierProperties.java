@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationStrategy;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

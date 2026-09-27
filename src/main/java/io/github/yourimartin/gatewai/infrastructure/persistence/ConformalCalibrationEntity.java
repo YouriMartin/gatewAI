@@ -2,9 +2,9 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 
 import java.time.Instant;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
-import io.github.yourimartin.gatewai.domain.model.ConformalGuarantee;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

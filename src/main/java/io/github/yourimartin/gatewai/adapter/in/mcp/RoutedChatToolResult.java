@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.adapter.in.mcp;
 
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 
 /**
  * MCP-facing result of a completion routed through the gateway. Surfaces not

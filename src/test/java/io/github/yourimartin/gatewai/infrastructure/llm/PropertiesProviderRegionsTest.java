@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.ProviderRegion;
-import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.carbon.ProviderRegion;
+import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
 
 import org.junit.jupiter.api.Test;
 

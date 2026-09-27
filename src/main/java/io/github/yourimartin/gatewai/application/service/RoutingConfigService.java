@@ -4,8 +4,8 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.in.RoutingConfigUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
 

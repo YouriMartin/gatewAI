@@ -1,7 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.UnknownModelException;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.springframework.ai.chat.model.ChatModel;

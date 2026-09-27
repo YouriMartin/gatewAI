@@ -1,7 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 

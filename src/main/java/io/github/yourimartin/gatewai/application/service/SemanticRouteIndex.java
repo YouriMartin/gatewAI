@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.application.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.EmbeddedRoute;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.EmbeddedRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;
 
 import org.slf4j.Logger;

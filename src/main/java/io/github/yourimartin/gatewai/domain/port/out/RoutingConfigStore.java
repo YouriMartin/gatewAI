@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.domain.port.out;
 
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.StoredRoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.StoredRoutingConfig;
 
 /**
  * The cluster-wide home of the routing rules (v3 lot B.1).

@@ -6,12 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.ClassificationJustification;
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
-import io.github.yourimartin.gatewai.domain.model.ConformalGuarantee;
-import io.github.yourimartin.gatewai.domain.model.ConformalQuantile;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalQuantile;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 /**

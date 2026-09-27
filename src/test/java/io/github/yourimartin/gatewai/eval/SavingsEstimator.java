@@ -2,13 +2,13 @@ package io.github.yourimartin.gatewai.eval;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.CarbonCalculator;
-import io.github.yourimartin.gatewai.domain.model.CarbonFootprint;
-import io.github.yourimartin.gatewai.domain.model.EnergySource;
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ModelSite;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.TokenUsage;
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonCalculator;
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonFootprint;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.carbon.ModelSite;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 /**
  * What the routing decisions would have saved against an all-premium baseline

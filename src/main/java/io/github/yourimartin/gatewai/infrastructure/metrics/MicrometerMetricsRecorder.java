@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.infrastructure.metrics;
 
 import java.util.concurrent.TimeUnit;
 
-import io.github.yourimartin.gatewai.domain.model.GreenMetrics;
-import io.github.yourimartin.gatewai.domain.model.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 
 import io.micrometer.core.instrument.MeterRegistry;

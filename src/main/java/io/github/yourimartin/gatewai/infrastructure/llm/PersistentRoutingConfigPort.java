@@ -1,7 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.StoredRoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.StoredRoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigStore;
 

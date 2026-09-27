@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.domain.port.in;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.DecisionExplanation;
-import io.github.yourimartin.gatewai.domain.model.TracedDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.TracedDecision;
+import io.github.yourimartin.gatewai.domain.model.explanation.DecisionExplanation;
 
 /**
  * Answers "why did this request go there?" (v2 batch 9).

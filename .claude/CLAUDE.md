@@ -48,6 +48,7 @@ Non-negotiable principles:
 ```
 io.github.yourimartin.gatewai
 ├── domain/model/            # Entities, value objects — zero Spring/JPA dependency
+│   └── llm, routing, calibration, decision, explanation, carbon, report, client, dispatch, context
 ├── domain/port/in/          # Inbound ports (use cases)
 ├── domain/port/out/         # Outbound ports (persistence, LLM, vector store)
 ├── application/service/     # Application services — depend on domain only
@@ -56,6 +57,7 @@ io.github.yourimartin.gatewai
 │   ├── llm/                 # ChatClient/ChatModel
 │   └── vectorstore/         # VectorStore
 └── adapter/in/web/          # REST controllers (OpenAI ingress)
+    └── chat, admin, report, security, ratelimit, error, nativehints
 ```
 
 **Dependency rules:**

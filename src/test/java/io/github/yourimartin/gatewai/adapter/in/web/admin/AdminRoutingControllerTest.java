@@ -1,0 +1,125 @@
+package io.github.yourimartin.gatewai.adapter.in.web.admin;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
+import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.port.in.RoutingConfigUseCase;
+import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(AdminRoutingController.class)
+@Import(SecurityConfig.class)
+class AdminRoutingControllerTest {
+
+  @Autowired
+  private MockMvc mockMvc;
+
+  @MockitoBean
+  private RoutingConfigUseCase useCase;
+
+  @MockitoBean
+  private ApiClientRepository apiClientRepository;
+
+  private static ApiKeyAuthentication adminAuth() {
+    return new ApiKeyAuthentication("admin-id", "admin",
+        List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+  }
+
+  private static RoutingConfig config() {
+    return new RoutingConfig("embedding", 100, 500, List.of("refactor"),
+        0.6, List.of(new SemanticRoute("code", ModelTier.CLOUD_PREMIUM,
+            List.of("refactor this", "debug that"))));
+  }
+
+  private static final String BODY = """
+      {
+        "strategy": "llm",
+        "entry_length_threshold": 120,
+        "premium_length_threshold": 600,
+        "premium_keywords": ["refactor", "debug"],
+        "route_similarity_threshold": 0.7,
+        "cascade_margin_band": 0.05,
+        "routes": [
+          {"name": "chat", "tier": "local",
+           "examples": ["hello", "bonjour"]}
+        ]
+      }
+      """;
+
+  @Test
+  void getReturnsCurrentConfig() throws Exception {
+    when(useCase.current()).thenReturn(config());
+    when(useCase.cascadeMarginBand()).thenReturn(0.02);
+
+    mockMvc.perform(get("/v1/admin/routing")
+            .with(authentication(adminAuth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.strategy").value("embedding"))
+        .andExpect(jsonPath("$.entry_length_threshold").value(100))
+        .andExpect(jsonPath("$.premium_keywords[0]").value("refactor"))
+        .andExpect(jsonPath("$.route_similarity_threshold").value(0.6))
+        .andExpect(jsonPath("$.cascade_margin_band").value(0.02))
+        .andExpect(jsonPath("$.routes[0].name").value("code"))
+        .andExpect(jsonPath("$.routes[0].tier").value("cloud_premium"))
+        .andExpect(jsonPath("$.routes[0].examples[0]").value("refactor this"));
+  }
+
+  @Test
+  void putAppliesAndReturnsUpdatedConfig() throws Exception {
+    when(useCase.current()).thenReturn(
+        new RoutingConfig("llm", 120, 600, List.of("refactor", "debug"),
+            0.7, List.of(new SemanticRoute("chat", ModelTier.LOCAL,
+                List.of("hello", "bonjour")))));
+
+    mockMvc.perform(put("/v1/admin/routing")
+            .contentType(MediaType.APPLICATION_JSON).content(BODY)
+            .with(authentication(adminAuth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.strategy").value("llm"))
+        .andExpect(jsonPath("$.premium_length_threshold").value(600))
+        .andExpect(jsonPath("$.routes[0].tier").value("local"));
+
+    // The band rides on the same endpoint but never enters RoutingConfig, so it
+    // cannot bump routing_config_version (v2 batch 4, D26).
+    verify(useCase).updateCascadeMarginBand(0.05);
+  }
+
+  @Test
+  void putReturns400ForInvalidConfig() throws Exception {
+    doThrow(new IllegalArgumentException("bad")).when(useCase).update(any());
+
+    mockMvc.perform(put("/v1/admin/routing")
+            .contentType(MediaType.APPLICATION_JSON).content(BODY)
+            .with(authentication(adminAuth())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void nonAdminIsForbidden() throws Exception {
+    mockMvc.perform(get("/v1/admin/routing")
+            .with(authentication(new ApiKeyAuthentication("u", "user"))))
+        .andExpect(status().isForbidden());
+  }
+}

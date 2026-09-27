@@ -16,10 +16,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfigVersion;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.infrastructure.llm.EvalClassifierFactory;
 
 import org.junit.jupiter.api.BeforeAll;

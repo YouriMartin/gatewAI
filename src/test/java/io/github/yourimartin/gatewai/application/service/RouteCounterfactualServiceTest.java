@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.github.yourimartin.gatewai.domain.model.Counterfactual;
-import io.github.yourimartin.gatewai.domain.model.CounterfactualReport;
-import io.github.yourimartin.gatewai.domain.model.CounterfactualStatus;
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.explanation.Counterfactual;
+import io.github.yourimartin.gatewai.domain.model.explanation.CounterfactualReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.CounterfactualStatus;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
 import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;
 

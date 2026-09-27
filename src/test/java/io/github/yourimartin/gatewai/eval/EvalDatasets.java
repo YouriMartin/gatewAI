@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

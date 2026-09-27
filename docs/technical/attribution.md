@@ -7,8 +7,8 @@ Two questions about the same ranking, answered on demand:
   and by how little it missed.
 
 Sources: `application/service/OcclusionAttributionService`,
-`application/service/RouteCounterfactualService`, `domain/model/Occlusion`,
-`domain/model/PromptSegmentation`, `domain/model/Counterfactuals`.
+`application/service/RouteCounterfactualService`, `domain/model/explanation/Occlusion`,
+`domain/model/explanation/PromptSegmentation`, `domain/model/explanation/Counterfactuals`.
 
 ## Occlusion attribution (batch 7)
 

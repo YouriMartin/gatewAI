@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.in;
 
-import io.github.yourimartin.gatewai.domain.model.AttributionReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionReport;
 
 /**
  * Explains which parts of a prompt drove its routing decision (v2 batch 7).

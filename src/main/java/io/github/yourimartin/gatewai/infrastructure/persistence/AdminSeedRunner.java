@@ -3,9 +3,9 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.ApiClient;
-import io.github.yourimartin.gatewai.domain.model.ApiKeyHasher;
-import io.github.yourimartin.gatewai.domain.model.CreatedApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiKeyHasher;
+import io.github.yourimartin.gatewai.domain.model.client.CreatedApiClient;
 import io.github.yourimartin.gatewai.domain.port.in.ManageApiClientsUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 

@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.domain.port.in;
 
 import java.util.function.Consumer;
 
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
 
 /**
  * Streaming variant of {@link ChatCompletionUseCase} (Phase 7.5). Callback-based

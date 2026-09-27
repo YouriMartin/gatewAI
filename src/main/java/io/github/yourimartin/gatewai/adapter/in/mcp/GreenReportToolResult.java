@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.adapter.in.mcp;
 import java.util.List;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
 /**
  * MCP-facing shape of an aggregated {@link GreenReport}. Kept separate from the

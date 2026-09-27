@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

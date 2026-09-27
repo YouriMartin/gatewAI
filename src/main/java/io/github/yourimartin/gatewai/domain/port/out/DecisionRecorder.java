@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.domain.port.out;
 
 import java.time.Instant;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 
 /**
  * Records the decisions the gateway takes on the request path (v2 batch 2).

@@ -24,7 +24,7 @@ Fit, offline, on labelled cases:
 3. at inference, admit a candidate when its score is at most `q̂`.
 
 The `n+1` is the whole point, and the reason
-[`ConformalQuantile`](../../src/main/java/io/github/yourimartin/gatewai/domain/model/ConformalQuantile.java)
+[`ConformalQuantile`](../../src/main/java/io/github/yourimartin/gatewai/domain/model/calibration/ConformalQuantile.java)
 is not a call to `percentile(scores, 1-alpha)`. It is the finite-sample
 correction that turns an empirical percentile into a distribution-free
 guarantee: the next observation is treated as the `(n+1)`-th member of an
@@ -217,14 +217,14 @@ at the same level of honesty as the energy coefficients.
 
 | Piece | Class |
 |---|---|
-| The quantile, with its finite-sample rule | `domain/model/ConformalQuantile` |
-| A fitted threshold + provenance + staleness | `domain/model/ConformalCalibration` |
-| What α promises | `domain/model/ConformalGuarantee` |
-| Route scoring shared by router and calibration | `domain/model/RouteScoring` |
+| The quantile, with its finite-sample rule | `domain/model/calibration/ConformalQuantile` |
+| A fitted threshold + provenance + staleness | `domain/model/calibration/ConformalCalibration` |
+| What α promises | `domain/model/calibration/ConformalGuarantee` |
+| Route scoring shared by router and calibration | `domain/model/routing/RouteScoring` |
 | Fitting, snapshotting, degradation | `application/service/ConformalCalibrationService` |
 | Storage (one row per target) | `conformal_calibration` table, `JpaCalibrationStore` |
 | Labelled cases (replaceable port) | `infrastructure/calibration/ClasspathLabelledCaseSource` |
-| Admin API | `adapter/in/web/AdminCalibrationController` |
+| Admin API | `adapter/in/web/admin/AdminCalibrationController` |
 | Gauges + startup report | `infrastructure/metrics/CalibrationMetrics` |
 
 `RouteScoring` is worth a note: the calibration must be fitted on exactly the

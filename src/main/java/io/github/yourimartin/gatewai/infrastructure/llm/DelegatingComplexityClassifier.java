@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 
 import org.springframework.context.annotation.Primary;

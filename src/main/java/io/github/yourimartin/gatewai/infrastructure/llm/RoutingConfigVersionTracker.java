@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.time.Instant;
 
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfigVersion;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
 
 import io.micrometer.core.instrument.Counter;

@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.infrastructure.metrics;
 
 import java.util.Locale;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationState;
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 
 import io.micrometer.core.instrument.Gauge;

@@ -16,10 +16,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.SemanticRoute;
-import io.github.yourimartin.gatewai.domain.model.StoredRoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
+import io.github.yourimartin.gatewai.domain.model.routing.StoredRoutingConfig;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

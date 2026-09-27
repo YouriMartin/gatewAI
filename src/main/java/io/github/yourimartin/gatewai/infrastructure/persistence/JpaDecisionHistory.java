@@ -8,9 +8,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-import io.github.yourimartin.gatewai.domain.model.CacheDecision;
-import io.github.yourimartin.gatewai.domain.model.RoutingDecision;
-import io.github.yourimartin.gatewai.domain.model.TracedDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.TracedDecision;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionHistory;
 
 import org.springframework.data.domain.PageRequest;

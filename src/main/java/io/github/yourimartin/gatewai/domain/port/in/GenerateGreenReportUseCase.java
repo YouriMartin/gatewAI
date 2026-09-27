@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.domain.port.in;
 import java.time.Instant;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
 /** Produces aggregated green reports over a date range (Phase 4.5 / 5.3). */
 public interface GenerateGreenReportUseCase {

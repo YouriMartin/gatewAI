@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.EnergySource;
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
-import io.github.yourimartin.gatewai.domain.model.ModelDefinition;
-import io.github.yourimartin.gatewai.domain.model.ReportAggregator;
+import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
+import io.github.yourimartin.gatewai.domain.model.report.ReportAggregator;
 import io.github.yourimartin.gatewai.domain.port.in.GenerateGreenReportUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;

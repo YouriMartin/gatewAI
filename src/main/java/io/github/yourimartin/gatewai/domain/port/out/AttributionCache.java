@@ -2,8 +2,8 @@ package io.github.yourimartin.gatewai.domain.port.out;
 
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.AttributionKey;
-import io.github.yourimartin.gatewai.domain.model.AttributionReport;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionKey;
+import io.github.yourimartin.gatewai.domain.model.explanation.AttributionReport;
 
 /**
  * Remembers computed attributions (v2 batch 7).

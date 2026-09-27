@@ -3,7 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
 
 import org.springframework.ai.ollama.management.PullModelStrategy;
 import org.springframework.boot.context.properties.ConfigurationProperties;

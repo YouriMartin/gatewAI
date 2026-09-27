@@ -12,10 +12,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import io.github.yourimartin.gatewai.domain.model.EmissionsBreakdown;
-import io.github.yourimartin.gatewai.domain.model.GreenReport;
-import io.github.yourimartin.gatewai.domain.model.LlmRequest;
-import io.github.yourimartin.gatewai.domain.model.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.report.EmissionsBreakdown;
+import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.GenerateGreenReportUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;

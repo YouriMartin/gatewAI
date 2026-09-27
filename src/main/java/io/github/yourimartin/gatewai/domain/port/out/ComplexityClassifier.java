@@ -1,6 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.out;
 
-import io.github.yourimartin.gatewai.domain.model.ClassificationOutcome;
+import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 
 /**
  * Classifies a request into the cheapest model tier that can handle it.

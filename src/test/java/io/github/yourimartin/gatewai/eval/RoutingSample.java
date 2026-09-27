@@ -2,7 +2,7 @@ package io.github.yourimartin.gatewai.eval;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 /**
  * One labelled routing case: a prompt and the tier a human says it deserves.

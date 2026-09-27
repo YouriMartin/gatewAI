@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.yourimartin.gatewai.domain.model.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
 
 /**
  * Stores the current calibration per target (v2 batch 3).

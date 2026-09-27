@@ -2,7 +2,7 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.util.List;
 
-import io.github.yourimartin.gatewai.domain.model.RequestEmbeddingMemo;
+import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.document.Document;

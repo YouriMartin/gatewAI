@@ -2,7 +2,7 @@
 
 For non-interactive workloads, a request can be submitted asynchronously and run
 later at the **greenest** candidate zone. Sources:
-`adapter/in/web/AsyncChatCompletionController`,
+`adapter/in/web/chat/AsyncChatCompletionController`,
 `application/service/DeferredChatService`,
 `infrastructure/dispatch/{CarbonAwareDispatchWorker, DispatchProperties,
 DispatchSchedulingConfig}`,

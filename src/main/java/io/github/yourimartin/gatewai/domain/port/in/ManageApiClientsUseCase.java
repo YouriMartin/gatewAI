@@ -3,8 +3,8 @@ package io.github.yourimartin.gatewai.domain.port.in;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.yourimartin.gatewai.domain.model.ApiClient;
-import io.github.yourimartin.gatewai.domain.model.CreatedApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.CreatedApiClient;
 
 /** Admin operations on API clients / keys (Phase 5.1). */
 public interface ManageApiClientsUseCase {

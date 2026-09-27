@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfig;
-import io.github.yourimartin.gatewai.domain.model.RoutingConfigVersion;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
+import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfigVersion;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 import io.github.yourimartin.gatewai.infrastructure.llm.EvalClassifierFactory;
 
