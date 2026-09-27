@@ -1,92 +1,10 @@
-# Green AI Proxy & Router — Project context
+# Progress log
 
-Open-source, self-hosted (**on-premise**) LLM proxy / gateway for enterprises:
-it secures, caches, routes and measures the carbon footprint of AI requests.
-A Java/Spring portfolio project, built solo.
+Detailed, batch-by-batch record of what shipped — moved out of the agent
+instructions (`CLAUDE.md` / `AGENTS.md`) on 2026-09-27 so it no longer loads into
+every agent session. The plans live in the `roadmap-*.md` files next to this one;
+implementation deviations in [`../decisions.md`](../decisions.md).
 
-## Stack
-- **Java 25 LTS** (Virtual Threads + Scoped Values)
-- **Spring Boot 4.0**, **Spring AI 2.0**
-- **PostgreSQL + pgvector** — single database: vector cache **AND** relational metrics
-- **In-process embeddings** — ONNX (DJL + ONNX Runtime), 384 dim, fetched at build time into the jar (v3 lot A)
-- **Ollama** — local chat egress only (no longer on the decision path)
-- **Docker Compose** for local infra
-- Build: **Maven** (wrapper `./mvnw`)
-
-## Architecture (to follow strictly)
-A single processing chain, not three applications. Thin gateway + Spring AI **Advisor** chain.
-
-```
-Client → OpenAI-format ingress (/v1/chat/completions) → DTO mapping → Prompt
-   → [Advisor 1] semantic cache    ── short-circuits on hit (does not call chain.nextCall())
-   → [Advisor 2] router            ── picks the target ChatClient
-   → [Advisor 3] green accounting  ── € cost + gCO2
-      → egress: real ChatModel (any configured provider mix; local-first default)
-   ← remap response → OpenAI DTO → Client
-```
-
-Non-negotiable principles:
-- **Ingress** (the format clients speak = OpenAI) and **egress** (the provider called) are **independent**.
-- Egress is **provider-agnostic and local-first**: provider instances are declared under
-  `gatewai.providers.<name>` (anthropic | openai | openai-compatible | ollama), the model registry
-  references them by name, and there is **no fallback provider** (unknown model id → 400). No API
-  key is required by default — all tiers run on Ollama.
-- The custom cache implements `CallAdvisor`/`StreamAdvisor`, low `getOrder()`, short-circuits by **not calling** `chain.nextCall()`.
-- All persistence (the `RequestLog` entity + cache vectors) goes into the **same PostgreSQL**.
-- Depend on the `VectorStore` interface, **never** on pgvector directly (reversibility toward Qdrant).
-- **Structured Concurrency = preview → DO NOT use it** in the core. **Scoped Values = OK** (client/trace context propagation).
-
-## Commands
-- Tests: `./mvnw test`
-- Run the app: `./mvnw spring-boot:run` (Boot starts Postgres via `compose.yaml`; local chat egress is opt-in: `docker compose --profile inference up -d`)
-- Infra only: `docker compose up -d`
-- The embedding model is **not in git**: `download-maven-plugin` fetches it at `generate-resources` (pinned SHA-256, cached in `~/.m2`)
-- **Always run `./mvnw test` before committing.**
-
-## Hexagonal architecture (packages)
-
-```
-io.github.yourimartin.gatewai
-├── domain/model/            # Entities, value objects — zero Spring/JPA dependency
-│   └── llm, routing, calibration, decision, explanation, carbon, report, client, dispatch, context
-├── domain/port/in/          # Inbound ports (use cases)
-├── domain/port/out/         # Outbound ports (persistence, LLM, vector store)
-├── application/service/     # Application services — depend on domain only
-├── infrastructure/          # Outbound adapters — implement out ports
-│   ├── persistence/         # JPA
-│   ├── llm/                 # ChatClient/ChatModel
-│   └── vectorstore/         # VectorStore
-└── adapter/in/web/          # REST controllers (OpenAI ingress)
-    └── chat, admin, report, security, ratelimit, error, nativehints
-```
-
-**Dependency rules:**
-- `domain` depends on nothing (no Spring, no JPA, no Spring AI)
-- `application` depends on `domain` only
-- `infrastructure` implements the `out` ports of `domain`
-- `adapter.in.web` calls the `in` ports of `domain`
-- These rules are enforced by **ArchUnit** (`ArchitectureTest.java`)
-
-## Conventions
-- Java `record` for DTOs.
-- Spring AI 2.0 immutable builders (no setters).
-- Jackson 3 → `tools.jackson` package (not `com.fasterxml.jackson`).
-- Secrets via environment variables, **never committed** (`ANTHROPIC_API_KEY`).
-- Short commit messages, **in English**, imperative mood.
-- **Always propose a commit message at the end of each implementation.**
-
-## Tests
-- Naming: `{Class}Test.java` in the mirror package under `src/test/java`
-- Unit tests on all classes **except**: REST controllers (integration-tested), trivial mappers
-- `ArchitectureTest` validates the hexagonal rules via ArchUnit
-- **Always run `./mvnw test` before committing**
-
-## Linters & static analysis
-- **Checkstyle** (`maven-checkstyle-plugin`) — `validate` phase, fail-fast, config `checkstyle.xml` (Google Style + overrides)
-- **SpotBugs** (`spotbugs-maven-plugin`) — `verify` phase, effort=max, threshold=low
-- `./mvnw verify` runs all three (Checkstyle + Tests + SpotBugs)
-
-## Status / roadmap
 MVP = Phases 0 to 2 + part of Phase 3 (details in `docs/developpment/plan-action-green-ai-proxy.md`).
 Progress: _(to be kept up to date)_
 - [x] Phase 0 — skeleton + local infra
@@ -125,8 +43,8 @@ Progress: _(to be kept up to date)_
 - [x] v2 batch 9 — decision API + dashboard: `DecisionHistory` out port + `JpaDecisionHistory` (merged across both decision tables), `DecisionExplanationUseCase`, `GET /v1/admin/decisions[?limit]`, `GET /v1/admin/decisions/{correlationId}` (stored rows, no recomputation), `POST /v1/admin/decisions/explain` (correlationId **or** prompt; a past decision answers `PROMPT_UNAVAILABLE` since only hashes are stored), rate-limited + admin-only + native hints; "why this decision" dashboard panel; cascade margin band now editable via `/v1/admin/routing` while staying out of `routing_config_version` (`docs/technical/decision-tracing.md`)
 - [x] v2 batch 10 — documentation (closes v2): ADRs 0008 (conformal over tuning/Platt), 0009 (occlusion over gradients), 0010 (tracing cache decisions like routing); compliance note in `decision-tracing.md` (what each store holds — the vector cache **does** keep prompt text — what replays, AI Act art. 50 sourced to Reg. (EU) 2024/1689 + the Commission FAQ, evidence not compliance); `testing-and-quality.md` (549 tests, why no Testcontainers, the untested composition seam); `api-reference.md` cascade-band drift fixed; `roadmap-post-v1.md` cascade done / feedback loop half done
 
-- [x] v3 (`docs/developpment/roadmap-v3.md`) — **all three lots done (A, B, C)**; **lot A**: in-process ONNX embedding (`paraphrase-multilingual-MiniLM-L12-v2`, int8, 384d, fetched at build time; PyTorch engine excluded; jar 161→349 MiB; boots in 7.9 s with no model server), vector schema 768→384 (upgrade = `DROP TABLE vector_store`; skipping it silently kills the cache, traced `outcome=ERROR`), model chosen on measurements (82.0 % calibrated routing vs 73.0 % EN-only and 81.0 % e5), fixtures/baselines/calibrations redone (`route-similarity-threshold` 0.60→**0.25**, q̂ 0.9526 cache / 0.2221 routing, decisions 34→**3.2 ms** p50), native hints + [ADR 0011](docs/technical/adr/0011-in-process-onnx-embedding.md).
-  - **lot B — multi-instance readiness** (no Redis; state inventory + per-batch status in [`docs/technical/clustering.md`](docs/technical/clustering.md)):
+- [x] v3 (`docs/developpment/roadmap-v3.md`) — **all three lots done (A, B, C)**; **lot A**: in-process ONNX embedding (`paraphrase-multilingual-MiniLM-L12-v2`, int8, 384d, fetched at build time; PyTorch engine excluded; jar 161→349 MiB; boots in 7.9 s with no model server), vector schema 768→384 (upgrade = `DROP TABLE vector_store`; skipping it silently kills the cache, traced `outcome=ERROR`), model chosen on measurements (82.0 % calibrated routing vs 73.0 % EN-only and 81.0 % e5), fixtures/baselines/calibrations redone (`route-similarity-threshold` 0.60→**0.25**, q̂ 0.9526 cache / 0.2221 routing, decisions 34→**3.2 ms** p50), native hints + [ADR 0011](../technical/adr/0011-in-process-onnx-embedding.md).
+  - **lot B — multi-instance readiness** (no Redis; state inventory + per-batch status in [`docs/technical/clustering.md`](../technical/clustering.md)):
     - [x] B.0 — audit: every piece of node-local state, its verdict and the batch that owns it
     - [x] B.1 — routing config persisted (`routing_config`, single row, `V6`) and propagated: `PersistentRoutingConfigPort` (`@Primary`) writes through and polls every `gatewai.routing.config-sync-interval-ms` (5 s); `application.properties` is now only the seed, edits survive restarts, `routing_config_version` identical cluster-wide. Measured on two nodes: convergence 2.05 s, one change counted per node
     - [x] B.2 — deferred jobs persisted (`deferred_job`, `V7`) and **claimed** one at a time with `FOR UPDATE SKIP LOCKED` (`JpaDeferredJobStore`); crash recovery by lease (`claimed_by` + `lease_expires_at`, swept every tick) → concurrent claims exactly-once, a lease expiry at-least-once. Every node works the queue, so the dispatch worker is deliberately **not** leader-gated. Verified on two nodes: 32 jobs / 32 executions / 0 duplicates, jobs survived a full stop, node A's job completed by node B. Gap named: prompts stored in clear text with no retention policy
@@ -139,15 +57,5 @@ Progress: _(to be kept up to date)_
     - [x] C.3 — intensity resolved **per request**: `CarbonZoneResolver` (pure domain, plain values — the onion rule bars a domain model from the ports) walks dispatch zone (operator-controlled providers only) → provider region (via `CloudRegionZones`) → gateway default (a **null** zone, so `gramsCo2PerKwh()` keeps owning its value). `operatorControlled` is derived from the provider type + "not an explicitly assumed region", so a hosted OpenAI-compatible endpoint is excluded without a new property. For a hosted API the dispatch zone is **recorded, not applied** (`dispatchRecordedOnly()`). Also fixed one step removed: `GreenAccountant` now takes **two** intensities, so the avoided figure prices the premium baseline at *its* provider's grid. Verified live on a real Postgres: premium 0.0805 gCO2 (×350, was 0.0529 at ×230), deferred local 0.00312 (×30 — dispatch still applies on your own box), deferred premium 0.1015 (×350 with `chosen_zone=SE` stored)
     - [x] C.4 — energy is an `EnergyProfile` value object, not a scalar: `prefill×promptTokens/1k + decode×completionTokens/1k + fixed`, × PUE (provider's, else **1.2** — top of EcoLogits' published range), × grid. Config moved to a nested `energy.*` group (`energy.source` replaces C.1's flat key) and gained `includes-datacenter-overhead`, because a full-stack vendor figure must NOT be multiplied by PUE while a GPU-level parametric one must. Coefficients are **sourced with read-dates** (2026-09-13): `MODELLED` = EcoLogits' per-output-token fit (H100, batch 64) × the 60 GPUs its memory formula needs, prefill from 2 FLOPs/param/token at 40 % of 989 TFLOPS BF16 / 700 W, on a documented 200–600 B active-parameter range (midpoint stored, no interval propagated); `VENDOR_PUBLISHED` = Google's 0.24 Wh median Gemini prompt (arXiv:2508.15734). Mistral's LCA cited but deliberately unused (gCO2e incl. embodied, not kWh). `GreenAccountant.account` now takes two `ModelSite`s + a `TokenUsage`. Verified live: 320/322 tokens → 0.0059471552 kWh → 2.0815 gCO2, mirror-image rows differ 34×, vendor entry flat at 0.00024 kWh with its PUE correctly not applied
     - [x] C.5 — `GreenProvenance` on `RequestLog` (`V9`, **eight** nullable columns: `provider`, `grid_zone`, `grid_intensity_g_per_kwh`, `grid_zone_source`, `dispatch_zone`, `region_provenance`, `energy_source`, `pue`) so a row explains itself — `grams_co2 = energy_kwh x grid_intensity` re-derives on the row, and C.3's recorded-vs-applied dispatch zone finally lands in the data. Pre-V9 rows come back `UNKNOWN` (bucketed `unattributed`/`unknown`), never back-dated. `EmissionsBreakdown` splits gCO2 **by region and by provider** from the stored rows, flags **assumed** regions, and every surface states `SCOPE_BASIS` (location-based Scope 2 only): CSV header + sections, PDF section 5, JSON/MCP fields, dashboard panel. Deliberate limit: the coefficient set is not stored, so energy does not re-derive from tokens. Caught by reading the real PDF: the `unattributed` bucket was labelled 'known', now 'no region attributed'
-    - [x] C.6 — **lot C closed**: [ADR 0012](docs/technical/adr/0012-region-on-the-provider-instance.md) (region belongs to the provider instance — not the model, which would let two entries of one connection disagree, and not the vendor response, which does not carry it; plus why a dispatch zone never overrides a hosted API) and [ADR 0013](docs/technical/adr/0013-sourced-and-labelled-not-measured.md) (sourced-and-labelled beats both measuring — impossible from here — and dropping the feature; names exactly what a later lot D would change: a `MEASURED` label for local models, not a coefficient edit). Honesty pass: `carbon-intensity-reliability.md` §5 is now a **scored** table (auditable methodology done, measured factors partly with lot D owning the rest, marginal intensity + multi-region open and post-v3), and three stale 'placeholder' claims retired (ADR 0006, `roadmap-post-v1.md`, `plan-action-documentation.md`)
+    - [x] C.6 — **lot C closed**: [ADR 0012](../technical/adr/0012-region-on-the-provider-instance.md) (region belongs to the provider instance — not the model, which would let two entries of one connection disagree, and not the vendor response, which does not carry it; plus why a dispatch zone never overrides a hosted API) and [ADR 0013](../technical/adr/0013-sourced-and-labelled-not-measured.md) (sourced-and-labelled beats both measuring — impossible from here — and dropping the feature; names exactly what a later lot D would change: a `MEASURED` label for local models, not a coefficient edit). Honesty pass: `carbon-intensity-reliability.md` §5 is now a **scored** table (auditable methodology done, measured factors partly with lot D owning the rest, marginal intensity + multi-region open and post-v3), and three stale 'placeholder' claims retired (ADR 0006, `roadmap-post-v1.md`, `plan-action-documentation.md`)
     - Scope: **location-based Scope 2 only**, stated in the report header — market-based (renewable PPAs) differs by an order of magnitude and is post-v3
-
-## Frontend build (mono-repo)
-- Svelte+Vite app in `src/main/frontend`, built into `target/classes/static` (bundled in the jar).
-- `./mvnw package` builds the frontend (`frontend` profile active by default); `./mvnw test` stays Node-free.
-- Back-end-only work: `./mvnw … -DskipFrontend`. Frontend dev: `npm run dev` (proxies `/v1` → `:8080`).
-
-## Communication preferences
-- **After each implementation**: explain in detail what was done and why (technical choices, trade-offs, links to the architecture).
-- **Before each command**: explain why the command is needed before asking for confirmation.
-- **Language**: **100% English** project since 2026-06-28 — all documentation, code comments, commit messages and new artifacts are written in English. (Chat replies to the user are in English too.)
