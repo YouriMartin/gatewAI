@@ -79,6 +79,9 @@ class EvaluationHarnessTest {
   private static ConformalCalibration cacheFit;
   private static HarnessCalibrator.Coverage routingCoverage;
   private static HarnessCalibrator.Coverage cacheWrongAnswerRate;
+  private static List<ConversationCase> conversationTest;
+  private static VectorFixture conversationVectors;
+  private static ConversationCacheEvaluator.Result conversationResult;
 
   @BeforeAll
   static void evaluate() {
@@ -160,6 +163,14 @@ class EvaluationHarnessTest {
     savings = SavingsEstimator.estimate(
         routingTestCalibratedResult.predictions(), config);
 
+    // --- v4 A.1: the real cache advisor on conversations, at the fixed threshold.
+    conversationTest = EvalDatasets.conversations(EvalDatasets.CONVERSATION_TEST);
+    conversationVectors = VectorFixture.load(EvalPaths.CONVERSATION_VECTORS);
+    conversationResult = ConversationCacheEvaluator.evaluate(conversationTest,
+        new ReplayEmbeddingModel(conversationVectors.vectors(),
+            conversationVectors.provenance().dimensions()),
+        threshold);
+
     EvalReport report = new EvalReport(vectors.provenance(),
         RoutingConfigVersion.of(routingConfig));
     report.routing("routingCalibration", routingCalibrationResult);
@@ -175,12 +186,14 @@ class EvaluationHarnessTest {
     report.conformal(routingFit, routingCoverage, cacheFit, cacheWrongAnswerRate);
     report.escalation(cascadeTestResult, routingTestCalibratedResult,
         config.cascadeMarginBand(), cascadeBandSweep);
+    report.conversation("conversationTest", conversationResult);
     report.write(EvalPaths.REPORT_DIR);
 
     System.out.printf(
         "Evaluation: routing %.1f%% fixed -> %.1f%% calibrated (heuristic %.1f%%), "
             + "cache FP %.1f%% -> %.1f%%, FN %.1f%% -> %.1f%%, "
-            + "coverage %.1f%% (target %.1f%%) — report in %s%n",
+            + "coverage %.1f%% (target %.1f%%), conversations: cross-context hits %.1f%%, "
+            + "same-context hits %.1f%% — report in %s%n",
         routingTestResult.accuracy() * 100,
         routingTestCalibratedResult.accuracy() * 100,
         heuristicBaselineResult.accuracy() * 100,
@@ -189,6 +202,8 @@ class EvaluationHarnessTest {
         cacheTestResult.confusion().falseNegativeRate() * 100,
         cacheTestCalibratedResult.confusion().falseNegativeRate() * 100,
         routingCoverage.rate() * 100, routingCoverage.target() * 100,
+        conversationResult.overall().crossContextHitRate() * 100,
+        conversationResult.overall().sameContextHitRate() * 100,
         EvalPaths.REPORT_DIR.toAbsolutePath());
   }
 
@@ -287,6 +302,28 @@ class EvaluationHarnessTest {
     assertEquals(config.embeddingModelId(), vectors.provenance().embeddingModel(),
         "fixtures were recorded with a different embedding model. Re-record: "
             + EvalPaths.RECORD_COMMAND);
+    assertEquals(EvalDatasets.digest(EvalDatasets.CONVERSATION_TEST),
+        conversationVectors.provenance().datasetDigest(),
+        "conversation fixtures were recorded on different data. Re-record: "
+            + EvalPaths.RECORD_COMMAND);
+    assertEquals(config.embeddingModelId(), conversationVectors.provenance().embeddingModel(),
+        "conversation fixtures were recorded with a different embedding model. Re-record: "
+            + EvalPaths.RECORD_COMMAND);
+  }
+
+  @Test
+  @DisplayName("the cache serves across conversation contexts no more often than it used to")
+  void conversationCacheMeetsBaseline() {
+    conversationResult.byTag().forEach((tag, score) -> {
+      if (score.crossContextHitRate() != null) {
+        assertAtMost("conversationCrossContextHitRateMax." + tag,
+            score.crossContextHitRate());
+      }
+      if (score.sameContextHitRate() != null) {
+        assertMetric("conversationSameContextHitRateMin." + tag,
+            score.sameContextHitRate());
+      }
+    });
   }
 
   @Test

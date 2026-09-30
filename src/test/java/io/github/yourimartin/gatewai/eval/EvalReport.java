@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -364,6 +365,74 @@ final class EvalReport {
     node.put("pending", reason);
     markdown.append("## ").append(key).append("\n\nNot measurable yet: ")
         .append(reason).append("\n\n");
+  }
+
+  /**
+   * The conversation blind spot (v4 A.1): two rates, never folded into one
+   * accuracy, for the reason {@link ConversationCacheEvaluator} gives.
+   */
+  void conversation(String key, ConversationCacheEvaluator.Result result) {
+    ObjectNode node = metrics().putObject(key);
+    node.put("threshold", result.threshold());
+    node.put("total", result.outcomes().size());
+    putConversationScore(node.putObject("overall"), result.overall());
+    ObjectNode byTag = node.putObject("byTag");
+    result.byTag().forEach((tag, score) -> putConversationScore(byTag.putObject(tag), score));
+    ArrayNode wrong = node.putArray("wrong");
+    for (ConversationCacheEvaluator.Outcome outcome : result.outcomes()) {
+      if (outcome.wrong()) {
+        ObjectNode entry = wrong.addObject();
+        entry.put("id", outcome.conversation().id());
+        entry.put("served", outcome.served());
+        entry.put("similarity", round(outcome.similarity()));
+      }
+    }
+
+    markdown.append("## Cache — conversations (").append(key).append(")\n\n")
+        .append("The real `SemanticCacheAdvisor`, fixed threshold ")
+        .append(result.threshold()).append(", no calibration (n=")
+        .append(result.outcomes().size()).append("). `cross_context_hit_rate`: served on ")
+        .append("NO cases, lower is better. `same_context_hit_rate`: served on YES cases.\n\n")
+        .append("| Tag | n | cross_context_hit_rate | same_context_hit_rate |\n")
+        .append("|---|---|---|---|\n");
+    result.byTag().forEach(this::appendConversationRow);
+    appendConversationRow("**all**", result.overall());
+    markdown.append('\n');
+
+    List<String> wrongIds = result.outcomes().stream()
+        .filter(ConversationCacheEvaluator.Outcome::wrong)
+        .map(outcome -> outcome.conversation().id() + " ("
+            + (outcome.served() ? "served" : "refused") + ", "
+            + round(outcome.similarity()) + ")")
+        .toList();
+    if (!wrongIds.isEmpty()) {
+      markdown.append("Wrong decisions (first ").append(MISSES_SHOWN).append(" of ")
+          .append(wrongIds.size()).append("): ")
+          .append(String.join(", ", wrongIds.stream().limit(MISSES_SHOWN).toList()))
+          .append("\n\n");
+    }
+  }
+
+  private static void putConversationScore(ObjectNode node,
+                                           ConversationCacheEvaluator.TagScore score) {
+    node.put("noCases", score.noCases());
+    node.put("yesCases", score.yesCases());
+    if (score.crossContextHitRate() != null) {
+      node.put("crossContextHitRate", round(score.crossContextHitRate()));
+    }
+    if (score.sameContextHitRate() != null) {
+      node.put("sameContextHitRate", round(score.sameContextHitRate()));
+    }
+  }
+
+  private void appendConversationRow(String tag, ConversationCacheEvaluator.TagScore score) {
+    markdown.append("| ").append(tag)
+        .append(" | ").append(score.noCases() + score.yesCases())
+        .append(" | ").append(score.crossContextHitRate() == null
+            ? "—" : percent(score.crossContextHitRate()))
+        .append(" | ").append(score.sameContextHitRate() == null
+            ? "—" : percent(score.sameContextHitRate()))
+        .append(" |\n");
   }
 
   void write(Path directory) {

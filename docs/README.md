@@ -53,6 +53,7 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 - [`contributing.md`](developpment/contributing.md) — build, test, conventions, how to make common changes
 - [`roadmap-v2.md`](developpment/roadmap-v2.md) — v2 action plan: explainable, calibrated decisions (done)
 - [`roadmap-v3.md`](developpment/roadmap-v3.md) — v3 action plan: in-process ONNX embedding, multi-instance readiness, cloud carbon (done)
+- [`roadmap-v4.md`](developpment/roadmap-v4.md) — v4 action plan: from portfolio to a tool people use (in progress)
 - [`progress.md`](developpment/progress.md) — batch-by-batch log of what shipped (moved out of the agent instructions)
 - [`roadmap-post-v1.md`](developpment/roadmap-post-v1.md) — directional backlog after v1
 - [`plan-action-green-ai-proxy.md`](developpment/plan-action-green-ai-proxy.md) — product action plan (phases 0–6)

@@ -51,12 +51,13 @@ import org.springframework.ai.transformers.TransformersEmbeddingModel;
 class EvalFixtureRecorderTest {
 
   @Test
-  void recordsRoutingVectorsAndCacheSimilarities() {
+  void recordsEvaluationFixtures() {
     EvalConfig config = EvalConfig.load();
     RoutingConfig routingConfig = config.routingConfig();
     String modelId = config.embeddingModelId();
 
-    CapturingEmbeddingModel model = new CapturingEmbeddingModel(inProcess(config));
+    EmbeddingModel shipped = inProcess(config);
+    CapturingEmbeddingModel model = new CapturingEmbeddingModel(shipped);
     // Recorded at the fixed threshold: fixtures hold vectors, and the vectors do
     // not depend on which threshold reads them.
     ComplexityClassifier classifier = EvalClassifierFactory.embeddingClassifier(
@@ -101,8 +102,24 @@ class EvalFixtureRecorderTest {
         similarities)
         .write(EvalPaths.FIXTURE_SOURCE_DIR.resolve("cache-similarities.json"));
 
-    System.out.printf("Recorded %d vectors and %d pair similarities into %s%n",
-        model.captured().size(), similarities.size(), EvalPaths.FIXTURE_SOURCE_DIR);
+    // v4 A.1: run the real cache advisor over the conversation cases, so the
+    // fixture holds exactly the texts it embeds — whatever it decides to embed.
+    CapturingEmbeddingModel conversationModel = new CapturingEmbeddingModel(shipped);
+    ConversationCacheEvaluator.evaluate(
+        EvalDatasets.conversations(EvalDatasets.CONVERSATION_TEST), conversationModel,
+        config.cacheSimilarityThreshold());
+    new VectorFixture(
+        new FixtureProvenance(modelId, conversationModel.dimensions(), Instant.now().toString(),
+            EvalDatasets.digest(EvalDatasets.CONVERSATION_TEST),
+            RoutingConfigVersion.of(routingConfig)),
+        LatencyStats.NONE,
+        conversationModel.captured())
+        .write(EvalPaths.FIXTURE_SOURCE_DIR.resolve("conversation-vectors.json"));
+
+    System.out.printf(
+        "Recorded %d routing vectors, %d pair similarities and %d conversation vectors into %s%n",
+        model.captured().size(), similarities.size(), conversationModel.captured().size(),
+        EvalPaths.FIXTURE_SOURCE_DIR);
   }
 
   /**

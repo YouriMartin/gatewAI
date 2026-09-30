@@ -67,6 +67,19 @@ particular:
 
 ## Semantic cache trade-offs
 
+- **The cache ignores the conversation around the last message — measured, not
+  yet fixed.** The cache key is the last user message only (and only its first
+  128 tokens): the system prompt, the conversation history, the pinned model and
+  the OpenAI `user` field are not part of it. Two conversations under one API key
+  that both end with "Give me an example in Java" get the same answer; in a
+  support bot whose system prompt carries the customer's data, one customer can
+  receive the answer written for another. On 100 labelled conversation cases
+  (v4 A.1), the cache served **64 of 64 (100 %)** of the cases it should have
+  refused, each at similarity 1.0 — no threshold changes that, and there is no
+  switch to turn the cache off. Until v4 A.2 scopes the cache by conversation
+  context, do not put multi-turn, system-prompt-templated or per-end-user
+  traffic behind gatewAI. See
+  [`evaluation.md`](../technical/evaluation.md#what-the-conversation-set-found-v4-a1).
 - A high-enough similarity can return a **stored answer for a prompt that only
   looks similar**, which may be wrong or stale for the new intent. Tune the
   threshold for your tolerance.

@@ -11,6 +11,9 @@ final class EvalPaths {
   /** Classpath resource holding the recorded query/entry similarities. */
   static final String CACHE_SIMILARITIES = "/eval/fixtures/cache-similarities.json";
 
+  /** Classpath resource holding the vectors of the texts the cache embeds for conversations. */
+  static final String CONVERSATION_VECTORS = "/eval/fixtures/conversation-vectors.json";
+
   /** Source tree the recorder writes to, so fixtures land under version control. */
   static final Path FIXTURE_SOURCE_DIR =
       Path.of("src", "test", "resources", "eval", "fixtures");

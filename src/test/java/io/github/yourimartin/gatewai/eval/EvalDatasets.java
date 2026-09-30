@@ -35,6 +35,7 @@ final class EvalDatasets {
   static final String ROUTING_TEST = "/eval/routing-test.jsonl";
   static final String CACHE_CALIBRATION = "/eval/cache-calibration.jsonl";
   static final String CACHE_TEST = "/eval/cache-test.jsonl";
+  static final String CONVERSATION_TEST = "/eval/conversation-test.jsonl";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final int DIGEST_LENGTH = 16;
@@ -76,6 +77,20 @@ final class EvalDatasets {
    * fixtures no longer describe the data it is about to score — the same
    * provenance discipline batch 2 applies to routing decisions.
    */
+  static List<ConversationCase> conversations(String resource) {
+    List<ConversationCase> cases = new ArrayList<>();
+    for (JsonNode node : read(resource)) {
+      cases.add(new ConversationCase(
+          node.path("id").asString(),
+          turns(node.path("stored")),
+          turns(node.path("incoming")),
+          "YES".equals(node.path("judgment").asString()),
+          node.path("language").asString(),
+          strings(node.path("tags"))));
+    }
+    return List.copyOf(cases);
+  }
+
   static String digest(String... resources) {
     MessageDigest digest;
     try {
@@ -117,6 +132,13 @@ final class EvalDatasets {
     } catch (IOException e) {
       throw new UncheckedIOException("Could not read " + resource, e);
     }
+  }
+
+  private static List<ConversationCase.Turn> turns(JsonNode array) {
+    List<ConversationCase.Turn> turns = new ArrayList<>();
+    array.forEach(node -> turns.add(new ConversationCase.Turn(
+        node.path("role").asString(), node.path("content").asString())));
+    return turns;
   }
 
   private static List<String> strings(JsonNode array) {

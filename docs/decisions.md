@@ -7,6 +7,28 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot A — A.1 (measure the conversation blind spot)
+
+- **One rate per tag, not two.** The plan asked for both metrics per tag. Each
+  tag carries a fixed judgment (the labelling rules make it so), so a NO tag has no
+  YES case to compute `same_context_hit_rate` on, and the reverse. The report
+  prints the one that exists and a dash for the other; the overall row has both.
+- **Per-tag baselines, flat keys.** `baselines.json` gains
+  `conversationCrossContextHitRateMax.<tag>` and
+  `conversationSameContextHitRateMin.<tag>`: a per-tag ceiling is what lets A.2
+  prove each collision category closed, and an overall ceiling at 1.0 would only
+  say that something is still served. The ceilings sit at 1.0 today, which checks
+  nothing yet — that is the recorded "before", as the batch asked.
+- **The dataset checks got their own class.** `ConversationDatasetTest` holds the
+  labelling-rule, collision/paraphrase-shape and tokenizer checks;
+  `EvaluationHarnessTest` only scores. The split was forced by the 500-line
+  Checkstyle limit, and it also separates two kinds of failure: bad labels versus
+  a regressed cache.
+- **The harness maps roles itself.** `SpringAiLlmClient.toSpringMessage` is
+  private; the evaluator mirrors it for `system`/`user`/`assistant`, the only roles
+  the dataset uses. B.1 changes that mapping (`developer`, `tool`); if it adds a
+  role to the dataset, the evaluator must follow.
+
 ## v3 lot C — C.5 (self-describing rows, region reporting)
 
 - **Eight provenance columns, not the three the plan named.** `grid_zone`,

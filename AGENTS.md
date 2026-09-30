@@ -98,5 +98,4 @@ io.github.yourimartin.gatewai
 - End every implementation with a proposed commit message: short, English, imperative mood.
 
 ## Status
-v1, v2 and v3 (lots A, B, C) are done. Next candidate: lot D (measured energy for local
-models) — see `docs/developpment/roadmap-v3.md` and the log in `progress.md`.
+v4 in progress — A.1 done; next: batch A.2 (docs/developpment/roadmap-v4.md)

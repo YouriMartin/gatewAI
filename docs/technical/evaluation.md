@@ -88,6 +88,7 @@ Calibration and test sets are **disjoint** and asserted to be.
 | `routing-test.jsonl` | `src/test/resources/eval/` | 100 | idem, disjoint |
 | `cache-calibration.jsonl` | `src/main/resources/eval/` | 200 | `(query, entry, judgment, language, tags)` |
 | `cache-test.jsonl` | `src/test/resources/eval/` | 100 | idem, disjoint |
+| `conversation-test.jsonl` | `src/test/resources/eval/` | 100 | `(stored, incoming, judgment, language, tags)`, two OpenAI `messages` arrays (v4 A.1) |
 
 The **calibration** halves ship in the jar (v2 batch 3): the gateway calibrates
 itself from them on a fresh install, rather than shipping thresholds someone
@@ -144,6 +145,47 @@ Conventions worth stating, because they are choices:
 Negative cases are built from the ways meaning flips under small edits:
 `entity-swap`, `negation`, `direction-swap`, `version-swap`, `task-swap`,
 `scope-change`, `specificity`, `near-miss`, `unrelated`.
+
+### Conversation labels (v4 A.1)
+
+The 300 cache pairs above are single-turn, 41 characters on average and 80 at
+most, with no system prompt. A gateway's traffic is not: clients resend the whole
+history, system prompts carry personas, tenants and end-user data, and RAG
+templates run past the embedding window. `conversation-test.jsonl` measures what
+the cache does with that — 100 cases, 50 EN / 50 FR, test-only (it measures a
+blind spot, it fits nothing).
+
+Each case holds two full `messages` arrays: `stored`, whose answer is in the
+cache, and `incoming`. The question is the same as for pairs — may the stored
+answer be served? — and each tag carries a fixed judgment:
+
+| Tag | n | What differs | Judgment |
+|---|---|---|---|
+| `follow-up-collision` | 20 | the history; identical, history-dependent last turn ("give me an example in Java") | `NO` |
+| `system-prompt-collision` | 16 | the system prompt (persona, output language, tenant, one instruction) | `NO` |
+| `end-user-collision` | 16 | the per-user data inside one system-prompt template | `NO` |
+| `template-prefix` | 12 | the end of a single-turn prompt longer than 128 tokens | `NO` |
+| `same-context-paraphrase` | 18 | only the wording of the last turn, in an identical context | `YES` |
+| `first-turn-paraphrase` | 18 | only the wording of the first turn, same system prompt | `YES` |
+
+The full rules and the choices behind them are in
+[`src/test/resources/eval/README.md`](../../src/test/resources/eval/README.md).
+`ConversationDatasetTest` turns them into assertions: a case labelled against its
+tag, a collision that does not repeat the last turn, or a paraphrase whose context
+is not identical fails the build. `template-prefix` cases are checked with the
+embedding model's own tokenizer — both prompts must exceed the window and be
+identical inside it — so the tag cannot drift from what it claims.
+
+**How it is scored.** `ConversationCacheEvaluator` drives the **real**
+`SemanticCacheAdvisor` (built by the test-scope `EvalCacheAdvisorFactory`, as the
+router is built by `EvalClassifierFactory`) over Spring AI's `SimpleVectorStore`,
+which honours the advisor's filter expressions. Per case, on a fresh store and
+under one client id: `stored` misses, reaches a stub model and is cached exactly
+as production caches it; then `incoming` is looked up. It counts as **served** if
+it never reached the model. The fixture `conversation-vectors.json` holds the
+vectors of exactly the texts the advisor embedded while the recorder ran it, and
+a failed lookup (a missing vector) fails the run instead of scoring as a miss.
+The run uses the fixed 0.92 threshold with no calibration.
 
 ---
 
@@ -264,6 +306,38 @@ Three things the v3 run changed, and one it did not:
   belong in the same sentence. (That figure is from the pre-C.1 registry, which
   gave the local tiers placeholder coefficients. On the shipped registry the same
   run now reports the carbon saving as *not determinable* — see above.)
+
+### What the conversation set found (v4 A.1)
+
+The real advisor, fixed 0.92, no calibration, 100 cases:
+
+| Tag | n | cross_context_hit_rate (lower is better) | same_context_hit_rate |
+|---|---|---|---|
+| `follow-up-collision` | 20 | **100 %** | — |
+| `system-prompt-collision` | 16 | **100 %** | — |
+| `end-user-collision` | 16 | **100 %** | — |
+| `template-prefix` | 12 | **100 %** | — |
+| `same-context-paraphrase` | 18 | — | 11.1 % |
+| `first-turn-paraphrase` | 18 | — | 33.3 % |
+| **all** | 100 | **100 %** (64 of 64) | 22.2 % (8 of 36) |
+
+Every one of the 64 cases that must not be served was served, each at
+similarity **1.0**. This is not a threshold problem and no threshold fixes it:
+the cache embeds only the last user turn (`Prompt.getUserMessage()`), and the
+embedding sees only its first 128 tokens, so two different conversations that end
+on the same words are the same vector. The system prompt, the history and the
+end of a long prompt never reach the key. Across users of one API key, the
+`end-user-collision` row is a data leak, not just a wrong answer.
+
+The other column is the price that already exists: in an identical context, a
+reworded follow-up is served only 11 % of the time. Short, history-dependent
+turns ("what's the difference with a readiness probe, then?") move a lot in
+embedding space when reworded, which is the same false-negative side the pair
+set measures at 61 %.
+
+`baselines.json` records these values as they are: ceilings at 1.0 and floors
+just below 11.1 % and 33.3%. They are the "before" of v4 A.2, which scopes the
+cache by conversation context.
 
 ### What the v2 run found, and why it still matters
 
