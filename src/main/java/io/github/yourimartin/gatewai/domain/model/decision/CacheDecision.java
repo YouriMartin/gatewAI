@@ -36,6 +36,14 @@ import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
  *                                A miss caused by an <b>ambiguous</b> set is a
  *                                deliberate refusal and reads nothing like an
  *                                empty one; without this both are just "MISS"
+ * @param reason                  why the decision is not a plain lookup — a
+ *                                bypass, an exact-match-only lookup, a
+ *                                {@code max_tokens} refusal (ADR 0014); null
+ *                                otherwise
+ * @param cacheScope              the conversation scope the lookup ran in, as a
+ *                                hash — never text — so a hit can be traced to
+ *                                the context it was allowed in; null when no
+ *                                scope was computed
  */
 public record CacheDecision(
     UUID id,
@@ -50,6 +58,8 @@ public record CacheDecision(
     Long matchedEntryAgeSeconds,
     String originCorrelationId,
     String embeddingModel,
-    ConformalStatus conformalStatus
+    ConformalStatus conformalStatus,
+    CacheDecisionReason reason,
+    String cacheScope
 ) {
 }

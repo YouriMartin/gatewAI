@@ -135,6 +135,7 @@ class RoutingAdvisorTest {
             .model("original-model")
             .temperature(0.7)
             .maxTokens(256)
+            .stopSequences(List.of("END"))
             .build()
     );
     ChatClientRequest request = ChatClientRequest.builder()
@@ -155,6 +156,9 @@ class RoutingAdvisorTest {
     assertEquals("claude-sonnet-4-20250514", routedOptions.getModel());
     assertEquals(0.7, routedOptions.getTemperature());
     assertEquals(256, routedOptions.getMaxTokens());
+    // Part of the cache scope since v4 A.2: an answer keyed on its stop
+    // sequences must be generated with them.
+    assertEquals(List.of("END"), routedOptions.getStopSequences());
   }
 
   // ---- Fallback tests ----

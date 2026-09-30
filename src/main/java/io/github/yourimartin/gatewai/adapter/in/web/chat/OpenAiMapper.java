@@ -24,7 +24,7 @@ final class OpenAiMapper {
         .map(message -> new LlmMessage(message.role(), message.content()))
         .toList();
     return new LlmRequest(request.model(), messages,
-        request.temperature(), request.maxTokens());
+        request.temperature(), request.maxTokens(), request.stop(), request.user());
   }
 
   /** Maps a domain stream chunk to an OpenAI {@code chat.completion.chunk}. */

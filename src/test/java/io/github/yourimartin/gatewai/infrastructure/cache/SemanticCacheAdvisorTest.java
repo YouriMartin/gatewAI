@@ -2,11 +2,11 @@ package io.github.yourimartin.gatewai.infrastructure.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +16,7 @@ import java.util.Map;
 import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,7 +76,7 @@ class SemanticCacheAdvisorTest {
   void setUp() {
     properties = new SemanticCacheProperties();
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
-        CalibrationFixtures.none(properties.getSimilarityThreshold()));
+        CalibrationFixtures.none(properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
   }
 
   // ---- Cache hit tests ----
@@ -138,7 +139,11 @@ class SemanticCacheAdvisorTest {
 
     ChatClientResponse result = advisor.adviseCall(request, callChain);
 
-    assertSame(llmResponse, result);
+    // The model's answer, flagged with what the cache did (X-GatewAI-Cache).
+    assertEquals("Quarkus is a framework.",
+        result.chatResponse().getResult().getOutput().getText());
+    assertEquals("MISS", result.chatResponse().getMetadata()
+        .get(LlmResponse.CACHE_OUTCOME_METADATA_KEY));
     verify(callChain).nextCall(request);
 
     verify(vectorStore).add(documentsCaptor.capture());
@@ -148,8 +153,10 @@ class SemanticCacheAdvisorTest {
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_RESPONSE_KEY));
     assertEquals("claude-3-sonnet",
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_MODEL_KEY));
-    assertEquals("end_turn",
+    // Stored in the OpenAI vocabulary: Anthropic's end_turn is a normal stop.
+    assertEquals("stop",
         doc.getMetadata().get(SemanticCacheAdvisor.CACHE_FINISH_REASON_KEY));
+    assertNotNull(doc.getMetadata().get(SemanticCacheAdvisor.CACHE_SCOPE_KEY));
     assertNotNull(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY));
     assertTrue(doc.getMetadata().get(SemanticCacheAdvisor.CREATED_AT_KEY) instanceof Long);
     assertEquals(10,
@@ -241,13 +248,16 @@ class SemanticCacheAdvisorTest {
   // ---- Filter expression tests ----
 
   @Test
-  void noFilterWhenNamespacingDisabledAndNoTtl() {
+  void theScopeIsAlwaysFilteredOn() {
     properties.setClientNamespacing(false);
     properties.setTtlMinutes(0);
 
-    Filter.Expression filter = advisor.buildFilterExpression();
+    Filter.Expression filter = advisor.buildFilterExpression("scope-1", null);
 
-    assertNull(filter);
+    // ADR 0014: without it, an entry from another conversation context — or one
+    // written before scopes existed — could match.
+    assertEquals(Filter.ExpressionType.EQ, filter.type());
+    assertTrue(filter.toString().contains(SemanticCacheAdvisor.CACHE_SCOPE_KEY));
   }
 
   @Test
@@ -257,10 +267,10 @@ class SemanticCacheAdvisorTest {
 
     RequestContext ctx = new RequestContext("tenant-99", "trace-1");
     Filter.Expression filter = ScopedValue.where(RequestContext.CURRENT, ctx)
-        .call(() -> advisor.buildFilterExpression());
+        .call(() -> advisor.buildFilterExpression("scope-1", null));
 
-    assertNotNull(filter);
-    assertEquals(Filter.ExpressionType.EQ, filter.type());
+    assertEquals(Filter.ExpressionType.AND, filter.type());
+    assertTrue(filter.toString().contains("tenant-99"));
   }
 
   @Test
@@ -268,9 +278,9 @@ class SemanticCacheAdvisorTest {
     properties.setClientNamespacing(true);
     properties.setTtlMinutes(0);
 
-    Filter.Expression filter = advisor.buildFilterExpression();
+    Filter.Expression filter = advisor.buildFilterExpression("scope-1", null);
 
-    assertNull(filter);
+    assertEquals(Filter.ExpressionType.EQ, filter.type());
   }
 
   @Test
@@ -278,23 +288,21 @@ class SemanticCacheAdvisorTest {
     properties.setClientNamespacing(false);
     properties.setTtlMinutes(60);
 
-    Filter.Expression filter = advisor.buildFilterExpression();
+    Filter.Expression filter = advisor.buildFilterExpression("scope-1", null);
 
-    assertNotNull(filter);
-    assertEquals(Filter.ExpressionType.GTE, filter.type());
+    assertEquals(Filter.ExpressionType.AND, filter.type());
+    assertTrue(filter.toString().contains(SemanticCacheAdvisor.CREATED_AT_KEY));
   }
 
   @Test
-  void combinedFilterWhenBothNamespaceAndTtl() {
-    properties.setClientNamespacing(true);
-    properties.setTtlMinutes(60);
+  void anExactMatchAddsTheTurnHash() {
+    properties.setClientNamespacing(false);
+    properties.setTtlMinutes(0);
 
-    RequestContext ctx = new RequestContext("tenant-1", "trace-1");
-    Filter.Expression filter = ScopedValue.where(RequestContext.CURRENT, ctx)
-        .call(() -> advisor.buildFilterExpression());
+    Filter.Expression filter = advisor.buildFilterExpression("scope-1", "turn-hash");
 
-    assertNotNull(filter);
-    assertEquals(Filter.ExpressionType.AND, filter.type());
+    assertTrue(filter.toString().contains(SemanticCacheAdvisor.TURN_HASH_KEY));
+    assertTrue(filter.toString().contains("turn-hash"));
   }
 
   @Test

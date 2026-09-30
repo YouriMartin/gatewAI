@@ -1,10 +1,17 @@
 package io.github.yourimartin.gatewai.infrastructure.cache;
 
+import java.util.List;
+import java.util.Optional;
+
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
+import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -39,20 +46,48 @@ public final class EvalCacheAdvisorFactory {
     }
   };
 
+  private static final ModelRegistry NO_MODELS = new ModelRegistry() {
+    @Override
+    public List<ModelDefinition> allModels() {
+      return List.of();
+    }
+
+    @Override
+    public Optional<ModelDefinition> findByKey(String key) {
+      return Optional.empty();
+    }
+
+    @Override
+    public Optional<ModelDefinition> findByModelId(String modelId) {
+      return Optional.empty();
+    }
+
+    @Override
+    public List<ModelDefinition> findByTier(ModelTier tier) {
+      return List.of();
+    }
+  };
+
   private EvalCacheAdvisorFactory() {
   }
 
   /**
    * The production cache advisor over {@code vectorStore}.
    *
+   * <p>No model is registered: the conversation cases pin none, so every
+   * requested name is routed and shares a scope, as unregistered names do.
+   *
    * @param decisions receives every cache decision the advisor traces, so the
    *                  harness can read the outcome and the similarity it was taken on
+   * @param window    the embedding window — the real one, since the exact-match
+   *                  rule for long prompts is part of what is measured
    */
   public static CallAdvisor semanticCache(VectorStore vectorStore,
                                           CalibrationUseCase calibrations,
-                                          DecisionRecorder decisions) {
+                                          DecisionRecorder decisions,
+                                          EmbeddingWindow window) {
     CacheDecisionTracer tracer = new CacheDecisionTracer(decisions, NO_METRICS);
     return new SemanticCacheAdvisor(vectorStore, new SemanticCacheProperties(), tracer,
-        calibrations);
+        calibrations, NO_MODELS, window);
   }
 }

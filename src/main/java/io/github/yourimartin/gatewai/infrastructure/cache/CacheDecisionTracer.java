@@ -7,6 +7,7 @@ import java.util.UUID;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
@@ -40,9 +41,15 @@ class CacheDecisionTracer {
     this.metrics = metrics;
   }
 
-  /** Records a hit or a miss, with the scores that separated them. */
+  /**
+   * Records a hit or a miss, with the scores that separated them.
+   *
+   * @param reason why this was not a plain similarity lookup, or null
+   * @param scope  the conversation scope the lookup ran in (ADR 0014)
+   */
   void decided(String userText, List<Document> candidates, Document hit,
-               double threshold, ConformalStatus conformalStatus) {
+               double threshold, ConformalStatus conformalStatus,
+               CacheDecisionReason reason, String scope) {
     try {
       Double best = score(candidates, 0);
       Double runnerUp = score(candidates, 1);
@@ -60,23 +67,26 @@ class CacheDecisionTracer {
           hit == null ? null : ageSeconds(hit),
           hit == null ? null : originCorrelationId(hit),
           embeddingModel(),
-          conformalStatus));
+          conformalStatus,
+          reason,
+          scope));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }
   }
 
-  /** Records a request the cache never looked at (blank prompt). */
-  void bypassed(String userText) {
-    record(userText, CacheOutcome.BYPASS, 0);
+  /** Records a request the cache never looked at, and why. */
+  void bypassed(String userText, CacheDecisionReason reason, String scope) {
+    record(userText, CacheOutcome.BYPASS, 0, reason, scope);
   }
 
   /** Records a lookup that failed; the request is served as if it missed. */
-  void failed(String userText, double threshold) {
-    record(userText, CacheOutcome.ERROR, threshold);
+  void failed(String userText, double threshold, String scope) {
+    record(userText, CacheOutcome.ERROR, threshold, null, scope);
   }
 
-  private void record(String userText, CacheOutcome outcome, double threshold) {
+  private void record(String userText, CacheOutcome outcome, double threshold,
+                      CacheDecisionReason reason, String scope) {
     try {
       publish(new CacheDecision(
           UUID.randomUUID(),
@@ -87,7 +97,9 @@ class CacheDecisionTracer {
           0, null, threshold,
           null, null, null,
           embeddingModel(),
-          null));
+          null,
+          reason,
+          scope));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }

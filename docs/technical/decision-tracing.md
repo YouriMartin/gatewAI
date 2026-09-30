@@ -115,16 +115,19 @@ two: recording off, or retention passed. The 404 says so.
 |---|---|---|
 | `request_log` | correlation id, model, `prompt_hash`, token counts, latency, client id, cost/energy/CO2 | no — SHA-256 only |
 | `routing_decision` | tier, model, strategy, justification, confidence, config version, `prompt_hash` + `prompt_length` | no |
-| `cache_decision` | outcome, similarity, runner-up, threshold, matched entry, conformal status | no |
-| Vector cache (`vector_store`) | the **question text and the answer text**, per client, with the embedding | **yes** — similarity search needs it |
+| `cache_decision` | outcome, similarity, runner-up, threshold, matched entry, conformal status, reason, `cache_scope` (v4 A.2) | no — the scope is a SHA-256 of the conversation context |
+| Vector cache (`vector_store`) | the **last user turn and the answer text**, per client, with the embedding; the rest of the conversation only as the `cache_scope` hash | **yes** — similarity search needs it |
 | `deferred_job` (v3 lot B.2) | the **full request and response**, client id, chosen zone, which node ran it | **yes** — the request runs after the client is gone |
 | Metrics (Micrometer) | counters and summaries with enum-valued tags only | no |
 
 The two "yes" rows are the ones to read twice. The decision trace is hash-only by
 design; these two are not, and for different reasons. The semantic cache is a
 cache: it stores what it will replay. It is namespaced per client
-(`client-namespacing=true` by default) and can be given a TTL; a deployment that
-must not retain prompt text turns the cache off, not the tracing. The deferred
+(`client-namespacing=true` by default) and can be given a TTL, but there is no
+switch to turn it off today; a deployment that must not retain prompt text
+cannot run it as shipped. The `cache_scope` hash (v4 A.2) is pseudonymous, not
+anonymous: it is unsalted, so a reader who can guess a system prompt can confirm
+the guess — the same reader who can already read the cached turns above. The deferred
 queue stores the prompt because deferral means executing it later — turning that
 off means not using `POST /v1/chat/completions/async`, which is opt-in and
 disabled by default. Unlike the cache and the decision tables, **it has no

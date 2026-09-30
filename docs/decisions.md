@@ -7,6 +7,40 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot A — A.2 (scope the cache by conversation context)
+
+- **`hnsw.iterative_scan` replaced by a metadata index, after measuring.** The
+  approved ADR 0014 said A.2 would enable `hnsw.iterative_scan = relaxed_order`
+  and check it on real pgvector. The check (pgvector 0.8.3, 23,000 entries, one
+  popular turn duplicated in 3,000 scopes, `PgVectorStore`'s own query) found a
+  scope's entry in 3 of 20 lookups with it off, `relaxed_order`, `strict_order`
+  and a raised `max_scan_tuples` alike — iterative scans cannot reach what the
+  HNSW graph does not connect, and identical vectors disconnect it. A GIN
+  `jsonb_path_ops` index on `metadata::jsonb` found 20 of 20 in 0.18 ms, so that
+  is what shipped, and ADR 0014's consequence was rewritten with the numbers
+  before it was accepted. It is created at startup by `PgVectorMetadataIndex`
+  because Spring AI creates `vector_store` after Flyway runs.
+- **The long-turn case is a lookup, not a bypass** (`EXACT_MATCH_ONLY` on a `HIT`
+  or `MISS`), as ADR 0014 records against the roadmap's wording.
+- **`stop` survives the router.** `RoutingAdvisor.reroutePrompt` rebuilt options
+  keeping only temperature, max tokens and top-p. Keying the cache on `stop`
+  while the model never received it would store answers generated without it, so
+  `stopSequences` is now carried through — one line of B.1, pulled forward. The
+  other forwarded parameters stay with B.1.
+- **`user` and `stop` survive deferral.** `DeferredJobJson` now writes both;
+  jobs stored earlier read back with neither. Dropping `user` there would have
+  silently undone end-user isolation for asynchronous requests.
+- **`CachedResponseStream` became `CachedResponses`** and `CacheLookup` was
+  split out of the advisor, to keep `SemanticCacheAdvisor` under the 500-line
+  Checkstyle limit; both are cohesive on their own (response plumbing, request
+  description).
+- **The decision panel shows the reason and a short scope id.** Not asked for by
+  the batch; it is two lines, and a scope hash in the API that no screen shows
+  would be traceability in name only.
+- **Noticed, not fixed:** `stop` as a single string (which the OpenAI API also
+  accepts) is not deserialised by `ChatCompletionRequest`, which declares a list.
+  That is a request-shape question and belongs to B.1.
+
 ## v4 lot A — A.1 (measure the conversation blind spot)
 
 - **One rate per tag, not two.** The plan asked for both metrics per tag. Each

@@ -204,7 +204,7 @@ class AdminDecisionControllerTest {
   private static CacheDecision cache() {
     return new CacheDecision(UUID.randomUUID(), "req-1", NOW, "b".repeat(64),
         CacheOutcome.MISS, 0.71, 0.42, 0.92, null, null, null,
-        "nomic-embed-text", ConformalStatus.EMPTY_SET);
+        "nomic-embed-text", ConformalStatus.EMPTY_SET, null, null);
   }
 
   private static RoutingDecision routing() {

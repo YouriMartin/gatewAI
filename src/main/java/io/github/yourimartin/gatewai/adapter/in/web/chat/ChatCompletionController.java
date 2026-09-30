@@ -13,6 +13,7 @@ import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +23,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class ChatCompletionController {
 
   private static final long SSE_TIMEOUT_MS = 600_000L;
+
+  /** What the semantic cache did: {@code HIT}, {@code MISS} or {@code BYPASS} (ADR 0014). */
+  static final String CACHE_HEADER = "X-GatewAI-Cache";
+
+  /** The model that produced the answer — on a hit, the one that produced it first. */
+  static final String MODEL_HEADER = "X-GatewAI-Model";
 
   private final ChatCompletionUseCase useCase;
   private final StreamChatCompletionUseCase streamUseCase;
@@ -39,7 +46,14 @@ public class ChatCompletionController {
       return stream(llmRequest);
     }
     LlmResponse llmResponse = useCase.complete(llmRequest);
-    return OpenAiMapper.toCompletionResponse(llmResponse);
+    ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+    if (llmResponse.cacheOutcome() != null) {
+      response.header(CACHE_HEADER, llmResponse.cacheOutcome());
+    }
+    if (llmResponse.model() != null) {
+      response.header(MODEL_HEADER, llmResponse.model());
+    }
+    return response.body(OpenAiMapper.toCompletionResponse(llmResponse));
   }
 
   private SseEmitter stream(LlmRequest llmRequest) {

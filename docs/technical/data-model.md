@@ -81,9 +81,18 @@ excluding the LLM call) · `conformal_set` / `conformal_alpha` (v2 batch 3) ·
 `cache_decision`: `outcome` (`HIT` \| `MISS` \| `BYPASS` \| `ERROR`) ·
 `similarity_score` and `runner_up_score` (the implicit margin) · `threshold` ·
 `matched_entry_id` / `matched_entry_age_seconds` · `origin_correlation_id` ·
-`embedding_model` · `conformal_status` (v2 batch 3).
+`embedding_model` · `conformal_status` (v2 batch 3) · `reason` and
+`cache_scope` (`V10`, v4 A.2).
 
-Six properties worth knowing:
+`reason` ∈ `EMPTY_PROMPT` · `HISTORY_TOO_LONG` (both `BYPASS`) ·
+`EXACT_MATCH_ONLY` (a last turn past the embedding window) · `MAX_TOKENS` (a
+candidate longer than the request allowed); null on a plain `HIT` or `MISS`. v4
+B.3 will add `PASSTHROUGH_<feature>`. `cache_scope` is the SHA-256 of the
+conversation scope the lookup ran in ([ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md)):
+a hash, never text, so a hit can be traced to the context it was allowed in.
+Rows written before `V10` hold null in both; nothing is back-filled.
+
+Seven properties worth knowing:
 
 - **A cache hit has no routing decision.** The cache runs upstream of the
   router, so a hit short-circuits before any routing happens. That asymmetry is
@@ -112,6 +121,10 @@ Six properties worth knowing:
   ran, and `chosen_model_id` / `chosen_tier` already hold the entire
   explanation — the client asked for that model. Every other row has one, which
   is batch 1's invariant.
+- **`cache_scope` is pseudonymous, not anonymous.** It is an unsalted SHA-256,
+  like `prompt_hash`: whoever can read the database and guess a system prompt
+  (a template plus an order number) can confirm the guess. The same reader can
+  already see every cached last turn in clear text in `vector_store`.
 
 `routing_config_version` is a short hash of the live `RoutingConfig` (strategy,
 thresholds, keywords, routes and their examples, order included). The rules are
@@ -257,8 +270,32 @@ Managed by the Spring AI pgvector `VectorStore`. Each cached answer is a
 `Document(question_text, metadata)` with a **384**-dim embedding (in-process
 ONNX, `paraphrase-multilingual-MiniLM-L12-v2`, v3 lot A; 768-dim
 `nomic-embed-text` before it). Metadata keys (`cached_response`, `cached_model`,
-`cached_*_tokens`, `created_at`, `client_id`) are documented in
-[`semantic-cache.md`](semantic-cache.md).
+`cached_*_tokens`, `created_at`, `client_id`, and since v4 A.2 `cache_scope` and
+`turn_hash`) are documented in [`semantic-cache.md`](semantic-cache.md).
+
+**Upgrading to v4 A.2.** Every lookup now filters on `cache_scope`, so an entry
+written before it has none and never matches again — nothing to migrate, and
+nothing wrong is served. To reclaim the space:
+
+```sql
+DELETE FROM vector_store WHERE NOT (metadata::jsonb ? 'cache_scope');
+```
+
+**Metadata index (v4 A.2).** At startup `PgVectorMetadataIndex` creates
+`vector_store_metadata_path_idx`, a GIN `jsonb_path_ops` index on
+`metadata::jsonb` — the expression `PgVectorStore`'s filters use — so a lookup
+in a small conversation scope is read through it and computed exactly, rather
+than through HNSW, which filters after searching. Flyway cannot own it because
+Spring AI creates `vector_store` after Flyway has run; it is created only when
+`initialize-schema=true`. An operator who manages the schema should run:
+
+```sql
+CREATE INDEX IF NOT EXISTS vector_store_metadata_path_idx
+    ON public.vector_store USING gin ((metadata::jsonb) jsonb_path_ops);
+```
+
+On a large existing store the build takes a lock that blocks writes to
+`vector_store` (not reads) for its duration, once.
 
 Config (`application.properties`): `initialize-schema=true`, `dimensions=384`,
 `index-type=hnsw`, `distance-type=cosine_distance`. The `vector` extension is

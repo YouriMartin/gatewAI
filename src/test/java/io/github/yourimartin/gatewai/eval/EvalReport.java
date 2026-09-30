@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import tools.jackson.databind.ObjectMapper;
@@ -367,10 +368,7 @@ final class EvalReport {
         .append(reason).append("\n\n");
   }
 
-  /**
-   * The conversation blind spot (v4 A.1): two rates, never folded into one
-   * accuracy, for the reason {@link ConversationCacheEvaluator} gives.
-   */
+  /** The conversation cases (v4 A.1): two rates, never one accuracy — see the evaluator. */
   void conversation(String key, ConversationCacheEvaluator.Result result) {
     ObjectNode node = metrics().putObject(key);
     node.put("threshold", result.threshold());
@@ -384,6 +382,7 @@ final class EvalReport {
         ObjectNode entry = wrong.addObject();
         entry.put("id", outcome.conversation().id());
         entry.put("served", outcome.served());
+        entry.put("decision", outcome.decision().name());
         entry.put("similarity", round(outcome.similarity()));
       }
     }
@@ -402,8 +401,9 @@ final class EvalReport {
     List<String> wrongIds = result.outcomes().stream()
         .filter(ConversationCacheEvaluator.Outcome::wrong)
         .map(outcome -> outcome.conversation().id() + " ("
-            + (outcome.served() ? "served" : "refused") + ", "
-            + round(outcome.similarity()) + ")")
+            + (outcome.decision() == CacheOutcome.BYPASS ? "bypassed"
+                : (outcome.served() ? "served, " : "refused, ") + round(outcome.similarity()))
+            + ")")
         .toList();
     if (!wrongIds.isEmpty()) {
       markdown.append("Wrong decisions (first ").append(MISSES_SHOWN).append(" of ")

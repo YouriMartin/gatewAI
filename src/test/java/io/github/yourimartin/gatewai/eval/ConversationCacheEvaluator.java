@@ -12,6 +12,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 import io.github.yourimartin.gatewai.infrastructure.cache.EvalCacheAdvisorFactory;
 
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -65,10 +66,10 @@ final class ConversationCacheEvaluator {
   }
 
   static Result evaluate(List<ConversationCase> cases, EmbeddingModel embeddings,
-                         double threshold) {
+                         EmbeddingWindow window, double threshold) {
     List<Outcome> outcomes = new ArrayList<>();
     for (ConversationCase conversation : cases) {
-      outcomes.add(run(conversation, embeddings, threshold));
+      outcomes.add(run(conversation, embeddings, window, threshold));
     }
 
     Map<String, TagScore> byTag = new LinkedHashMap<>();
@@ -84,12 +85,13 @@ final class ConversationCacheEvaluator {
   }
 
   private static Outcome run(ConversationCase conversation, EmbeddingModel embeddings,
-                             double threshold) {
+                             EmbeddingWindow window, double threshold) {
     List<CacheDecision> decisions = new ArrayList<>();
     CallAdvisor cache = EvalCacheAdvisorFactory.semanticCache(
         SimpleVectorStore.builder(embeddings).build(),
         CalibrationFixtures.none(threshold),
-        collecting(decisions));
+        collecting(decisions),
+        window);
 
     AnsweringChain storing = new AnsweringChain("Answer to " + conversation.id() + " (stored)");
     within(conversation.id() + "-stored",
@@ -115,7 +117,8 @@ final class ConversationCacheEvaluator {
           + ": the cache lookup failed — the conversation fixtures are stale. Re-record: "
           + EvalPaths.RECORD_COMMAND);
     }
-    return new Outcome(conversation, answering.calls() == 0, decision.similarityScore());
+    return new Outcome(conversation, answering.calls() == 0, decision.outcome(),
+        decision.similarityScore());
   }
 
   private static void within(String correlationId, Runnable call) {
@@ -202,9 +205,12 @@ final class ConversationCacheEvaluator {
    * What happened to one case.
    *
    * @param served     true when the incoming request was answered from the cache
+   * @param decision   what the cache traced for the incoming request — a
+   *                   {@code BYPASS} refuses without comparing anything
    * @param similarity the best candidate's similarity, as the cache traced it
    */
-  record Outcome(ConversationCase conversation, boolean served, double similarity) {
+  record Outcome(ConversationCase conversation, boolean served, CacheOutcome decision,
+                 double similarity) {
 
     boolean wrong() {
       return served != conversation.servable();

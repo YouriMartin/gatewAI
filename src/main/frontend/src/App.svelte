@@ -561,6 +561,8 @@ async function revoke(id: string) {
               runner-up {num(cache.runnerUpScore)} ·
               threshold {num(cache.threshold)} ·
               {cache.conformalStatus ?? 'not calibrated'}
+              {cache.reason ? ` · ${cache.reason}` : ''}
+              {cache.cacheScope ? ` · scope ${shortId(cache.cacheScope)}` : ''}
               {cache.originCorrelationId
                 ? ` · answer written by ${shortId(cache.originCorrelationId)}`
                 : ''}

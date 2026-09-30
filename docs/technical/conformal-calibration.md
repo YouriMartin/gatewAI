@@ -199,6 +199,12 @@ thresholds — the last snapshot keeps applying.
   the measured error rates should be read as a **worst case**, and the guarantee
   transfers only as far as that resemblance holds. Calibrating on your own
   traffic is the fix, and is one property away.
+- **The cache calibration is single-turn.** Its pairs have no system prompt and
+  no history, so they all fall in one conversation scope (v4 A.2,
+  [ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md)). Inside other
+  scopes the question is the same one — last turn against last turn — but the
+  turns are shorter and more history-dependent than the calibration pairs, and
+  exchangeability with them is weaker still.
 - **n = 200 and n = 93.** The cache is fitted on 93 negative pairs, which makes
   α = 0.10 about the tightest honest promise available; the finite-sample rule
   refuses anything the sample cannot support, but a small sample still means a

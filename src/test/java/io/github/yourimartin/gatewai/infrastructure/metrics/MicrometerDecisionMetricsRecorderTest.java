@@ -222,6 +222,6 @@ class MicrometerDecisionMetricsRecorderTest {
                                      ConformalStatus status, double score) {
     return new CacheDecision(UUID.randomUUID(), "corr", Instant.now(), "hash",
         outcome, score, null, 0.94, null, null, null, "nomic-embed-text",
-        status);
+        status, null, null);
   }
 }

@@ -169,6 +169,7 @@ class EvaluationHarnessTest {
     conversationResult = ConversationCacheEvaluator.evaluate(conversationTest,
         new ReplayEmbeddingModel(conversationVectors.vectors(),
             conversationVectors.provenance().dimensions()),
+        EvalClassifierFactory.embeddingWindow(config.embeddingTokenizerResource()),
         threshold);
 
     EvalReport report = new EvalReport(vectors.provenance(),

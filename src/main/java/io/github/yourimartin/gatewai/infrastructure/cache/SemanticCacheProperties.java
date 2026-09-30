@@ -9,6 +9,11 @@ class SemanticCacheProperties {
   private int topK = 1;
   private long ttlMinutes;
   private boolean clientNamespacing = true;
+  /**
+   * Non-system messages above which a request bypasses the cache (ADR 0014). 3
+   * keeps the first follow-up (user, assistant, user) cacheable.
+   */
+  private int maxHistoryMessages = 3;
 
   double getSimilarityThreshold() {
     return similarityThreshold;
@@ -40,5 +45,13 @@ class SemanticCacheProperties {
 
   void setClientNamespacing(boolean clientNamespacing) {
     this.clientNamespacing = clientNamespacing;
+  }
+
+  int getMaxHistoryMessages() {
+    return maxHistoryMessages;
+  }
+
+  void setMaxHistoryMessages(int maxHistoryMessages) {
+    this.maxHistoryMessages = maxHistoryMessages;
   }
 }

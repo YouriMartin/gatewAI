@@ -107,6 +107,7 @@ class EvalFixtureRecorderTest {
     CapturingEmbeddingModel conversationModel = new CapturingEmbeddingModel(shipped);
     ConversationCacheEvaluator.evaluate(
         EvalDatasets.conversations(EvalDatasets.CONVERSATION_TEST), conversationModel,
+        EvalClassifierFactory.embeddingWindow(config.embeddingTokenizerResource()),
         config.cacheSimilarityThreshold());
     new VectorFixture(
         new FixtureProvenance(modelId, conversationModel.dimensions(), Instant.now().toString(),

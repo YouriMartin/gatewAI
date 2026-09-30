@@ -192,6 +192,6 @@ class JpaDecisionHistoryTest {
         outcome == CacheOutcome.HIT ? "entry-1" : null,
         outcome == CacheOutcome.HIT ? 120L : null,
         outcome == CacheOutcome.HIT ? "origin-1" : null,
-        "nomic-embed-text", ConformalStatus.SINGLETON));
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null));
   }
 }

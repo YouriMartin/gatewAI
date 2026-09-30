@@ -1,20 +1,25 @@
 package io.github.yourimartin.gatewai.adapter.in.web.chat;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
@@ -22,6 +27,7 @@ import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -105,6 +111,60 @@ class ChatCompletionControllerTest {
                 new ApiKeyAuthentication("test-client-id", "test-client"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.model").value("gpt-4"));
+  }
+
+  @Test
+  void postCarriesTheCacheOutcomeAndTheModelAsHeaders() throws Exception {
+    when(useCase.complete(any())).thenReturn(new LlmResponse(
+        "qwen2.5:3b", "Cached!", "stop", 10, 5, 15, true, "HIT"));
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(REQUEST_JSON)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isOk())
+        .andExpect(header().string(ChatCompletionController.CACHE_HEADER, "HIT"))
+        .andExpect(header().string(ChatCompletionController.MODEL_HEADER, "qwen2.5:3b"));
+  }
+
+  @Test
+  void postWithNoCacheDecisionSendsNoCacheHeader() throws Exception {
+    when(useCase.complete(any())).thenReturn(new LlmResponse(
+        "gpt-4", "OK", "stop", 1, 1, 2, false));
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(REQUEST_JSON)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isOk())
+        .andExpect(header().doesNotExist(ChatCompletionController.CACHE_HEADER));
+  }
+
+  @Test
+  void postHandsUserAndStopToTheUseCase() throws Exception {
+    when(useCase.complete(any())).thenReturn(new LlmResponse(
+        "gpt-4", "OK", "stop", 1, 1, 2, false));
+    ArgumentCaptor<LlmRequest> captured = ArgumentCaptor.forClass(LlmRequest.class);
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "model": "gpt-4",
+                  "messages": [{"role": "user", "content": "test"}],
+                  "user": "end-user-7",
+                  "stop": ["END"]
+                }
+                """)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isOk());
+
+    verify(useCase).complete(captured.capture());
+    assertEquals("end-user-7", captured.getValue().user());
+    assertEquals(List.of("END"), captured.getValue().stop());
   }
 
   @Test

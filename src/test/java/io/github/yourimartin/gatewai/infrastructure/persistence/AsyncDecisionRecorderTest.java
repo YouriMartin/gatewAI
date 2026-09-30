@@ -136,6 +136,6 @@ class AsyncDecisionRecorderTest {
     return new CacheDecision(
         UUID.randomUUID(), "corr-1", Instant.now(), "b".repeat(64),
         CacheOutcome.MISS, 0.4, 0.2, 0.92, null, null, null,
-        "nomic-embed-text", ConformalStatus.NOT_CALIBRATED);
+        "nomic-embed-text", ConformalStatus.NOT_CALIBRATED, null, null);
   }
 }

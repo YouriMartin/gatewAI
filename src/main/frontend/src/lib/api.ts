@@ -168,6 +168,10 @@ export interface CacheDecisionView {
   matchedEntryAgeSeconds: number | null;
   originCorrelationId: string | null;
   embeddingModel: string | null;
+  /** Why it was not a plain lookup (ADR 0014): EMPTY_PROMPT, HISTORY_TOO_LONG, EXACT_MATCH_ONLY, MAX_TOKENS. */
+  reason: string | null;
+  /** SHA-256 of the conversation scope the lookup ran in; a hit was allowed only there. */
+  cacheScope: string | null;
 }
 
 export interface ConfidenceView {

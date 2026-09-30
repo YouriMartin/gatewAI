@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import io.github.yourimartin.gatewai.domain.model.llm.FinishReason;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
@@ -36,24 +37,10 @@ class SpringAiLlmClient implements LlmClient {
 
   @Override
   public LlmResponse call(LlmRequest request) {
-    List<Message> springMessages = request.messages().stream()
-        .map(SpringAiLlmClient::toSpringMessage)
-        .toList();
-
-    var optionsBuilder = ChatOptions.builder().model(request.model());
-    if (request.temperature() != null) {
-      optionsBuilder.temperature(request.temperature());
-    }
-    if (request.maxTokens() != null) {
-      optionsBuilder.maxTokens(request.maxTokens());
-    }
-
     // One embedding memo per request, spanning the whole advisor chain: the
     // cache advisor and the router then share the user text's vector (batch 0.2).
     ChatResponse chatResponse = Objects.requireNonNull(
-        RequestEmbeddingMemo.callWith(() -> chatClient.prompt()
-            .messages(springMessages)
-            .options(optionsBuilder)
+        RequestEmbeddingMemo.callWith(() -> prompt(request)
             .call()
             .chatResponse()),
         "ChatResponse must not be null");
@@ -63,6 +50,23 @@ class SpringAiLlmClient implements LlmClient {
 
   @Override
   public void stream(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
+    // toStream() drains the reactive pipeline (incl. the cache/routing advisors)
+    // on the calling thread, so Reactor stays confined to this adapter — and so
+    // the embedding memo below actually covers the advisors' eager work.
+    RequestEmbeddingMemo.runWith(() -> prompt(request)
+        .stream()
+        .chatResponse()
+        .toStream()
+        .forEach(chatResponse -> onChunk.accept(toChunk(chatResponse))));
+  }
+
+  /**
+   * The request as the advisor chain receives it. {@code stop} travels as an
+   * option the model receives; the end user travels on the chain's context,
+   * because it is a fact about this request for the cache's scope (ADR 0014),
+   * not something any egress model is sent.
+   */
+  private ChatClient.ChatClientRequestSpec prompt(LlmRequest request) {
     List<Message> springMessages = request.messages().stream()
         .map(SpringAiLlmClient::toSpringMessage)
         .toList();
@@ -74,17 +78,18 @@ class SpringAiLlmClient implements LlmClient {
     if (request.maxTokens() != null) {
       optionsBuilder.maxTokens(request.maxTokens());
     }
+    if (request.stop() != null && !request.stop().isEmpty()) {
+      optionsBuilder.stopSequences(request.stop());
+    }
 
-    // toStream() drains the reactive pipeline (incl. the cache/routing advisors)
-    // on the calling thread, so Reactor stays confined to this adapter — and so
-    // the embedding memo below actually covers the advisors' eager work.
-    RequestEmbeddingMemo.runWith(() -> chatClient.prompt()
+    ChatClient.ChatClientRequestSpec spec = chatClient.prompt()
         .messages(springMessages)
-        .options(optionsBuilder)
-        .stream()
-        .chatResponse()
-        .toStream()
-        .forEach(chatResponse -> onChunk.accept(toChunk(chatResponse))));
+        .options(optionsBuilder);
+    if (request.user() != null && !request.user().isBlank()) {
+      spec = spec.advisors(advisors ->
+          advisors.param(LlmRequest.END_USER_CONTEXT_KEY, request.user()));
+    }
+    return spec;
   }
 
   private static LlmStreamChunk toChunk(ChatResponse chatResponse) {
@@ -96,7 +101,7 @@ class SpringAiLlmClient implements LlmClient {
     var responseMeta = chatResponse.getMetadata();
     String model = responseMeta != null ? responseMeta.getModel() : null;
     String finishReason = result != null && result.getMetadata() != null
-        ? result.getMetadata().getFinishReason() : null;
+        ? FinishReason.toOpenAi(result.getMetadata().getFinishReason()) : null;
     boolean last = finishReason != null && !finishReason.isBlank();
 
     int promptTokens = 0;
@@ -132,7 +137,8 @@ class SpringAiLlmClient implements LlmClient {
     String model = Objects.requireNonNull(chatResponse.getMetadata()).getModel();
 
     var resultMeta = result.getMetadata();
-    String finishReason = resultMeta != null ? resultMeta.getFinishReason() : null;
+    String finishReason = resultMeta != null
+        ? FinishReason.toOpenAi(resultMeta.getFinishReason()) : null;
 
     Usage usage = Objects.requireNonNull(chatResponse.getMetadata().getUsage());
     int promptTokens = usage.getPromptTokens() != null
@@ -145,9 +151,12 @@ class SpringAiLlmClient implements LlmClient {
     Boolean cacheHitFlag =
         chatResponse.getMetadata().get(LlmResponse.CACHE_HIT_METADATA_KEY);
     boolean cacheHit = Boolean.TRUE.equals(cacheHitFlag);
+    Object cacheOutcome =
+        chatResponse.getMetadata().get(LlmResponse.CACHE_OUTCOME_METADATA_KEY);
 
     return new LlmResponse(
         model, content, finishReason,
-        promptTokens, completionTokens, totalTokens, cacheHit);
+        promptTokens, completionTokens, totalTokens, cacheHit,
+        cacheOutcome instanceof String outcome ? outcome : null);
   }
 }

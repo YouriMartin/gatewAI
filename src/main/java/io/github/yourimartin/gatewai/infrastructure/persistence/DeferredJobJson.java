@@ -43,6 +43,13 @@ final class DeferredJobJson {
     }
     putNullableDouble(node, "temperature", request.temperature());
     putNullableInt(node, "maxTokens", request.maxTokens());
+    // v4 A.2: both are part of the cache scope, so a deferred job must keep them
+    // or its end user would share answers with every other end user of the key.
+    if (request.stop() != null) {
+      ArrayNode stop = node.putArray("stop");
+      request.stop().forEach(stop::add);
+    }
+    node.put("user", request.user());
     return MAPPER.writeValueAsString(node);
   }
 
@@ -52,11 +59,21 @@ final class DeferredJobJson {
     for (JsonNode entry : node.path("messages")) {
       messages.add(new LlmMessage(text(entry, "role"), text(entry, "content")));
     }
+    List<String> stop = null;
+    if (node.path("stop").isArray()) {
+      stop = new ArrayList<>();
+      for (JsonNode sequence : node.path("stop")) {
+        stop.add(sequence.asString());
+      }
+    }
+    // Jobs stored before v4 A.2 have neither field: they read back as null.
     return new LlmRequest(
         text(node, "model"),
         messages,
         nullableDouble(node, "temperature"),
-        nullableInt(node, "maxTokens"));
+        nullableInt(node, "maxTokens"),
+        stop,
+        text(node, "user"));
   }
 
   static String responseToJson(LlmResponse response) {

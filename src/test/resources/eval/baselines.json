@@ -15,11 +15,11 @@
   "gramsCo2SavedRatioMin": 0.35,
   "cascadeEscalationRateMax": 0.15,
   "cascadeWorstCaseAccuracyLossMax": 0.08,
-  "_conversationNote": "v4 A.1 records the conversation blind spot as it is: every cross-context case is served (similarity 1.0 — the cache only sees the last user turn, or the first 128 tokens of it). The 1.0 ceilings are the 'before' of v4 A.2, which scopes the cache by conversation context and lowers them to 0. The two floors are the same-context hit rates at 0.92, set just below the measured 11.1% and 33.3%.",
-  "conversationCrossContextHitRateMax.follow-up-collision": 1.0,
-  "conversationCrossContextHitRateMax.system-prompt-collision": 1.0,
-  "conversationCrossContextHitRateMax.end-user-collision": 1.0,
-  "conversationCrossContextHitRateMax.template-prefix": 1.0,
-  "conversationSameContextHitRateMin.same-context-paraphrase": 0.11,
+  "_conversationNote": "v4 A.1 recorded the conversation blind spot as it was: every cross-context case served (64/64, similarity 1.0), same-context hits 11.1% / 33.3%. v4 A.2 scopes the cache by conversation context (ADR 0014): the four cross-context ceilings drop to 0 and hold there. The price is on the other side and is recorded, not hidden: same-context-paraphrase falls to 5.6% (1/18) because conversations with two prior exchanges now bypass the cache (gatewai.cache.max-history-messages=3); first-turn-paraphrase is unchanged at 33.3%. Floors set just below the measured values.",
+  "conversationCrossContextHitRateMax.follow-up-collision": 0.0,
+  "conversationCrossContextHitRateMax.system-prompt-collision": 0.0,
+  "conversationCrossContextHitRateMax.end-user-collision": 0.0,
+  "conversationCrossContextHitRateMax.template-prefix": 0.0,
+  "conversationSameContextHitRateMin.same-context-paraphrase": 0.05,
   "conversationSameContextHitRateMin.first-turn-paraphrase": 0.33
 }

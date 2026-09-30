@@ -40,6 +40,27 @@ class DeferredJobJsonTest {
   }
 
   @Test
+  void stopAndTheEndUserSurvive() {
+    // Both are part of the cache scope (v4 A.2): a deferred job that lost its
+    // end user would share answers with every other end user of the key.
+    LlmRequest request = new LlmRequest("qwen", List.of(new LlmMessage("user", "hi")),
+        null, null, List.of("END", "\n\n"), "end-user-7");
+
+    assertEquals(request, DeferredJobJson.requestFromJson(
+        DeferredJobJson.requestToJson(request)));
+  }
+
+  @Test
+  void aJobStoredBeforeV4ReadsBackWithoutStopOrEndUser() {
+    LlmRequest parsed = DeferredJobJson.requestFromJson(
+        "{\"model\":\"qwen\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],"
+            + "\"temperature\":null,\"maxTokens\":null}");
+
+    assertNull(parsed.stop());
+    assertNull(parsed.user());
+  }
+
+  @Test
   void aRequestWithNoMessagesReadsBackAsEmpty() {
     LlmRequest parsed = DeferredJobJson.requestFromJson(
         DeferredJobJson.requestToJson(

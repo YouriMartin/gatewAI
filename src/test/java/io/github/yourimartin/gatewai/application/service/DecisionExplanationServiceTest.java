@@ -175,7 +175,7 @@ class DecisionExplanationServiceTest {
   private static CacheDecision cacheHit() {
     return new CacheDecision(UUID.randomUUID(), "req-2", NOW, "b".repeat(64),
         CacheOutcome.HIT, 0.97, 0.42, 0.92, "entry-1", 30L, "origin-1",
-        "nomic-embed-text", ConformalStatus.SINGLETON);
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null);
   }
 
   private static final class StubHistory implements DecisionHistory {

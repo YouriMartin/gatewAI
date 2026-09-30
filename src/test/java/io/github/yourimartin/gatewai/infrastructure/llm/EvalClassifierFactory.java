@@ -4,8 +4,10 @@ import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
+import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.core.io.DefaultResourceLoader;
 
 /**
  * Lends the evaluation harness (v2 batch 5) the <b>real</b> classifiers.
@@ -79,6 +81,15 @@ public final class EvalClassifierFactory {
         new EmbeddingComplexityClassifier(embeddingModel, properties, heuristic,
             calibrations),
         new HeuristicLevelThree(properties, heuristic), calibrations);
+  }
+
+  /**
+   * The production embedding window (v4 A.2): the shipped tokenizer, loaded as
+   * the application loads it. The cache's exact-match rule for long prompts is
+   * part of what the conversation harness measures, so it cannot be a stand-in.
+   */
+  public static EmbeddingWindow embeddingWindow(String tokenizerLocation) {
+    return new TokenizerEmbeddingWindow(new DefaultResourceLoader(), tokenizerLocation);
   }
 
   /**

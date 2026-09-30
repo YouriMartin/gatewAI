@@ -19,3 +19,4 @@ part that ages well.
 | [0011](0011-in-process-onnx-embedding.md) | Run the embedding model in-process (ONNX) instead of on a model server | Accepted |
 | [0012](0012-region-on-the-provider-instance.md) | Region attribution belongs to the provider instance (and a dispatch zone never overrides a hosted API) | Accepted |
 | [0013](0013-sourced-and-labelled-not-measured.md) | Energy figures are sourced and labelled, never presented as measured | Accepted |
+| [0014](0014-scope-the-cache-by-conversation-context.md) | Scope the semantic cache by conversation context: similarity on the last turn only inside an identical context | Accepted |

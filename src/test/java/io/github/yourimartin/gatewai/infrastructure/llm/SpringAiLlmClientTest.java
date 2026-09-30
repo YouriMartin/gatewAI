@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +37,7 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
 
 @ExtendWith(MockitoExtension.class)
 class SpringAiLlmClientTest {
@@ -120,7 +125,8 @@ class SpringAiLlmClientTest {
 
     assertEquals("claude-3-sonnet", response.model());
     assertEquals("Hello from Claude!", response.content());
-    assertEquals("end_turn", response.finishReason());
+    // ADR 0014: the client gets the OpenAI value, not Anthropic's end_turn.
+    assertEquals("stop", response.finishReason());
     assertEquals(10, response.promptTokens());
     assertEquals(5, response.completionTokens());
     assertEquals(15, response.totalTokens());
@@ -143,6 +149,63 @@ class SpringAiLlmClientTest {
         List.of(new LlmMessage("user", "Hello")), null, null));
 
     assertTrue(response.cacheHit());
+  }
+
+  @Test
+  void callForwardsStopSequencesAsAnOption() {
+    stubFluentChain(buildChatResponse());
+    ArgumentCaptor<ChatOptions.Builder<?>> options = ArgumentCaptor.captor();
+
+    llmClient.call(new LlmRequest("claude-3", List.of(new LlmMessage("user", "Hello")),
+        null, null, List.of("END"), null));
+
+    verify(requestSpec).options(options.capture());
+    assertEquals(List.of("END"), options.getValue().build().getStopSequences());
+  }
+
+  @Test
+  void callHandsTheEndUserToTheAdvisorChainNotToTheModel() {
+    stubFluentChain(buildChatResponse());
+    when(requestSpec.advisors(ArgumentMatchers.<Consumer<ChatClient.AdvisorSpec>>any()))
+        .thenReturn(requestSpec);
+    ArgumentCaptor<Consumer<ChatClient.AdvisorSpec>> spec = ArgumentCaptor.captor();
+
+    llmClient.call(new LlmRequest("claude-3", List.of(new LlmMessage("user", "Hello")),
+        null, null, null, "end-user-7"));
+
+    verify(requestSpec).advisors(spec.capture());
+    ChatClient.AdvisorSpec advisors = mock(ChatClient.AdvisorSpec.class);
+    spec.getValue().accept(advisors);
+    verify(advisors).param(LlmRequest.END_USER_CONTEXT_KEY, "end-user-7");
+  }
+
+  @Test
+  void callWithoutAnEndUserAddsNoAdvisorParameter() {
+    stubFluentChain(buildChatResponse());
+
+    llmClient.call(new LlmRequest("claude-3", List.of(new LlmMessage("user", "Hello")),
+        null, null));
+
+    verify(requestSpec, never())
+        .advisors(ArgumentMatchers.<Consumer<ChatClient.AdvisorSpec>>any());
+  }
+
+  @Test
+  void callReadsTheCacheOutcomeForTheResponseHeader() {
+    ChatResponseMetadata meta = ChatResponseMetadata.builder()
+        .model("claude-3-sonnet")
+        .usage(new DefaultUsage(10, 5))
+        .keyValue(LlmResponse.CACHE_OUTCOME_METADATA_KEY, "BYPASS")
+        .build();
+    Generation generation = new Generation(new AssistantMessage("Fresh"),
+        ChatGenerationMetadata.builder().finishReason("STOP").build());
+    stubFluentChain(new ChatResponse(List.of(generation), meta));
+
+    LlmResponse response = llmClient.call(new LlmRequest("gpt",
+        List.of(new LlmMessage("user", "Hello")), null, null));
+
+    assertEquals("BYPASS", response.cacheOutcome());
+    assertEquals("stop", response.finishReason());
   }
 
   private static ChatResponse buildChatResponse() {

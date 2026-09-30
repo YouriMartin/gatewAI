@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,8 @@ import java.util.Map;
 import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+
+import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +65,7 @@ class SemanticCacheConformalTest {
   void setUp() {
     properties = new SemanticCacheProperties();
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
-        CalibrationFixtures.none(properties::getSimilarityThreshold));
+        CalibrationFixtures.none(properties::getSimilarityThreshold), mock(ModelRegistry.class), text -> true);
   }
 
   // ---- Conformal prediction set (v2 batch 3) ----
@@ -83,7 +86,7 @@ class SemanticCacheConformalTest {
     assertEquals("Spring is a framework.",
         result.chatResponse().getResult().getOutput().getText());
     verify(tracer).decided(any(), any(), any(), eq(0.90),
-        eq(ConformalStatus.SINGLETON));
+        eq(ConformalStatus.SINGLETON), any(), any());
   }
 
   @Test
@@ -101,7 +104,7 @@ class SemanticCacheConformalTest {
 
     verify(callChain).nextCall(any());
     verify(tracer).decided(any(), any(), isNull(), eq(0.90),
-        eq(ConformalStatus.AMBIGUOUS));
+        eq(ConformalStatus.AMBIGUOUS), any(), any());
   }
 
   @Test
@@ -119,7 +122,7 @@ class SemanticCacheConformalTest {
     assertEquals("A framework.",
         result.chatResponse().getResult().getOutput().getText());
     verify(tracer).decided(any(), any(), any(), eq(0.92),
-        eq(ConformalStatus.NOT_CALIBRATED));
+        eq(ConformalStatus.NOT_CALIBRATED), any(), any());
   }
 
   @Test
@@ -128,7 +131,7 @@ class SemanticCacheConformalTest {
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
         CalibrationFixtures.stale(
             CalibrationFixtures.calibration(CalibrationTarget.CACHE, 0.80),
-            properties.getSimilarityThreshold()));
+            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
     ChatClientRequest request = buildRequest("What is Spring?");
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
         .thenReturn(List.of(cached("What is Spring?", "A framework.", 0.85)));
@@ -140,14 +143,14 @@ class SemanticCacheConformalTest {
     // 0.85 would have cleared the stale 0.80 but not the fixed 0.92.
     verify(callChain).nextCall(any());
     verify(tracer).decided(any(), any(), isNull(), eq(0.92),
-        eq(ConformalStatus.STALE_CALIBRATION));
+        eq(ConformalStatus.STALE_CALIBRATION), any(), any());
   }
 
   private SemanticCacheAdvisor calibratedAdvisor(double threshold) {
     return new SemanticCacheAdvisor(vectorStore, properties, tracer,
         CalibrationFixtures.applied(
             CalibrationFixtures.calibration(CalibrationTarget.CACHE, threshold),
-            properties.getSimilarityThreshold()));
+            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
   }
 
   private static Document cached(String question, String answer, double score) {

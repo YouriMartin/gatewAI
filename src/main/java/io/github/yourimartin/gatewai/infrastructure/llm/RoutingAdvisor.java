@@ -376,6 +376,11 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       if (originalOptions.getTopP() != null) {
         builder.topP(originalOptions.getTopP());
       }
+      // Part of the cache scope since v4 A.2 (ADR 0014): an answer keyed on its
+      // stop sequences must have been generated with them.
+      if (originalOptions.getStopSequences() != null) {
+        builder.stopSequences(originalOptions.getStopSequences());
+      }
     }
 
     return new Prompt(original.getInstructions(), builder.build());

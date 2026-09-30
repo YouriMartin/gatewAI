@@ -67,19 +67,43 @@ particular:
 
 ## Semantic cache trade-offs
 
-- **The cache ignores the conversation around the last message — measured, not
-  yet fixed.** The cache key is the last user message only (and only its first
-  128 tokens): the system prompt, the conversation history, the pinned model and
-  the OpenAI `user` field are not part of it. Two conversations under one API key
-  that both end with "Give me an example in Java" get the same answer; in a
-  support bot whose system prompt carries the customer's data, one customer can
-  receive the answer written for another. On 100 labelled conversation cases
-  (v4 A.1), the cache served **64 of 64 (100 %)** of the cases it should have
-  refused, each at similarity 1.0 — no threshold changes that, and there is no
-  switch to turn the cache off. Until v4 A.2 scopes the cache by conversation
-  context, do not put multi-turn, system-prompt-templated or per-end-user
-  traffic behind gatewAI. See
-  [`evaluation.md`](../technical/evaluation.md#what-the-conversation-set-found-v4-a1).
+- **The conversation around the last message — measured in v4 A.1, fixed in
+  v4 A.2.** Until A.2 the cache key was the last user message only (and only its
+  first 128 tokens): two conversations under one API key that both ended with
+  "Give me an example in Java" got the same answer, and in a support bot whose
+  system prompt carried the customer's data, one customer could receive the
+  answer written for another. Since A.2
+  ([ADR 0014](../technical/adr/0014-scope-the-cache-by-conversation-context.md))
+  the last turn is compared only inside an identical context — system prompts,
+  history, a pinned model, the OpenAI `user` field and `stop` must all match
+  exactly — and a turn longer than the embedding window is matched exactly.
+  Measured on the same 100 labelled conversation cases, real advisor, fixed 0.92:
+
+  | | before (A.1) | after (A.2) |
+  |---|---|---|
+  | served across contexts (must be 0) | **64 / 64** | **0 / 64** |
+  | served in the same context — reworded follow-up | 2 / 18 (11.1 %) | 1 / 18 (5.6 %) |
+  | served in the same context — reworded first turn | 6 / 18 (33.3 %) | 6 / 18 (33.3 %) |
+
+  What it still does not do, and what it costs:
+  - **Conversations with more than one prior exchange bypass the cache**
+    (`gatewai.cache.max-history-messages`, default 3). That is the drop in the
+    second row: correctness bought with hits, and shown rather than hidden.
+  - **A reworded follow-up rarely hits even in the same context.** Short,
+    history-dependent turns move a lot in embedding space when reworded.
+  - **Isolation between end users of one API key needs the `user` field.** A
+    client that does not send it, and whose system prompt does not carry the
+    end user's data, shares cached answers across its end users for identical
+    conversations.
+  - **Entries cached before A.2 are never served again**; they only take space
+    until deleted ([`data-model.md`](../technical/data-model.md#vector-cache-pgvector)).
+  - **An identical popular turn stored in many conversations can hide an entry
+    from a large scope** on pgvector's HNSW index. A small scope is searched
+    exactly through a metadata index, and a miss here costs a model call, never
+    a wrong answer (measurement in ADR 0014).
+  - **There is no switch to turn the cache off.**
+
+  See [`evaluation.md`](../technical/evaluation.md#what-the-conversation-set-found-v4-a1).
 - A high-enough similarity can return a **stored answer for a prompt that only
   looks similar**, which may be wrong or stale for the new intent. Tune the
   threshold for your tolerance.

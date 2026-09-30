@@ -19,9 +19,23 @@ Request (`ChatCompletionRequest`):
 }
 ```
 
-Honored: `model`, `messages`, `temperature`, `max_tokens`, and **`stream`**
-(`model` is a **hint** — the router may override it). Accepted but ignored:
-`top_p`, `n`, `stop`, `presence_penalty`, `frequency_penalty`, `user`.
+Honored: `model`, `messages`, `temperature`, `max_tokens`, **`stream`**, and since
+v4 A.2 `stop` and `user` (`model` is a **hint** — the router may override it; a
+registered model id pins). Accepted but ignored: `top_p`, `n`,
+`presence_penalty`, `frequency_penalty` (v4 B.1 plans to forward them).
+
+- **`stop`** (an array of strings) is forwarded to the model, and is part of the
+  semantic cache's scope: an answer generated with stop sequences is only
+  served to a request with the same ones.
+- **`user`** is never sent to a model. It isolates end users inside one API key:
+  an answer cached for one `user` is never served to another. Send it if one key
+  serves several of your end users —
+  [ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md).
+
+The semantic cache compares the last user message only **inside an identical
+conversation context** — the system prompts, the history, a pinned model,
+`user` and `stop` must all match exactly. Requests with more than three
+non-system messages bypass it (see [`semantic-cache.md`](semantic-cache.md)).
 
 **Streaming** (`"stream": true`): the response is `text/event-stream` — a series of
 `data: {chat.completion.chunk}` events (each `choices[0].delta.content` is a token
@@ -47,6 +61,24 @@ Response (`ChatCompletionResponse`, non-streaming):
 
 `model` is the model that actually served the request. On a cache hit, `usage`
 replays the original counts.
+
+`finish_reason` uses the OpenAI vocabulary — `stop`, `length`, `tool_calls`,
+`content_filter` — whichever provider answered. **Changed in v4 A.2:** before,
+provider values passed through as-is (`end_turn` from Anthropic, `STOP` from the
+OpenAI egress). A value with no OpenAI equivalent is still passed through
+unchanged.
+
+Response headers (non-streaming):
+
+| Header | Value |
+|---|---|
+| `X-Request-Id` | the correlation id — the key of the decision API and the carbon record |
+| `X-GatewAI-Cache` | `HIT`, `MISS` or `BYPASS` — what the semantic cache did (v4 A.2) |
+| `X-GatewAI-Model` | the model that produced the answer; on a hit, the one that produced it first |
+
+Streaming responses carry `X-Request-Id` only: headers leave before the cache
+outcome is known to the client-facing layer, so a streaming caller reads the
+decision back by id.
 
 ### Errors
 
@@ -255,7 +287,8 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
            "threshold": 0.9526, "conformalStatus": "EMPTY_SET",
            "matchedEntryId": null, "matchedEntryAgeSeconds": null,
            "originCorrelationId": null,
-           "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2"},
+           "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
+           "reason": null, "cacheScope": "3cf52977134c…"},
  "routing": {"chosenTier": "CLOUD_PREMIUM", "chosenModelId": "qwen2.5:3b",
              "decisionReason": "MATCH", "strategy": "EMBEDDING",
              "effectiveStrategy": "EMBEDDING", "escalatedTo": null,
@@ -269,7 +302,9 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
 ```
 
 `routing` is **null on a cache hit** — the router never ran, and saying so is the
-point. `404 decision_not_found` when nothing was recorded under that id (purged,
+point. `cache.cacheScope` is the hash of the conversation scope the lookup ran in
+(never text), and `cache.reason` says why a decision was not a plain lookup:
+`EMPTY_PROMPT`, `HISTORY_TOO_LONG`, `EXACT_MATCH_ONLY` or `MAX_TOKENS` (v4 A.2). `404 decision_not_found` when nothing was recorded under that id (purged,
 never recorded, or `gatewai.decisions.enabled=false`).
 
 The correlation id is the one echoed on every response as `X-Request-Id`, and

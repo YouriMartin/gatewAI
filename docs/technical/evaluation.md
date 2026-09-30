@@ -335,9 +335,40 @@ turns ("what's the difference with a readiness probe, then?") move a lot in
 embedding space when reworded, which is the same false-negative side the pair
 set measures at 61 %.
 
-`baselines.json` records these values as they are: ceilings at 1.0 and floors
-just below 11.1 % and 33.3%. They are the "before" of v4 A.2, which scopes the
-cache by conversation context.
+A.1 recorded these values in `baselines.json` as they were: ceilings at 1.0 and
+floors just below 11.1 % and 33.3 %, the "before" of v4 A.2.
+
+### After v4 A.2: the cache scoped by conversation context
+
+Same cases, same advisor settings, after
+[ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md):
+
+| Tag | n | cross_context_hit_rate A.1 → A.2 | same_context_hit_rate A.1 → A.2 |
+|---|---|---|---|
+| `follow-up-collision` | 20 | 100 % → **0 %** | — |
+| `system-prompt-collision` | 16 | 100 % → **0 %** | — |
+| `end-user-collision` | 16 | 100 % → **0 %** | — |
+| `template-prefix` | 12 | 100 % → **0 %** | — |
+| `same-context-paraphrase` | 18 | — | 11.1 % → **5.6 %** |
+| `first-turn-paraphrase` | 18 | — | 33.3 % → 33.3 % |
+| **all** | 100 | 64/64 → **0/64** | 8/36 → **7/36** (19.4 %) |
+
+The four collision categories are closed, and the ceilings are now 0. The price
+is one case, shown rather than hidden: `same-context-paraphrase` includes four
+conversations with two prior exchanges, which now bypass the cache (history
+limit 3), and one of them used to be served. Its floor moved down to 0.05 in the
+same change, with the reason in `baselines.json`. The report names bypassed cases
+as such, so they cannot pass for low-similarity refusals.
+
+The single-turn pair metrics did not move (test half: FP 14.3 %, FN 61.4 %).
+That is expected: the pair evaluator scores recorded similarities, not the
+advisor, and a single-turn request with no system prompt has one scope anyway,
+which `CacheScopeTest` asserts.
+
+The harness runs on `SimpleVectorStore`, which searches exactly, so it cannot see
+what the production index does with a per-scope filter. That was measured
+separately, on pgvector 0.8.3, and changed the design: see the HNSW consequence
+in ADR 0014.
 
 ### What the v2 run found, and why it still matters
 
