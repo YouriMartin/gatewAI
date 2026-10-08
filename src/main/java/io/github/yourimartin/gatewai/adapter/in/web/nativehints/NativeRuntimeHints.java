@@ -16,6 +16,7 @@ import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionChunk;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionResponse;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatMessage;
+import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatRequestMessage;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChunkChoice;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.DeferredJobResponse;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.TokenUsage;
@@ -36,6 +37,10 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
 
   private static final List<Class<?>> BOUND_DTOS = List.of(
       ChatCompletionRequest.class,
+      ChatCompletionRequest.StreamOptions.class,
+      ChatRequestMessage.class,
+      ChatRequestMessage.ChatToolCall.class,
+      ChatRequestMessage.ChatFunctionCall.class,
       ChatCompletionResponse.class,
       ChatCompletionChunk.class,
       ChunkChoice.class,

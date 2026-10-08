@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Set;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
@@ -83,5 +85,15 @@ class DeferredJobJsonTest {
     assertNull(DeferredJobJson.responseToJson(null));
     assertNull(DeferredJobJson.responseFromJson(null));
     assertNull(DeferredJobJson.responseFromJson(""));
+  }
+
+  @Test
+  void theSamplingParametersSurvive() {
+    LlmRequest request = new LlmRequest("auto", List.of(new LlmMessage("user", "hi")),
+        null, null, null, null, new SamplingParameters(0.9, 0.1, 0.2, 1L << 40), Set.of());
+
+    LlmRequest back = DeferredJobJson.requestFromJson(DeferredJobJson.requestToJson(request));
+
+    assertEquals(request.sampling(), back.sampling());
   }
 }

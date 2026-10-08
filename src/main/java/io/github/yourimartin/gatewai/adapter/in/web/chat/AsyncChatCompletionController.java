@@ -4,6 +4,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.port.in.GetDeferredJobUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.SubmitDeferredRequestUseCase;
 
@@ -33,7 +34,9 @@ class AsyncChatCompletionController {
   @PostMapping("/v1/chat/completions/async")
   ResponseEntity<DeferredJobResponse> submit(
       @RequestBody ChatCompletionRequest request) {
-    UUID id = submitUseCase.submit(OpenAiMapper.toLlmRequest(request));
+    LlmRequest llmRequest = OpenAiMapper.toLlmRequest(request);
+    llmRequest.requireServableByChain();
+    UUID id = submitUseCase.submit(llmRequest);
     return ResponseEntity.accepted()
         .body(new DeferredJobResponse(id.toString(), "queued", null, null, null));
   }

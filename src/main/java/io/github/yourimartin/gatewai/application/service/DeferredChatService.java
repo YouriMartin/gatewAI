@@ -60,6 +60,8 @@ class DeferredChatService implements SubmitDeferredRequestUseCase,
 
   @Override
   public UUID submit(LlmRequest request) {
+    // A job is replayed through the advisor chain later; refuse it now, not then.
+    request.requireServableByChain();
     UUID id = UUID.randomUUID();
     DeferredJob job =
         DeferredJob.queued(id, request, currentClientId(), Instant.now());

@@ -7,6 +7,47 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.1 (message shapes, forwarded parameters)
+
+- **The egress options fix was not in the plan.** The roadmap asked for forwarded
+  parameters to reach "each provider's options"; checking that against a stub server
+  showed the cloud egress did not work at all. Spring AI 2.0's `OpenAiChatModel`
+  casts the prompt's options to `OpenAiChatOptions` (a `ClassCastException` on every
+  routed call to an `openai` or `openai-compatible` instance), and
+  `AnthropicChatModel` swaps any other options type for empty ones — no model, no
+  `max_tokens`. Only Ollama was rebuilt with native options. `DelegatingChatModel`
+  now merges the request's options over **the target instance's own options** for
+  every type, which also keeps its model, credentials and Anthropic's default
+  `max_tokens`. The unit tests had not caught it because they mocked the provider
+  models; `DelegatingChatModelWireTest` builds them as production does.
+- **The seed rides on a `ChatOptions` subtype.** Spring AI has no portable seed, and
+  the options are rebuilt twice before the egress (the `ChatClient` merge, the
+  router). `GatewaiChatOptions` survives both — the delegating model's default
+  options are of that type, and the router now `mutate()`s instead of rebuilding.
+  The alternatives were a Scoped Value (not reliably bound on the streaming path's
+  Reactor threads) or the advisor context (which never reaches the `ChatModel`).
+- **A seed beyond 32 bits is not sent.** The OpenAI and Ollama clients take an
+  `Integer`; the ingress accepts any JSON integer rather than turn a valid request
+  into a deserialisation error.
+- **`openai` sends `max_completion_tokens`; `openai-compatible` keeps
+  `max_tokens`.** OpenAI deprecated `max_tokens` and its reasoning models reject it;
+  vLLM-style servers are the ones that still expect it. `max_completion_tokens`
+  wins when a client sends both.
+- **A `response_format` of `text` is not marked**, nor are `n: 1`,
+  `logprobs: false`, an empty `logit_bias` or empty `tools`: they ask for the
+  default, which the chain already gives. Unknown part types are marked
+  (`OTHER_CONTENT`) and kept with their JSON.
+- **The refusal lives in two places.** The controllers refuse before anything
+  starts — a stream must fail with a 400, not an SSE error event — and the use
+  cases refuse too (`LlmRequest.requireServableByChain`), so a marked request cannot
+  reach the chain through another caller. The OpenAI error handler now covers the
+  async endpoint as well.
+- **Unknown roles are a 400, and the chain no longer invents user messages.**
+  `SpringAiLlmClient` used to map any unknown role to a user message; it now throws
+  for anything but `system`/`user`/`assistant`, since tool roles are marked and
+  never reach it. The evaluation harness's role mapping is unchanged: the dataset
+  uses none of the new roles.
+
 ## v4 lot A — A.3 (conversation-sticky routing)
 
 - **A conversation with no record is recorded too.** The roadmap records turn 1

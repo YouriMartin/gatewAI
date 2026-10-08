@@ -2,6 +2,7 @@ package io.github.yourimartin.gatewai.adapter.in.web.error;
 
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionController;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
+import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,14 +18,15 @@ import org.springframework.web.client.RestClientException;
 /**
  * Translates failures on the OpenAI chat ingress into the OpenAI error envelope
  * ({@link ApiError}) with a matching HTTP status, so client SDKs surface a
- * usable message instead of a Spring whitelabel body. Scoped to the synchronous
- * {@code /v1/chat/completions} controller; streaming failures are reported
- * inline on the SSE stream and do not pass through here.
+ * usable message instead of a Spring whitelabel body. Scoped to the chat
+ * controllers ({@code /v1/chat/completions} and its async variant); failures
+ * after a stream has started are reported inline on the SSE stream and do not
+ * pass through here.
  *
  * <p>Upstream provider details are logged server-side but not echoed to the
  * caller, to avoid leaking internal configuration.
  */
-@RestControllerAdvice(assignableTypes = ChatCompletionController.class)
+@RestControllerAdvice(basePackageClasses = ChatCompletionController.class)
 class ApiExceptionHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
@@ -45,6 +47,18 @@ class ApiExceptionHandler {
   ResponseEntity<ApiError> handleUnknownModel(UnknownModelException e) {
     LOG.warn("Unroutable model on /v1/chat/completions: {}", e.getMessage());
     return build(HttpStatus.BAD_REQUEST, e.getMessage(), INVALID_REQUEST, "unknown_model");
+  }
+
+  /**
+   * A request the advisor chain cannot honour — tools, non-text parts,
+   * {@code response_format}… (v4 B.1). Refused with the features named, until
+   * pass-through (B.3) forwards it instead.
+   */
+  @ExceptionHandler(UnsupportedFeatureException.class)
+  ResponseEntity<ApiError> handleUnsupportedFeature(UnsupportedFeatureException e) {
+    LOG.info("Refused a request that needs pass-through: {}", e.features());
+    return ResponseEntity.badRequest().body(ApiError.of(e.getMessage(), INVALID_REQUEST,
+        e.features().getFirst().param(), "unsupported_feature"));
   }
 
   /** Semantically invalid request (e.g. missing {@code messages}). */

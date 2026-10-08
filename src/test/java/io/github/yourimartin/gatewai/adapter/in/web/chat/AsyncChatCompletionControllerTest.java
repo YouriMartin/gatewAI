@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.adapter.in.web.chat;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -102,5 +103,20 @@ class AsyncChatCompletionControllerTest {
     mockMvc.perform(get("/v1/chat/completions/async/" + id)
             .with(authentication(auth())))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void submitRefusesARequestThatNeedsPassThrough() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions/async")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto", "messages": [{"role": "user", "content": "Hi"}],
+                 "response_format": {"type": "json_object"}}
+                """)
+            .with(authentication(auth())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
+        .andExpect(jsonPath("$.error.param").value("response_format"));
+    verifyNoInteractions(submitUseCase);
   }
 }

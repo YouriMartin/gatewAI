@@ -1,5 +1,7 @@
 package io.github.yourimartin.gatewai.application.service;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -10,6 +12,10 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Set;
+import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
@@ -194,5 +200,17 @@ class ChatCompletionServiceTest {
 
     verify(requestLogRepository).save(logCaptor.capture());
     assertEquals(0.69, logCaptor.getValue().green().gramsCo2Avoided());
+  }
+
+  @Test
+  void aRequestThatNeedsPassThroughNeverReachesTheChain() {
+    LlmRequest request = new LlmRequest("auto", List.of(new LlmMessage("user", "hi")),
+        null, null, null, null, SamplingParameters.NONE,
+        Set.of(PassThroughFeature.IMAGE_INPUT));
+
+    assertThrows(UnsupportedFeatureException.class, () -> service.complete(request));
+    assertThrows(UnsupportedFeatureException.class,
+        () -> service.streamComplete(request, chunk -> { }));
+    verifyNoInteractions(llmClient, requestLogRepository);
   }
 }

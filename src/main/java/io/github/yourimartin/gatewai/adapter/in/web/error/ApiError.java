@@ -12,6 +12,11 @@ public record ApiError(Body error) {
   }
 
   public static ApiError of(String message, String type, String code) {
-    return new ApiError(new Body(message, type, null, code));
+    return of(message, type, null, code);
+  }
+
+  /** An error that names the request field at fault. */
+  public static ApiError of(String message, String type, String param, String code) {
+    return new ApiError(new Body(message, type, param, code));
   }
 }

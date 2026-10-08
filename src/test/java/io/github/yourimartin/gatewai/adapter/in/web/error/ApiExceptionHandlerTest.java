@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.adapter.in.web.error;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -149,5 +150,42 @@ class ApiExceptionHandlerTest {
         .andExpect(jsonPath("$.error.message")
             .value(org.hamcrest.Matchers.not(
                 org.hamcrest.Matchers.containsString("secret"))));
+  }
+
+  @Test
+  void aRequestWithToolsIsRefusedWithTheFeatureNamed() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto",
+                 "messages": [{"role": "user", "content": "weather in Paris?"}],
+                 "tools": [{"type": "function", "function": {"name": "get_weather"}}]}
+                """)
+            .with(authentication(auth())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.type").value("invalid_request_error"))
+        .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
+        .andExpect(jsonPath("$.error.param").value("tools"))
+        .andExpect(jsonPath("$.error.message")
+            .value(org.hamcrest.Matchers.containsString("tools")));
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  void aStreamedImageIsRefusedBeforeAnyEventIsSent() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto", "stream": true, "messages": [{"role": "user", "content": [
+                  {"type": "text", "text": "What is this?"},
+                  {"type": "image_url", "image_url": {"url": "https://example.com/a.png"}}]}]}
+                """)
+            .with(authentication(auth())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
+        .andExpect(jsonPath("$.error.param").value("messages"))
+        .andExpect(jsonPath("$.error.message")
+            .value(org.hamcrest.Matchers.containsString("image_url")));
+    verifyNoInteractions(streamUseCase);
   }
 }

@@ -1,0 +1,11 @@
+{
+  "model": "auto",
+  "messages": [
+    {"role": "developer", "content": "Answer in French."},
+    {"role": "user", "content": "Explain what a reverse proxy does."}
+  ],
+  "max_completion_tokens": 512,
+  "reasoning_effort": "low",
+  "seed": 7,
+  "store": false
+}

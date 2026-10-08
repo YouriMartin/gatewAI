@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.CreatedClientView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.RoutingConfigView;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionResponse;
+import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatRequestMessage;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.aot.hint.RuntimeHints;
@@ -24,5 +25,8 @@ class NativeRuntimeHintsTest {
         .onType(RoutingConfigView.class).test(hints));
     assertTrue(RuntimeHintsPredicates.reflection()
         .onType(CreatedClientView.class).test(hints));
+    // v4 B.1: the request message shapes, nested types included.
+    assertTrue(RuntimeHintsPredicates.reflection()
+        .onType(ChatRequestMessage.ChatToolCall.class).test(hints));
   }
 }

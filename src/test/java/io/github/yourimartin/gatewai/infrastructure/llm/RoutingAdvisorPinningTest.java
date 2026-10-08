@@ -208,4 +208,23 @@ class RoutingAdvisorPinningTest {
         "claude-haiku-4-20250506", 0.002, new EnergyProfile(0.0, 0.15, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_ENTRY);
   }
+
+  @Test
+  void aPinnedRequestKeepsEveryForwardedOption() {
+    ChatClientRequest request = ChatClientRequest.builder()
+        .prompt(new Prompt(List.of(new UserMessage("Hello")), GatewaiChatOptions.builder()
+            .model("claude-haiku-4-20250506").presencePenalty(0.1).seed(42L).build()))
+        .context(Map.of())
+        .build();
+    when(modelRegistry.findByModelId("claude-haiku-4-20250506"))
+        .thenReturn(Optional.of(entryModel()));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    verify(callChain).nextCall(requestCaptor.capture());
+    var options = requestCaptor.getValue().prompt().getOptions();
+    assertEquals(0.1, options.getPresencePenalty());
+    assertEquals(42L, GatewaiChatOptions.seedOf(options));
+  }
 }

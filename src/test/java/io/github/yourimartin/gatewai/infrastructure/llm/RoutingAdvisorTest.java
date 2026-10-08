@@ -133,11 +133,15 @@ class RoutingAdvisorTest {
   void preservesOriginalOptionsExceptModel() {
     Prompt prompt = new Prompt(
         List.of(new UserMessage("Refactor this")),
-        ChatOptions.builder()
+        GatewaiChatOptions.builder()
             .model("original-model")
             .temperature(0.7)
             .maxTokens(256)
             .stopSequences(List.of("END"))
+            .topP(0.9)
+            .presencePenalty(0.1)
+            .frequencyPenalty(0.2)
+            .seed(42L)
             .build()
     );
     ChatClientRequest request = ChatClientRequest.builder()
@@ -161,6 +165,11 @@ class RoutingAdvisorTest {
     // Part of the cache scope since v4 A.2: an answer keyed on its stop
     // sequences must be generated with them.
     assertEquals(List.of("END"), routedOptions.getStopSequences());
+    // v4 B.1: the rebuild used to keep four options and drop the rest.
+    assertEquals(0.9, routedOptions.getTopP());
+    assertEquals(0.1, routedOptions.getPresencePenalty());
+    assertEquals(0.2, routedOptions.getFrequencyPenalty());
+    assertEquals(42L, GatewaiChatOptions.seedOf(routedOptions));
   }
 
   // ---- Fallback tests ----

@@ -19,10 +19,51 @@ Request (`ChatCompletionRequest`):
 }
 ```
 
-Honored: `model`, `messages`, `temperature`, `max_tokens`, **`stream`**, and since
-v4 A.2 `stop` and `user` (`model` is a **hint** — the router may override it; a
-registered model id pins). Accepted but ignored: `top_p`, `n`,
-`presence_penalty`, `frequency_penalty` (v4 B.1 plans to forward them).
+Honored: `model`, `messages`, `temperature`, `max_tokens` (or
+`max_completion_tokens`, which wins when both are sent), **`stream`**,
+`stream_options.include_usage`, `stop`, `user`, and since v4 B.1 `top_p`,
+`presence_penalty`, `frequency_penalty` and `seed` — forwarded where the provider
+supports them (table below). `model` is a **hint** — the router may override it; a
+registered model id pins. Unknown fields are ignored, never rejected.
+
+**Message shapes (v4 B.1).** `content` is a string, an array of parts, or `null`
+(an assistant message that only calls tools). An array of `text` parts is joined
+with `\n` and behaves exactly like the string form: same cache scope, same
+embedding, same routing. Roles: `system`, `developer` (treated as `system`),
+`user`, `assistant`, `tool`, `function`; anything else is a 400.
+
+**What the advisor chain cannot serve is refused, not degraded.** A request that
+uses one of the features below gets a 400 naming them, with
+`"code": "unsupported_feature"` and `param` set to the field at fault — never a
+deserialisation error, and never an answer with the feature silently dropped.
+Batch B.3 forwards these requests as-is instead (pass-through, ADR 0016).
+
+| Feature | Marked when |
+|---|---|
+| tools | `tools` or legacy `functions` is non-empty |
+| tool messages | a `tool`/`function` message, or an assistant message with `tool_calls`/`function_call` |
+| non-text content | an `image_url`, `input_audio`, `file` or unknown part type in `content` |
+| `response_format` | any `type` other than `text` |
+| `n` | greater than 1 |
+| `logprobs` | `logprobs: true` or `top_logprobs > 0` |
+| `logit_bias` | non-empty |
+
+**Forwarded parameters, per provider type** — what the egress puts on the wire,
+checked against a stub server for each type (`DelegatingChatModelWireTest`):
+
+| Parameter | `openai` | `openai-compatible` | `ollama` | `anthropic` |
+|---|---|---|---|---|
+| `temperature`, `top_p`, `stop` | sent | sent | sent (`options`) | sent (`stop_sequences`) |
+| `max_tokens` / `max_completion_tokens` | sent as `max_completion_tokens` | sent as `max_tokens` | sent as `num_predict` | sent as `max_tokens` (default 4096 when absent: the API requires it) |
+| `presence_penalty`, `frequency_penalty` | sent | sent | sent (`options`) | ignored — the Messages API has none |
+| `seed` | sent if it fits in 32 bits | sent if it fits in 32 bits | sent if it fits in 32 bits | ignored — the Messages API has none |
+| `user` | never sent — a cache-scope key only | never sent | never sent | never sent |
+| tools, non-text parts, `response_format`, `n > 1`, `logprobs`, `logit_bias` | refused (400) until B.3 | refused (400) until B.3 | refused (400) until B.3 | refused (400) until B.3 |
+
+"Sent" means the field is in the request gatewAI makes; whether a self-hosted
+server applies it is that server's business. The `mock` profile echoes and applies
+nothing. The penalties and the seed are not part of the cache scope, like
+temperature ([`semantic-cache.md`](semantic-cache.md)).
 
 - **`stop`** (an array of strings) is forwarded to the model, and is part of the
   semantic cache's scope: an answer generated with stop sequences is only
@@ -40,7 +81,10 @@ non-system messages bypass it (see [`semantic-cache.md`](semantic-cache.md)).
 **Streaming** (`"stream": true`): the response is `text/event-stream` — a series of
 `data: {chat.completion.chunk}` events (each `choices[0].delta.content` is a token
 delta; the terminal event sets `finish_reason`), ending with `data: [DONE]`. Cache
-hits are replayed as a synthetic stream (no model call).
+hits are replayed as a synthetic stream (no model call). With
+`"stream_options": {"include_usage": true}`, one more chunk precedes `[DONE]`:
+`"choices": []` and the `usage` of the whole answer, as OpenAI sends it. Other
+chunks carry no `usage` field.
 
 Response (`ChatCompletionResponse`, non-streaming):
 

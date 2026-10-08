@@ -40,9 +40,9 @@ class ChatCompletionDtoTest {
     assertEquals("gpt-4", req.model());
     assertEquals(2, req.messages().size());
     assertEquals("system", req.messages().get(0).role());
-    assertEquals("You are helpful.", req.messages().get(0).content());
+    assertEquals("You are helpful.", req.messages().get(0).content().asString());
     assertEquals("user", req.messages().get(1).role());
-    assertEquals("Hello", req.messages().get(1).content());
+    assertEquals("Hello", req.messages().get(1).content().asString());
     assertEquals(0.7, req.temperature());
     assertEquals(256, req.maxTokens());
     assertEquals(0.9, req.topP());

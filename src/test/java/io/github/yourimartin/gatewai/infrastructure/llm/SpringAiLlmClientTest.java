@@ -1,5 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -11,6 +13,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Set;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -222,5 +226,29 @@ class SpringAiLlmClientTest {
         .build();
 
     return new ChatResponse(List.of(generation), responseMeta);
+  }
+
+  @Test
+  void callForwardsTheSamplingParametersAsOptions() {
+    stubFluentChain(buildChatResponse());
+    ArgumentCaptor<ChatOptions.Builder<?>> options = ArgumentCaptor.captor();
+
+    llmClient.call(new LlmRequest("claude-3", List.of(new LlmMessage("user", "Hello")),
+        0.5, 64, null, null, new SamplingParameters(0.9, 0.1, 0.2, 7L), Set.of()));
+
+    verify(requestSpec).options(options.capture());
+    ChatOptions built = options.getValue().build();
+    assertThat(built.getTopP()).isEqualTo(0.9);
+    assertThat(built.getPresencePenalty()).isEqualTo(0.1);
+    assertThat(built.getFrequencyPenalty()).isEqualTo(0.2);
+    assertThat(GatewaiChatOptions.seedOf(built)).isEqualTo(7L);
+  }
+
+  @Test
+  void aToolMessageIsNeverTurnedIntoAUserMessage() {
+    assertThatThrownBy(() -> llmClient.call(new LlmRequest("claude-3",
+        List.of(new LlmMessage("tool", "18 degrees")), null, null)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("tool");
   }
 }

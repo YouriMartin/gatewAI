@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -42,8 +43,10 @@ public class ChatCompletionController {
   @PostMapping("/v1/chat/completions")
   Object complete(@RequestBody ChatCompletionRequest request) {
     LlmRequest llmRequest = OpenAiMapper.toLlmRequest(request);
+    // Before any SSE is opened, so a refused stream is a 400, not an error event.
+    llmRequest.requireServableByChain();
     if (Boolean.TRUE.equals(request.stream())) {
-      return stream(llmRequest);
+      return stream(llmRequest, request.includeUsage());
     }
     LlmResponse llmResponse = useCase.complete(llmRequest);
     ResponseEntity.BodyBuilder response = ResponseEntity.ok();
@@ -56,7 +59,7 @@ public class ChatCompletionController {
     return response.body(OpenAiMapper.toCompletionResponse(llmResponse));
   }
 
-  private SseEmitter stream(LlmRequest llmRequest) {
+  private SseEmitter stream(LlmRequest llmRequest, boolean includeUsage) {
     SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
     String id = "chatcmpl-" + UUID.randomUUID();
     long created = Instant.now().getEpochSecond();
@@ -68,8 +71,16 @@ public class ChatCompletionController {
 
     Runnable task = () -> {
       try {
-        streamUseCase.streamComplete(llmRequest,
-            chunk -> sendChunk(emitter, id, created, chunk));
+        AtomicReference<LlmStreamChunk> usage = new AtomicReference<>();
+        streamUseCase.streamComplete(llmRequest, chunk -> {
+          if (chunk.totalTokens() > 0 || usage.get() == null) {
+            usage.set(chunk);
+          }
+          send(emitter, OpenAiMapper.toChunk(id, created, chunk));
+        });
+        if (includeUsage) {
+          send(emitter, OpenAiMapper.toUsageChunk(id, created, usage.get()));
+        }
         emitter.send(SseEmitter.event().data("[DONE]"));
         emitter.complete();
       } catch (Exception e) {
@@ -83,11 +94,9 @@ public class ChatCompletionController {
     return emitter;
   }
 
-  private static void sendChunk(SseEmitter emitter, String id, long created,
-                                LlmStreamChunk chunk) {
+  private static void send(SseEmitter emitter, ChatCompletionChunk chunk) {
     try {
-      emitter.send(SseEmitter.event()
-          .data(OpenAiMapper.toChunk(id, created, chunk), MediaType.APPLICATION_JSON));
+      emitter.send(SseEmitter.event().data(chunk, MediaType.APPLICATION_JSON));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

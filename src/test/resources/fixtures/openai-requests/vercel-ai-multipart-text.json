@@ -1,0 +1,17 @@
+{
+  "model": "auto",
+  "messages": [
+    {"role": "system", "content": "You are a concise assistant."},
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Summarise the paragraph below in one sentence."},
+        {"type": "text", "text": "The semantic cache answers a repeated question without calling a model."}
+      ]
+    }
+  ],
+  "max_tokens": 200,
+  "temperature": 0.2,
+  "stream": true,
+  "stream_options": {"include_usage": true}
+}

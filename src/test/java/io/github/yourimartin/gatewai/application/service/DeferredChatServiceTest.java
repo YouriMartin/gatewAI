@@ -1,5 +1,7 @@
 package io.github.yourimartin.gatewai.application.service;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -10,6 +12,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Set;
+import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -232,5 +238,14 @@ class DeferredChatServiceTest {
 
     verify(chatCompletion, never()).complete(any());
     verify(store, never()).save(any());
+  }
+
+  @Test
+  void aJobThatNeedsPassThroughIsRefusedAtSubmission() {
+    LlmRequest request = new LlmRequest("auto", List.of(new LlmMessage("user", "hi")),
+        null, null, null, null, SamplingParameters.NONE, Set.of(PassThroughFeature.TOOLS));
+
+    assertThrows(UnsupportedFeatureException.class, () -> service.submit(request));
+    verifyNoInteractions(store);
   }
 }

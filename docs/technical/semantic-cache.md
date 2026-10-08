@@ -108,6 +108,8 @@ The encoding is versioned and length-prefixed, with no normalisation: any
 difference is a different context, which only ever errs towards a refusal.
 Temperature, top-p, penalties and seed are deliberately left out — they say how
 to sample, not what a correct answer is ([ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md)).
+A `content` array of text parts is joined at the ingress before any of this is
+computed (v4 B.1), so it shares the scope of the same text sent as a string.
 A single-turn request with no system prompt, pin, `user` or `stop` always gets
 the same scope, which is why the v2/v3 pair metrics are unaffected.
 

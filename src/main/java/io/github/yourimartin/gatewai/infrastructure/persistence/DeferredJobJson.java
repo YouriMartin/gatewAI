@@ -2,10 +2,12 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -50,6 +52,16 @@ final class DeferredJobJson {
       request.stop().forEach(stop::add);
     }
     node.put("user", request.user());
+    // v4 B.1: forwarded to the egress, so a deferred job must forward them too.
+    SamplingParameters sampling = request.sampling();
+    putNullableDouble(node, "topP", sampling.topP());
+    putNullableDouble(node, "presencePenalty", sampling.presencePenalty());
+    putNullableDouble(node, "frequencyPenalty", sampling.frequencyPenalty());
+    if (sampling.seed() == null) {
+      node.putNull("seed");
+    } else {
+      node.put("seed", sampling.seed().longValue());
+    }
     return MAPPER.writeValueAsString(node);
   }
 
@@ -66,14 +78,22 @@ final class DeferredJobJson {
         stop.add(sequence.asString());
       }
     }
-    // Jobs stored before v4 A.2 have neither field: they read back as null.
+    // Jobs stored before v4 A.2 (stop, user) or B.1 (sampling) read back as null.
+    JsonNode seed = node.get("seed");
+    SamplingParameters sampling = new SamplingParameters(
+        nullableDouble(node, "topP"),
+        nullableDouble(node, "presencePenalty"),
+        nullableDouble(node, "frequencyPenalty"),
+        seed == null || seed.isNull() ? null : seed.asLong());
     return new LlmRequest(
         text(node, "model"),
         messages,
         nullableDouble(node, "temperature"),
         nullableInt(node, "maxTokens"),
         stop,
-        text(node, "user"));
+        text(node, "user"),
+        sampling,
+        Set.of());
   }
 
   static String responseToJson(LlmResponse response) {

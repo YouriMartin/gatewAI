@@ -9,6 +9,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 
@@ -20,7 +21,6 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -61,23 +61,25 @@ class SpringAiLlmClient implements LlmClient {
   }
 
   /**
-   * The request as the advisor chain receives it. {@code stop} travels as an
-   * option the model receives; the end user travels on the chain's context,
-   * because it is a fact about this request for the cache's scope (ADR 0014),
-   * not something any egress model is sent.
+   * The request as the advisor chain receives it. {@code stop} and the sampling
+   * parameters travel as options the model receives (v4 B.1); the end user
+   * travels on the chain's context, because it is a fact about this request for
+   * the cache's scope (ADR 0014), not something any egress model is sent.
    */
   private ChatClient.ChatClientRequestSpec prompt(LlmRequest request) {
     List<Message> springMessages = request.messages().stream()
         .map(SpringAiLlmClient::toSpringMessage)
         .toList();
 
-    var optionsBuilder = ChatOptions.builder().model(request.model());
-    if (request.temperature() != null) {
-      optionsBuilder.temperature(request.temperature());
-    }
-    if (request.maxTokens() != null) {
-      optionsBuilder.maxTokens(request.maxTokens());
-    }
+    SamplingParameters sampling = request.sampling();
+    var optionsBuilder = GatewaiChatOptions.builder()
+        .model(request.model())
+        .temperature(request.temperature())
+        .maxTokens(request.maxTokens())
+        .topP(sampling.topP())
+        .presencePenalty(sampling.presencePenalty())
+        .frequencyPenalty(sampling.frequencyPenalty())
+        .seed(sampling.seed());
     if (request.stop() != null && !request.stop().isEmpty()) {
       optionsBuilder.stopSequences(request.stop());
     }
@@ -123,11 +125,18 @@ class SpringAiLlmClient implements LlmClient {
         promptTokens, completionTokens, totalTokens, last);
   }
 
+  /**
+   * The chain receives text messages only: tool calls, tool results and non-text
+   * parts mark a request for pass-through (v4 B.1), which never reaches here. An
+   * unexpected role is a bug to surface, not a user message to invent.
+   */
   private static Message toSpringMessage(LlmMessage msg) {
     return switch (msg.role()) {
       case "system" -> new SystemMessage(msg.content());
+      case "user" -> new UserMessage(msg.content());
       case "assistant" -> new AssistantMessage(msg.content());
-      default -> new UserMessage(msg.content());
+      default -> throw new IllegalStateException("A '" + msg.role()
+          + "' message reached the advisor chain; it needs pass-through.");
     };
   }
 

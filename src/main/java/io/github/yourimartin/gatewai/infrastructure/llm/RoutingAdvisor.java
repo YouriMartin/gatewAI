@@ -424,29 +424,18 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     return userMessage != null ? userMessage.getText() : null;
   }
 
+  /**
+   * The prompt re-targeted at {@code targetModelId}, every other option kept.
+   * Until v4 B.1 this rebuilt the options from four of them, which dropped the
+   * penalties and the seed of every routed request; mutating keeps whatever the
+   * request carried — including the seed of {@link GatewaiChatOptions}.
+   */
   private static Prompt reroutePrompt(Prompt original,
                                       String targetModelId) {
     ChatOptions originalOptions = original.getOptions();
-    ChatOptions.Builder builder = ChatOptions.builder()
-        .model(targetModelId);
-
-    if (originalOptions != null) {
-      if (originalOptions.getTemperature() != null) {
-        builder.temperature(originalOptions.getTemperature());
-      }
-      if (originalOptions.getMaxTokens() != null) {
-        builder.maxTokens(originalOptions.getMaxTokens());
-      }
-      if (originalOptions.getTopP() != null) {
-        builder.topP(originalOptions.getTopP());
-      }
-      // Part of the cache scope since v4 A.2 (ADR 0014): an answer keyed on its
-      // stop sequences must have been generated with them.
-      if (originalOptions.getStopSequences() != null) {
-        builder.stopSequences(originalOptions.getStopSequences());
-      }
-    }
-
+    ChatOptions.Builder<?> builder = originalOptions == null
+        ? ChatOptions.builder() : originalOptions.mutate();
+    builder.model(targetModelId);
     return new Prompt(original.getInstructions(), builder.build());
   }
 }

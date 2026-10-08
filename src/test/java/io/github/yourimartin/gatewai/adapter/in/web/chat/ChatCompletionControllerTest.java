@@ -1,6 +1,8 @@
 package io.github.yourimartin.gatewai.adapter.in.web.chat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
@@ -206,5 +208,88 @@ class ChatCompletionControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(REQUEST_JSON))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void aStreamWithIncludeUsageEndsWithAUsageChunk() throws Exception {
+    doAnswer(invocation -> {
+      Consumer<LlmStreamChunk> sink = invocation.getArgument(1);
+      sink.accept(new LlmStreamChunk("qwen2.5:3b", "Hel", "", false, 0, 0, 0, false));
+      sink.accept(new LlmStreamChunk("qwen2.5:3b", "lo", "stop", false, 4, 1, 5, true));
+      return null;
+    }).when(streamUseCase).streamComplete(any(), any());
+
+    MvcResult result = mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto", "messages": [{"role": "user", "content": "Hi"}],
+                 "stream": true, "stream_options": {"include_usage": true}}
+                """)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    String body = mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    List<String> events = body.lines()
+        .filter(line -> line.startsWith("data:"))
+        .map(line -> line.substring("data:".length()))
+        .toList();
+    assertEquals("[DONE]", events.getLast());
+    String usageChunk = events.get(events.size() - 2);
+    assertTrue(usageChunk.contains("\"choices\":[]"), usageChunk);
+    assertTrue(usageChunk.contains("\"total_tokens\":5"), usageChunk);
+    // Content chunks carry no usage field at all.
+    assertFalse(events.getFirst().contains("usage"), events.getFirst());
+  }
+
+  @Test
+  void aStreamWithoutIncludeUsageSendsNoUsageChunk() throws Exception {
+    doAnswer(invocation -> {
+      Consumer<LlmStreamChunk> sink = invocation.getArgument(1);
+      sink.accept(new LlmStreamChunk("qwen2.5:3b", "Hi", "stop", false, 4, 1, 5, true));
+      return null;
+    }).when(streamUseCase).streamComplete(any(), any());
+
+    MvcResult result = mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto", "messages": [{"role": "user", "content": "Hi"}],
+                 "stream": true}
+                """)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(content().string(org.hamcrest.Matchers.not(
+            org.hamcrest.Matchers.containsString("usage"))));
+  }
+
+  @Test
+  void developerRoleAndMaxCompletionTokensReachTheUseCase() throws Exception {
+    when(useCase.complete(any())).thenReturn(new LlmResponse(
+        "gpt-4", "OK", "stop", 1, 1, 2, false));
+    ArgumentCaptor<LlmRequest> captured = ArgumentCaptor.forClass(LlmRequest.class);
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"model": "auto", "max_completion_tokens": 300, "seed": 7, "messages": [
+                  {"role": "developer", "content": "Be brief."},
+                  {"role": "user", "content": [{"type": "text", "text": "Hi"}]}]}
+                """)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isOk());
+
+    verify(useCase).complete(captured.capture());
+    assertEquals("system", captured.getValue().messages().getFirst().role());
+    assertEquals("Hi", captured.getValue().messages().get(1).content());
+    assertEquals(300, captured.getValue().maxTokens());
+    assertEquals(7L, captured.getValue().sampling().seed());
   }
 }

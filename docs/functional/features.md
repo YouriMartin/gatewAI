@@ -17,7 +17,13 @@ touching client code.
   reports the model that actually served the request.
 - **Streaming** is supported: pass `"stream": true` and the gateway returns
   Server-Sent Events (token-by-token deltas, then `[DONE]`) — exactly like the
-  OpenAI API. Even cache hits stream (replayed instantly, no model call).
+  OpenAI API. Even cache hits stream (replayed instantly, no model call), and
+  `stream_options.include_usage` adds the final usage chunk.
+- **The message shapes SDKs send are accepted** (v4 B.1): `content` as a string or
+  an array of parts, the `developer` role, `max_completion_tokens`, and `top_p`,
+  penalties and `seed` forwarded where the provider supports them. Tools, images
+  and structured outputs are refused with a clear 400 until pass-through lands
+  (see [limitations](limitations.md)).
 
 ## Semantic cache
 

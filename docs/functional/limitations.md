@@ -52,18 +52,25 @@ intensity, real multi-region execution and a documented methodology.
 
 ## Many OpenAI request fields are accepted but ignored
 
-The ingress DTO accepts the common OpenAI fields (`top_p`, `stream`, `n`, `stop`,
-`presence_penalty`, `frequency_penalty`, `user`); `model`, `messages`,
-`temperature`, `max_tokens` and **`stream`** are honored, the rest are not. In
-particular:
+Since v4 B.1 the ingress reads every message shape the Chat Completions API
+allows — string or array `content`, the `developer` role, tool calls and tool
+results — and forwards `temperature`, `max_tokens`/`max_completion_tokens`,
+`stop`, `top_p`, the penalties and `seed` where the provider supports them
+([`api-reference.md`](../technical/api-reference.md) has the table per provider
+type). In particular:
 
 - **Streaming is supported** (Phase 7.5): `stream: true` returns Server-Sent
   Events (`chat.completion.chunk` deltas + `[DONE]`), including a synthetic stream
-  on a cache hit.
-- `n`, `stop`, `top_p`, the penalties and `user` are not applied.
-- No tool/function calling, no `response_format`/structured outputs on the public
-  chat endpoint, no images/audio. Only `/v1/chat/completions` is implemented from
-  the OpenAI surface (no `/v1/embeddings`, `/v1/models`, etc.).
+  on a cache hit, and a final usage chunk with `stream_options.include_usage`.
+- **Tools, images, audio, files, `response_format`, `n > 1`, `logprobs` and
+  `logit_bias` are refused with a 400 that names them** — the advisor chain cannot
+  honour them, and serving the request without them would be a wrong answer.
+  Pass-through (v4 B.3–B.4) lifts this.
+- **Anthropic ignores `presence_penalty`, `frequency_penalty` and `seed`**: the
+  Messages API has no such parameters. A `seed` beyond 32 bits is not sent to any
+  provider (the OpenAI and Ollama clients take a 32-bit seed).
+- Only `/v1/chat/completions` is implemented from the OpenAI surface (no
+  `/v1/embeddings`, `/v1/models`, etc.).
 
 ## Semantic cache trade-offs
 

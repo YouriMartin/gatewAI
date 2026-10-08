@@ -72,6 +72,7 @@ class ChatCompletionService
 
   @Override
   public LlmResponse complete(LlmRequest request) {
+    request.requireServableByChain();
     long startNanos = System.nanoTime();
 
     LlmResponse response = llmClient.call(request);
@@ -111,6 +112,7 @@ class ChatCompletionService
    */
   @Override
   public void streamComplete(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
+    request.requireServableByChain();
     long startNanos = System.nanoTime();
     String clientId = resolveClientId();
     String correlationId = resolveCorrelationId();

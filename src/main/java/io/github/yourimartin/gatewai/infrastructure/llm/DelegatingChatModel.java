@@ -9,6 +9,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -28,10 +29,16 @@ import reactor.core.publisher.Flux;
  * (mapped to an OpenAI-style 400), never a silent call to another vendor. A
  * client may also pin any registered model id directly; routing only rewrites it.
  *
- * <p>The advisor chain sets generic {@code ChatOptions} on the prompt; Anthropic
- * and OpenAI merge those portable options natively, but {@code OllamaChatModel}
- * hard-casts to {@code OllamaChatOptions}, so for Ollama instances the prompt is
- * rebuilt with provider-native options (model, temperature, top-p, num-predict).
+ * <p>The advisor chain sets portable options on the prompt, but every Spring AI
+ * 2.0 provider model expects its <b>own</b> options type: {@code OpenAiChatModel}
+ * and {@code OllamaChatModel} hard-cast to it, and {@code AnthropicChatModel}
+ * silently replaces anything else with empty options (no model, no max tokens).
+ * So the prompt is always re-based on the target instance's own options (which
+ * hold its model, credentials and defaults), with the request's options merged
+ * over them — and the {@link GatewaiChatOptions#getSeed() seed} set where the
+ * provider takes one (v4 B.1). Until B.1 only Ollama was re-based, which left
+ * every routed call to an {@code openai}/{@code openai-compatible} instance
+ * failing with a {@code ClassCastException}.
  */
 @Component
 @Primary
@@ -58,10 +65,13 @@ class DelegatingChatModel implements ChatModel {
     return target.chatModel().stream(adapt(prompt, target));
   }
 
+  /**
+   * Neutral defaults — never leak one provider's options onto another's call. Of
+   * the gateway's type, so the {@code ChatClient}'s merge keeps the request's seed.
+   */
   @Override
-  public ChatOptions getDefaultOptions() {
-    // Neutral defaults — never leak one provider's options onto another's call.
-    return ChatOptions.builder().build();
+  public ChatOptions getOptions() {
+    return GatewaiChatOptions.builder().build();
   }
 
   /** Resolves the prompt's model id to a configured provider instance, or fails. */
@@ -81,30 +91,33 @@ class DelegatingChatModel implements ChatModel {
             + "', which is not configured on this gateway."));
   }
 
+  /** The prompt with the target's own options type, the request's options merged in. */
   private static Prompt adapt(Prompt prompt, ProviderChatModels.ProviderInstance target) {
-    return target.type() == ProviderProperties.ProviderType.OLLAMA
-        ? withOllamaOptions(prompt)
-        : prompt;
+    ChatOptions defaults = target.chatModel().getOptions();
+    ChatOptions.Builder<?> options = defaults == null
+        ? ChatOptions.builder() : defaults.mutate();
+    ChatOptions requested = prompt.getOptions();
+    if (requested != null) {
+      options.combineWith(requested.mutate());
+    }
+    Integer seed = intSeed(GatewaiChatOptions.seedOf(requested));
+    if (options instanceof OpenAiChatOptions.Builder openAi) {
+      openAi.seed(seed);
+      if (target.type() == ProviderProperties.ProviderType.OPENAI
+          && requested != null && requested.getMaxTokens() != null) {
+        // OpenAI deprecated max_tokens and its reasoning models reject it; servers
+        // that merely speak the format (openai-compatible) still expect max_tokens.
+        openAi.maxTokens(null).maxCompletionTokens(requested.getMaxTokens());
+      }
+    } else if (options instanceof OllamaChatOptions.Builder ollama) {
+      ollama.seed(seed);
+    }
+    // Anthropic has no seed: it is ignored there, as documented.
+    return new Prompt(prompt.getInstructions(), options.build());
   }
 
-  /** Rebuilds the prompt with {@link OllamaChatOptions} (Ollama hard-casts). */
-  private static Prompt withOllamaOptions(Prompt prompt) {
-    ChatOptions in = prompt.getOptions();
-    OllamaChatOptions.Builder out = OllamaChatOptions.builder();
-    if (in != null) {
-      if (in.getModel() != null) {
-        out.model(in.getModel());
-      }
-      if (in.getTemperature() != null) {
-        out.temperature(in.getTemperature());
-      }
-      if (in.getTopP() != null) {
-        out.topP(in.getTopP());
-      }
-      if (in.getMaxTokens() != null) {
-        out.numPredict(in.getMaxTokens());
-      }
-    }
-    return new Prompt(prompt.getInstructions(), out.build());
+  /** Both providers that take a seed take a 32-bit one; a larger seed is not sent. */
+  private static Integer intSeed(Long seed) {
+    return seed == null || seed != seed.intValue() ? null : seed.intValue();
   }
 }
