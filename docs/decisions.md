@@ -7,6 +7,43 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot A — A.3 (conversation-sticky routing)
+
+- **A conversation with no record is recorded too.** The roadmap records turn 1
+  and updates the record on an upgrade, and floors a no-record conversation on
+  max(last turn, first turn) at every turn. Recomputed at every turn, that floor
+  lets turn 3 drop back below a hard turn 2, which breaks "never comes back down".
+  So the `FIRST_TURN_FLOOR` decision is written as the record, and the next turn
+  is `STICKY` or `UPGRADED` like any other.
+- **"System messages" in the fingerprint means those before the first user
+  message.** Clients that inject a system message later (a date, a retrieved
+  document) would otherwise change the fingerprint mid-conversation. A first turn
+  and its follow-ups see the same set by construction.
+- **The router stamps the registry model id on its responses, and the cache stores
+  it as `routed_model`.** The roadmap's "a turn-1 cache hit records the cached
+  answer and its model" needs a *registry* id. The cache only had the provider's
+  name for the model (`cached_model`), which is often a dated variant the
+  registry does not know. Entries written before A.3 have no `routed_model`, so a
+  hit on one records nothing.
+- **Three columns on `routing_decision`, not new `DecisionReason` values.** "Each
+  case distinguishable" is met by `conversation_routing` (`STICKY` · `UPGRADED` ·
+  `FIRST_TURN_FLOOR`). `classified_tier` keeps what the turn alone was worth, now
+  that `chosen_tier` can differ from it, and `conversation_fingerprint` lets one
+  conversation be followed. `decision_reason` keeps summarising the classifier
+  only, so it stays comparable with v2/v3 rows and its Micrometer tag does not
+  change.
+- **Retention is enforced at read, not by the purge.** A lookup ignores a record
+  older than the TTL, and the upsert replaces one as if absent. The purge only
+  reclaims space, so a late purge never changes a routing decision.
+- **`FieldDigest` extracted from `CacheScope`.** The fingerprint uses the same
+  length-prefixed encoding. `CacheScope` now delegates to it, byte for byte: a
+  new test pins a scope hash computed independently of the Java code.
+- **Integration tests ran against a throwaway pgvector on port 55432**
+  (`SPRING_DOCKER_COMPOSE_ENABLED=false`), because another project's Postgres
+  holds 5432 on the development machine. The three context-load tests that need
+  Ollama on :11434 could not start there; every mock-profile integration test,
+  the new store test included, passed.
+
 ## v4 lot A — A.2 (scope the cache by conversation context)
 
 - **`hnsw.iterative_scan` replaced by a metadata index, after measuring.** The

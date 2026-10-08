@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.cache;
 import java.util.List;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
@@ -88,6 +89,6 @@ public final class EvalCacheAdvisorFactory {
                                           EmbeddingWindow window) {
     CacheDecisionTracer tracer = new CacheDecisionTracer(decisions, NO_METRICS);
     return new SemanticCacheAdvisor(vectorStore, new SemanticCacheProperties(), tracer,
-        calibrations, NO_MODELS, window);
+        calibrations, NO_MODELS, window, new InMemoryConversationAffinityStore());
   }
 }

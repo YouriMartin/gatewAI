@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
@@ -89,7 +90,8 @@ class RoutingAdvisorPinningTest {
     properties = new ClassifierProperties();
     advisor = new RoutingAdvisor(classifier, modelRegistry,
         decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
-        properties);
+        properties, new ConversationStickiness(
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
   }
 
   // ---- Client pinning (v2 batch 4, D3) ----

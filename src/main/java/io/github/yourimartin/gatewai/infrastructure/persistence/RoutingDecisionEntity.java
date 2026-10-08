@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ConversationRouting;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
@@ -94,6 +95,19 @@ class RoutingDecisionEntity {
   @Column(name = "escalated_to", updatable = false, length = 32)
   private CascadeLevel escalatedTo;
 
+  /** How the conversation bore on the decision (ADR 0015); null on a first turn. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "conversation_routing", updatable = false, length = 32)
+  private ConversationRouting conversationRouting;
+
+  /** The last turn's own tier, before the conversation's floor. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "classified_tier", updatable = false, length = 32)
+  private ModelTier classifiedTier;
+
+  @Column(name = "conversation_fingerprint", updatable = false, length = 64)
+  private String conversationFingerprint;
+
   protected RoutingDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -118,6 +132,9 @@ class RoutingDecisionEntity {
             .collect(Collectors.joining(","));
     this.conformalAlpha = decision.conformalAlpha();
     this.escalatedTo = decision.escalatedTo();
+    this.conversationRouting = decision.conversationRouting();
+    this.classifiedTier = decision.classifiedTier();
+    this.conversationFingerprint = decision.conversationFingerprint();
   }
 
   RoutingDecision toDomain() {
@@ -126,7 +143,8 @@ class RoutingDecisionEntity {
         embeddingModel, routingConfigVersion, strategy, effectiveStrategy,
         JustificationJson.fromJson(justification), decisionReason,
         chosenTier, chosenModelId, routingLatencyMs,
-        conformalSetToDomain(), conformalAlpha, escalatedTo);
+        conformalSetToDomain(), conformalAlpha, escalatedTo,
+        conversationRouting, classifiedTier, conversationFingerprint);
   }
 
   private List<ModelTier> conformalSetToDomain() {

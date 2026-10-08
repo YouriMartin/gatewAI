@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
@@ -81,7 +82,8 @@ class RoutingAdvisorCascadeTest {
     properties = new ClassifierProperties();
     advisor = new RoutingAdvisor(classifier, modelRegistry,
         decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
-        properties);
+        properties, new ConversationStickiness(
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
   }
 
   // ---- Cascade tracing (v2 batch 4) ----
@@ -129,7 +131,8 @@ class RoutingAdvisorCascadeTest {
         decisionMetrics, configVersion,
         CalibrationFixtures.applied(CalibrationFixtures.calibration(
             CalibrationTarget.ROUTING, 0.60), 0.60),
-        properties);
+        properties, new ConversationStickiness(
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
     when(classifier.classify(any())).thenReturn(new ClassificationOutcome(
         ModelTier.CLOUD_PREMIUM,
         new ClassificationJustification.Cascade(CascadeLevel.LLM, 0.02,

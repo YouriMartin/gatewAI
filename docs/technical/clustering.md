@@ -40,6 +40,8 @@ and says why.
 | `DecisionPurgeWorker` | runs on every node, gated on an advisory lock | **fine** — one purge per interval across the cluster (B.4) ✅ |
 | Routing-config poll | runs on every node | **fine** — a read, and it must run everywhere (B.1) |
 | Metric series | tagged `instance` per node | **fine** — the same string as `claimed_by`, so a graph and a job row name a node alike (B.5) ✅ |
+| Conversation records (v4 A.3) | `conversation_affinity` table | **fine** — shared, so a conversation started on one node is sticky on the others; the write never downgrades, atomically ✅ |
+| `ConversationAffinityPurgeWorker` | runs on every node, gated on an advisory lock | **fine** — one purge per interval; the lookup already ignores expired rows, so the purge only bounds the table ✅ |
 
 ## Routing configuration (B.1)
 
@@ -239,6 +241,7 @@ inventory above says which side each job is on:
 | Admin seeding | **yes** | two nodes with no configured key would create two admins with two keys |
 | Routing-config poll | no | it is a read, and it **must** run everywhere (B.1) |
 | Carbon-aware dispatch | no | the queue's own `SKIP LOCKED` claim coordinates it; a gate would elect one dispatcher and idle the rest (B.2) |
+| Conversation-record purge (v4 A.3) | **yes** | the same `DELETE` on every node; lock id 3 |
 | Conformal snapshot refresh | no | a per-node read-through cache |
 
 ### There is no leader
@@ -283,6 +286,42 @@ the lock from a `psql` session** and watching what the nodes did.
 | The seed gate is real | a node booting while `ADMIN_SEED` was held logged *"Another instance is seeding the admin client; skipping"*, left `api_client` **empty**, and **started anyway** |
 | Dying releases the lock | terminating the holder's backend dropped it (`pg_locks` empty), and the next start seeded exactly one admin |
 | Two nodes, one key | started together with the same `GATEWAI_ADMIN_API_KEY` against an empty table: **exactly one** admin, both nodes up, both accepting the key |
+
+## Conversation records (v4 A.3)
+
+[ADR 0015](adr/0015-conversation-sticky-routing.md) adds shared state: which model
+each conversation runs on. Turns of one conversation land on any node behind the
+balancer, so the record lives in `conversation_affinity` in the shared Postgres,
+never in a node's heap. A per-node map would make stickiness depend on which node
+the balancer picked.
+
+- **Concurrent writes.** Two turns of one conversation on two nodes can write the
+  same row at once. The write is a single `INSERT … ON CONFLICT DO UPDATE` whose
+  rule is "never downgrade": the row lock arbitrates, and the higher tier wins
+  whatever the order. No read-modify-write, no lock of its own.
+- **Read your own write across nodes.** A first turn is recorded before its
+  response returns (on completion when streaming), so a second turn sent after
+  the first answer arrived finds the record on any node.
+- **Retention without coordination.** A lookup ignores a row last seen more than
+  `gatewai.routing.conversation-ttl` ago, so every node agrees on what has expired
+  without waiting for the purge. The purge is `LeaderTask.CONVERSATION_AFFINITY_PURGE`
+  (lock id 3) and only reclaims space.
+- **Degrades to a floor, not an error.** A node that cannot reach the table routes
+  the turn on its first-turn floor and logs it.
+
+`scripts/cluster-smoke.sh` check 6 starts a conversation on node 1 and sends its
+second turn to node 2. Node 2's routing decision must be `STICKY` on node 1's
+model, or `UPGRADED`; either way it found node 1's record. `FIRST_TURN_FLOOR` is
+the failure: it means node 2 saw no record. First run (2026-10-08, `mock` egress):
+
+```
+6. A conversation started on one node is sticky on the other (v4 A.3)
+  PASS turn 2 on node 2 found node 1's record and moved up (qwen2.5:0.5b -> qwen2.5:1.5b)
+```
+
+It moved up rather than stayed because check 1 had just replaced the routing
+config with a single `cloud_entry` route. Turn 1 fell to the heuristic (`LOCAL`)
+and the follow-up matched the route.
 
 ## The scenario (B.5)
 

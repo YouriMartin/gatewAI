@@ -114,7 +114,8 @@ two: recording off, or retention passed. The 404 says so.
 | Store | Holds | Prompt text? |
 |---|---|---|
 | `request_log` | correlation id, model, `prompt_hash`, token counts, latency, client id, cost/energy/CO2 | no — SHA-256 only |
-| `routing_decision` | tier, model, strategy, justification, confidence, config version, `prompt_hash` + `prompt_length` | no |
+| `routing_decision` | tier, model, strategy, justification, confidence, config version, `prompt_hash` + `prompt_length`, conversation routing + `conversation_fingerprint` (v4 A.3) | no |
+| `conversation_affinity` (v4 A.3) | the conversation's opening as a SHA-256, its model and tier, two timestamps; 24 h after the last turn | no — the fingerprint is a SHA-256 of the opening |
 | `cache_decision` | outcome, similarity, runner-up, threshold, matched entry, conformal status, reason, `cache_scope` (v4 A.2) | no — the scope is a SHA-256 of the conversation context |
 | Vector cache (`vector_store`) | the **last user turn and the answer text**, per client, with the embedding; the rest of the conversation only as the `cache_scope` hash | **yes** — similarity search needs it |
 | `deferred_job` (v3 lot B.2) | the **full request and response**, client id, chosen zone, which node ran it | **yes** — the request runs after the client is gone |

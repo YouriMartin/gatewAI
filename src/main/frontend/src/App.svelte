@@ -543,6 +543,17 @@ async function revoke(id: string) {
               {routing.escalatedTo ? ` · escalated to ${routing.escalatedTo}` : ''}
               · {routing.routingLatencyMs} ms
             </p>
+            {#if routing.conversationRouting}
+              <p class="detail">
+                conversation {routing.conversationRouting}
+                {routing.classifiedTier && routing.classifiedTier !== routing.chosenTier
+                  ? ` · this turn alone: ${routing.classifiedTier}`
+                  : ''}
+                {routing.conversationFingerprint
+                  ? ` · ${shortId(routing.conversationFingerprint)}`
+                  : ''}
+              </p>
+            {/if}
             <p class="detail">
               top {num(routing.confidence.topScore)} ·
               margin {num(routing.confidence.margin)} ·

@@ -1,11 +1,8 @@
 package io.github.yourimartin.gatewai.domain.model.cache;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
+
+import io.github.yourimartin.gatewai.domain.model.decision.FieldDigest;
 
 /**
  * The conversation context a cached answer is valid in (ADR 0014, v4 A.2).
@@ -26,8 +23,6 @@ public final class CacheScope {
 
   static final String VERSION = "gatewai-cache-scope/v1";
 
-  private static final int ABSENT = -1;
-
   private CacheScope() {
   }
 
@@ -43,44 +38,18 @@ public final class CacheScope {
    */
   public static String of(List<Turn> context, String pinnedModel, String endUser,
                           List<String> stop) {
-    MessageDigest digest = sha256();
-    field(digest, VERSION);
-    count(digest, context.size());
+    FieldDigest digest = FieldDigest.begin(VERSION).count(context.size());
     for (Turn turn : context) {
-      field(digest, turn.role());
-      field(digest, turn.text());
+      digest.field(turn.role()).field(turn.text());
     }
-    field(digest, pinnedModel);
-    field(digest, endUser);
+    digest.field(pinnedModel).field(endUser);
     if (stop == null) {
-      count(digest, ABSENT);
+      digest.absent();
     } else {
-      count(digest, stop.size());
-      stop.forEach(sequence -> field(digest, sequence));
+      digest.count(stop.size());
+      stop.forEach(digest::field);
     }
-    return HexFormat.of().formatHex(digest.digest());
-  }
-
-  private static void field(MessageDigest digest, String value) {
-    if (value == null) {
-      count(digest, ABSENT);
-      return;
-    }
-    byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-    count(digest, bytes.length);
-    digest.update(bytes);
-  }
-
-  private static void count(MessageDigest digest, int value) {
-    digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(value).array());
-  }
-
-  private static MessageDigest sha256() {
-    try {
-      return MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError("SHA-256 is guaranteed by the JDK", e);
-    }
+    return digest.hex();
   }
 
   /**

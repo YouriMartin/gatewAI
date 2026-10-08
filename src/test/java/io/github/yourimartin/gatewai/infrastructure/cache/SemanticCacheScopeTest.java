@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -73,18 +74,21 @@ class SemanticCacheScopeTest {
   private SimpleVectorStore store;
   private List<CacheDecision> decisions;
   private SemanticCacheAdvisor advisor;
+  private InMemoryConversationAffinityStore conversations;
 
   @BeforeEach
   void setUp() {
     store = SimpleVectorStore.builder(new WindowedEmbeddingModel()).build();
     decisions = new ArrayList<>();
+    conversations = new InMemoryConversationAffinityStore();
     advisor = newAdvisor();
   }
 
   private SemanticCacheAdvisor newAdvisor() {
     CacheDecisionTracer tracer = new CacheDecisionTracer(recording(decisions), NO_METRICS);
     return new SemanticCacheAdvisor(store, new SemanticCacheProperties(), tracer,
-        CalibrationFixtures.none(0.92), REGISTRY, text -> text.length() <= WINDOW);
+        CalibrationFixtures.none(0.92), REGISTRY, text -> text.length() <= WINDOW,
+        conversations);
   }
 
   // ---- The four A.1 collision categories: never served across contexts ----

@@ -15,7 +15,10 @@ import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.FinishReason;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.routing.ConversationOpening;
 import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
+import io.github.yourimartin.gatewai.domain.port.out.ConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
@@ -68,6 +71,11 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   static final String CACHE_SCOPE_KEY = "cache_scope";
   /** SHA-256 of the full last user turn, for exact matching past the window. */
   static final String TURN_HASH_KEY = "turn_hash";
+  /**
+   * The registry model the router sent the request to (v4 A.3); absent on a
+   * pinned request and on entries written before ADR 0015.
+   */
+  static final String ROUTED_MODEL_KEY = "routed_model";
 
   /**
    * Candidates fetched per lookup. At least two, so the runner-up's score — the
@@ -85,19 +93,22 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
   private final CalibrationUseCase calibrations;
   private final ModelRegistry modelRegistry;
   private final EmbeddingWindow embeddingWindow;
+  private final ConversationAffinityStore conversations;
 
   SemanticCacheAdvisor(VectorStore vectorStore,
                        SemanticCacheProperties properties,
                        CacheDecisionTracer tracer,
                        CalibrationUseCase calibrations,
                        ModelRegistry modelRegistry,
-                       EmbeddingWindow embeddingWindow) {
+                       EmbeddingWindow embeddingWindow,
+                       ConversationAffinityStore conversations) {
     this.vectorStore = vectorStore;
     this.properties = properties;
     this.tracer = tracer;
     this.calibrations = calibrations;
     this.modelRegistry = modelRegistry;
     this.embeddingWindow = embeddingWindow;
+    this.conversations = conversations;
   }
 
   @Override
@@ -125,6 +136,7 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     if (verdict.hit() != null) {
       LOG.info("Cache HIT for query [{}] (score={})",
           truncate(lookup.userText()), verdict.hit().getScore());
+      startConversation(request, verdict.hit());
       return CachedResponses.call(verdict.hit(), request.context());
     }
 
@@ -163,6 +175,7 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     if (verdict.hit() != null) {
       LOG.info("Cache HIT (stream) for query [{}] (score={})",
           truncate(lookup.userText()), verdict.hit().getScore());
+      startConversation(request, verdict.hit());
       return CachedResponses.stream(verdict.hit(), request.context());
     }
 
@@ -191,6 +204,33 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
         })
         .doOnComplete(() -> storeStreamed(lookup, aggregate.toString(),
             lastResponse.get(), finishReason.get(), clientId, correlationId));
+  }
+
+  /**
+   * Records the conversation a cached first turn opens (ADR 0015): the router
+   * never sees a hit, so without this a conversation that began on a cached
+   * answer would have no record, and its second turn would fall back to the
+   * first-turn floor. The model is the one the stored answer was routed to;
+   * an entry that has none — pinned, or older than ADR 0015 — records nothing.
+   * Never fails the hit.
+   */
+  private void startConversation(ChatClientRequest request, Document hit) {
+    try {
+      Map<String, Object> metadata = hit.getMetadata();
+      if (!(metadata.get(ROUTED_MODEL_KEY) instanceof String modelId)
+          || !(metadata.get(CACHE_RESPONSE_KEY) instanceof String answer)) {
+        return;
+      }
+      List<ConversationOpening.Turn> turns = request.prompt().getInstructions().stream()
+          .map(message -> new ConversationOpening.Turn(
+              message.getMessageType().getValue(), message.getText()))
+          .toList();
+      modelRegistry.findByModelId(modelId).ifPresent(model ->
+          ConversationOpening.ofFirstTurn(turns, answer).ifPresent(opening ->
+              conversations.record(opening.fingerprint(), modelId, model.tier())));
+    } catch (RuntimeException e) {
+      LOG.warn("Could not record the conversation of a cached answer: {}", e.toString());
+    }
   }
 
   private CacheLookup describe(ChatClientRequest request) {
@@ -383,6 +423,10 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     ChatResponseMetadata responseMetadata = response.getMetadata();
     if (responseMetadata != null && responseMetadata.getModel() != null) {
       metadata.put(CACHE_MODEL_KEY, responseMetadata.getModel());
+    }
+    if (responseMetadata != null
+        && responseMetadata.get(LlmResponse.ROUTED_MODEL_METADATA_KEY) instanceof String routed) {
+      metadata.put(ROUTED_MODEL_KEY, routed);
     }
     if (responseMetadata != null && responseMetadata.getUsage() != null) {
       Usage usage = responseMetadata.getUsage();

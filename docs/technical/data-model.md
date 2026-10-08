@@ -73,7 +73,16 @@ differ on a hand-over) · `justification` (**JSONB**, the sealed
 `ClassificationJustification` from batch 1) · `decision_reason` ·
 `chosen_tier` / `chosen_model_id` · `routing_latency_ms` (the decision only,
 excluding the LLM call) · `conformal_set` / `conformal_alpha` (v2 batch 3) ·
-`escalated_to` (v2 batch 4).
+`escalated_to` (v2 batch 4) · `conversation_routing`, `classified_tier` and
+`conversation_fingerprint` (`V11`, v4 A.3).
+
+`conversation_routing` ∈ `STICKY` · `UPGRADED` · `FIRST_TURN_FLOOR`; null on a
+first turn and on a pinned request ([ADR 0015](adr/0015-conversation-sticky-routing.md)).
+`classified_tier` is what the last user turn alone was worth; `chosen_tier` is
+the tier the request was sent to, so `chosen_tier <> classified_tier` is exactly
+the set of turns a conversation held up. `conversation_fingerprint` is the
+opening's hash, the same on every turn of one conversation. Rows written before
+`V11` hold null in all three.
 
 `decision_reason` ∈ `MATCH` · `AMBIGUOUS_ESCALATED` · `CLIENT_PINNED` ·
 `BELOW_THRESHOLD_FALLBACK` · `ERROR_FALLBACK` · `NO_MODEL_FOR_TIER`.
@@ -121,6 +130,9 @@ Seven properties worth knowing:
   ran, and `chosen_model_id` / `chosen_tier` already hold the entire
   explanation — the client asked for that model. Every other row has one, which
   is batch 1's invariant.
+- **`conversation_fingerprint` is pseudonymous too**, for the same reason:
+  whoever can guess a conversation's system prompt, first question *and* first
+  answer can confirm it. The answer is the hard part to guess.
 - **`cache_scope` is pseudonymous, not anonymous.** It is an unsalted SHA-256,
   like `prompt_hash`: whoever can read the database and guess a system prompt
   (a template plus an order number) can confirm the guess. The same reader can
@@ -138,6 +150,26 @@ which stops the rows, **not** the metrics: since v2 batch 6 the same decision
 objects are also published to Micrometer, from the advisor rather than from the
 recorder, so switching the trace off does not blind the dashboards. See
 [`observability.md`](observability.md).
+
+## `conversation_affinity` (v4 A.3)
+
+Which model each conversation runs on ([ADR 0015](adr/0015-conversation-sticky-routing.md)),
+shared by every node (`V11`):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `fingerprint` | `varchar(64)` PK | SHA-256 of the opening: system messages before the first user message, first user message, first answer |
+| `model_id` | `varchar(255)` | the registry model id the conversation runs on |
+| `tier` | `varchar(32)` | its tier, the floor no later turn goes below |
+| `created_at` | `timestamptz` | first written |
+| `last_seen_at` | `timestamptz` | last turn that read or wrote it; the retention clock (indexed) |
+
+**Hashes and ids only**: no prompt or answer text. Written by
+`JdbcConversationAffinityStore` with one `INSERT … ON CONFLICT DO UPDATE` that
+never downgrades. A tier at or above the recorded one keeps the recorded model and
+only moves `last_seen_at`; a row past the TTL is replaced as if absent. Lookups
+ignore rows older than `gatewai.routing.conversation-ttl` (24 h); an hourly
+purge under `LeaderLock` deletes them.
 
 ## `conformal_calibration` (v2 batch 3)
 
@@ -270,8 +302,9 @@ Managed by the Spring AI pgvector `VectorStore`. Each cached answer is a
 `Document(question_text, metadata)` with a **384**-dim embedding (in-process
 ONNX, `paraphrase-multilingual-MiniLM-L12-v2`, v3 lot A; 768-dim
 `nomic-embed-text` before it). Metadata keys (`cached_response`, `cached_model`,
-`cached_*_tokens`, `created_at`, `client_id`, and since v4 A.2 `cache_scope` and
-`turn_hash`) are documented in [`semantic-cache.md`](semantic-cache.md).
+`cached_*_tokens`, `created_at`, `client_id`, since v4 A.2 `cache_scope` and
+`turn_hash`, and since v4 A.3 `routed_model`) are documented in
+[`semantic-cache.md`](semantic-cache.md).
 
 **Upgrading to v4 A.2.** Every lookup now filters on `cache_scope`, so an entry
 written before it has none and never matches again — nothing to migrate, and
@@ -323,6 +356,8 @@ startup instead of silently altering a table.
 | `V7__deferred_job.sql` | `deferred_job`, the carbon-aware queue + its claim index |
 | `V8__rate_limit_bucket.sql` | `rate_limit_bucket`, the shared Bucket4j buckets |
 | `V9__green_provenance.sql` | eight provenance columns on `request_log` + indexes on `grid_zone` and `provider` |
+| `V10__cache_scope.sql` | `cache_decision.reason` and `cache_scope` (v4 A.2) |
+| `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

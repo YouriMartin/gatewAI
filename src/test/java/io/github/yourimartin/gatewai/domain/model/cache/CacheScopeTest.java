@@ -35,6 +35,14 @@ class CacheScopeTest {
   }
 
   @Test
+  void theEncodingIsPinned() {
+    // Every stored entry is keyed on this hash: an encoding change would make
+    // the whole cache unreachable. Computed independently of the Java code.
+    assertEquals("140ca83b181518eb0bcdf0987f459e4f8be95816baec70ec3a5bbcc01ae37777",
+        CacheScope.of(PERSONA, null, null, null));
+  }
+
+  @Test
   void eachPartOfTheContextChangesTheScope() {
     String base = CacheScope.of(PERSONA, null, null, null);
     assertNotEquals(base, CacheScope.of(

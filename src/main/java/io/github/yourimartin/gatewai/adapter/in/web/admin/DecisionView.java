@@ -91,13 +91,23 @@ public record DecisionView(String correlationId, Instant at, Cache cache,
    * @param promptLength        its length in characters
    * @param embeddingModel      provenance of the vectors
    * @param routingConfigVersion the rules in force then
+   * @param conversationRouting how the conversation bore on the decision (ADR
+   *                            0015): STICKY, UPGRADED or FIRST_TURN_FLOOR;
+   *                            null on a first turn or a pin
+   * @param classifiedTier      the last turn's own tier, before the
+   *                            conversation's floor — {@code chosenTier} is
+   *                            where it went
+   * @param conversationFingerprint the conversation's opening, as a hash —
+   *                            the same value on every turn of it
    */
   public record Routing(String chosenTier, String chosenModelId, String decisionReason,
                  String strategy, String effectiveStrategy, String escalatedTo,
                  long routingLatencyMs,
                  ClassificationJustification justification,
                  Confidence confidence, String promptHash, int promptLength,
-                 String embeddingModel, String routingConfigVersion) {
+                 String embeddingModel, String routingConfigVersion,
+                 String conversationRouting, String classifiedTier,
+                 String conversationFingerprint) {
 
     static Routing of(RoutingDecision decision) {
       if (decision == null) {
@@ -109,7 +119,8 @@ public record DecisionView(String correlationId, Instant at, Cache cache,
           decision.routingLatencyMs(), decision.justification(),
           Confidence.of(decision), decision.promptHash(),
           decision.promptLength(), decision.embeddingModel(),
-          decision.routingConfigVersion());
+          decision.routingConfigVersion(), name(decision.conversationRouting()),
+          name(decision.classifiedTier()), decision.conversationFingerprint());
     }
   }
 

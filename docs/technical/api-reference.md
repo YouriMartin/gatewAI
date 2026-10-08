@@ -298,13 +298,23 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
                             "conformalSet": ["CLOUD_PREMIUM"], "alpha": 0.05},
              "promptHash": "…", "promptLength": 42,
              "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
-             "routingConfigVersion": "c1bb83ddd18f7771"}}
+             "routingConfigVersion": "c1bb83ddd18f7771",
+             "conversationRouting": "STICKY", "classifiedTier": "LOCAL",
+             "conversationFingerprint": "9d04e1b7a2c3…"}}
 ```
 
 `routing` is **null on a cache hit** — the router never ran, and saying so is the
 point. `cache.cacheScope` is the hash of the conversation scope the lookup ran in
 (never text), and `cache.reason` says why a decision was not a plain lookup:
-`EMPTY_PROMPT`, `HISTORY_TOO_LONG`, `EXACT_MATCH_ONLY` or `MAX_TOKENS` (v4 A.2). `404 decision_not_found` when nothing was recorded under that id (purged,
+`EMPTY_PROMPT`, `HISTORY_TOO_LONG`, `EXACT_MATCH_ONLY` or `MAX_TOKENS` (v4 A.2).
+`routing.conversationRouting` says how the conversation bore on the decision
+([ADR 0015](adr/0015-conversation-sticky-routing.md), v4 A.3): `STICKY` (kept the
+recorded model), `UPGRADED` (moved up for this turn and stays there) or
+`FIRST_TURN_FLOOR` (no record; floored on the first user message). It is null on
+a first turn or a pin. `classifiedTier` is what the last turn alone was worth, so
+a premium `chosenTier` next to a `LOCAL` `classifiedTier` is a follow-up the
+conversation held up. `conversationFingerprint` is the same hash on every turn of
+one conversation. `404 decision_not_found` when nothing was recorded under that id (purged,
 never recorded, or `gatewai.decisions.enabled=false`).
 
 The correlation id is the one echoed on every response as `X-Request-Id`, and

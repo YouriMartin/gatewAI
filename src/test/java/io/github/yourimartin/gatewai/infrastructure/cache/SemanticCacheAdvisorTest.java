@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
@@ -76,7 +77,8 @@ class SemanticCacheAdvisorTest {
   void setUp() {
     properties = new SemanticCacheProperties();
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
-        CalibrationFixtures.none(properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
+        CalibrationFixtures.none(properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true,
+        new InMemoryConversationAffinityStore());
   }
 
   // ---- Cache hit tests ----

@@ -195,6 +195,12 @@ export interface RoutingDecisionView {
   promptLength: number;
   embeddingModel: string | null;
   routingConfigVersion: string | null;
+  /** How the conversation bore on it (ADR 0015): STICKY, UPGRADED, FIRST_TURN_FLOOR; null on a first turn or a pin. */
+  conversationRouting: string | null;
+  /** What the last user turn alone was worth, before the conversation's floor. */
+  classifiedTier: string | null;
+  /** SHA-256 of the conversation's opening, the same on every turn. */
+  conversationFingerprint: string | null;
 }
 
 export interface DecisionView {

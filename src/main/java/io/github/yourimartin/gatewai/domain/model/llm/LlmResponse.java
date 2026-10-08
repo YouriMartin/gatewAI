@@ -31,6 +31,14 @@ public record LlmResponse(
   /** Key under which the cache advisor records its outcome in the response metadata. */
   public static final String CACHE_OUTCOME_METADATA_KEY = "gatewai.cache.outcome";
 
+  /**
+   * Key under which the router records the <b>registry</b> model id it sent the
+   * request to (v4 A.3) — the provider reports its own name, often a dated
+   * variant. The cache stores it, so a cached first turn starts a conversation
+   * on a model the registry knows.
+   */
+  public static final String ROUTED_MODEL_METADATA_KEY = "gatewai.routing.model";
+
   /** A response whose cache outcome is only known as hit or not. */
   public LlmResponse(String model, String content, String finishReason, int promptTokens,
                      int completionTokens, int totalTokens, boolean cacheHit) {

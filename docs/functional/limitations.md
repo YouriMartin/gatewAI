@@ -182,6 +182,42 @@ particular:
   the green router only governs traffic that does not pin. Set
   `gatewai.classifier.client-pinning=false` to make routing mandatory.
 
+## Conversation-sticky routing
+
+The classifier still reads the last user turn only. Since v4 A.3
+([ADR 0015](../technical/adr/0015-conversation-sticky-routing.md)), a conversation
+keeps its model unless a later turn needs a higher tier, so "ok, and in Java?"
+after a hard question stays on the premium model it started on. Fixed in the
+direction that costs money, on purpose. What it does not do:
+
+- **A conversation is recognised by its opening, not by an id.** Chat Completions
+  has none. The fingerprint is the system messages before the first user message,
+  the first user message and the first answer. **Clients that trim or rewrite
+  history** (summarise old turns, drop the system prompt, strip or reformat the
+  first answer, inject a different first message) produce a new fingerprint. Their
+  later turns fall back to the **first-turn floor**: max(this turn, first user
+  message), recorded from there. That floor is safe but can change model once.
+- **Conversations with identical openings share a floor.** Same system prompt,
+  same first question, same first answer → one record. A premium follow-up in one
+  of them raises the floor of all of them for 24 h. A cached first answer makes
+  identical openings more likely, which is exactly the case of a FAQ bot behind
+  the cache.
+- **Stickiness costs money.** Every short follow-up in a premium conversation is
+  billed at premium. That is the trade: not answering the second half of a hard
+  conversation with the local model, and not forfeiting the provider's prompt
+  cache on the whole history at every change of model. `routing_decision` makes
+  the cost countable: `chosen_tier <> classified_tier` is the set of turns the
+  conversation held up.
+- **One database round trip per routed follow-up** (an indexed read and an
+  upsert), included in `routing_latency_ms`. A database that cannot be reached
+  degrades the turn to its first-turn floor and is logged; it never fails the
+  request.
+- **Retention is 24 h since the last turn** (`gatewai.routing.conversation-ttl`).
+  A conversation resumed after that starts again from its first-turn floor.
+- **Pinned requests are never sticky.** A client that names a registered model
+  gets it on every turn, and a conversation whose first turn was pinned has no
+  record. If its later turns are routed, they start from the first-turn floor.
+
 ## Attribution is an approximation, and reads more precise than it is
 
 Since v2 batch 7 the gateway can say which parts of a prompt carried its routing

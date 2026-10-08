@@ -243,16 +243,55 @@ Two questions, both answered on demand and never while routing — see
    prompt untouched, record `CLIENT_PINNED` and stop (v2 batch 4). An
    **unregistered** id is not honoured — the egress has no fallback provider,
    so honouring it would turn a routed request into a 400.
-3. `tier = classifier.classify(userText)`.
-4. `candidates = modelRegistry.findByTier(tier)`. If empty, log and pass through
+3. `tier = classifier.classify(userText)` — the last user turn alone.
+4. `ConversationStickiness` places the request in its conversation (v4 A.3, see
+   [below](#conversations-keep-their-model-v4-a3)): on a first turn the tier stands;
+   on a later turn the conversation's floor may raise it, and may fix the model.
+5. If the registry has no model for the resulting tier, log and pass through
    (use the default model).
-5. Otherwise take the first candidate and **rewrite the prompt** with that model
-   id (`reroutePrompt` preserves temperature/maxTokens/topP), then
-   `chain.nextCall(routedRequest)`.
+6. Otherwise **rewrite the prompt** with that model id (`reroutePrompt` preserves
+   temperature/maxTokens/topP/stop), then `chain.nextCall(routedRequest)`.
+7. On a first turn, record the conversation it opens, with its answer. Stamp the
+   **registry** model id on the response (`gatewai.routing.model` metadata), so
+   the cache stores the model the registry knows rather than the provider's name
+   for it.
 
 So the **requested `model` is a hint unless it is registered**: an unknown id is
 overridden by the tier's configured model, a known one is honoured as sent. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
-streamed prompt the same way.
+streamed prompt the same way, and records a first turn on completion.
+
+## Conversations keep their model (v4 A.3)
+
+[ADR 0015](adr/0015-conversation-sticky-routing.md). The classifier decides on the
+last user turn. Without more, "ok, and in Java?" after a hard question drops to
+the local tier, and every change of model forfeits the provider's prompt cache on
+the whole history. **A conversation keeps its model unless a later turn needs a
+higher tier.**
+
+Chat Completions has no conversation id, but clients resend the history, so the
+**opening** identifies a conversation: `ConversationOpening` hashes the system
+messages before the first user message, the first user message and the first
+answer (SHA-256, versioned and length-prefixed). The table
+`conversation_affinity` maps that fingerprint to a model and a tier; it holds
+hashes and ids only.
+
+| Request | What happens | `conversation_routing` |
+|---|---|---|
+| first turn, routed | classified as before; recorded with its answer once the answer is known (on completion when streaming) | null |
+| first turn, served from the cache | the cache records it on the model the stored answer was routed to | (no routing row) |
+| later turn, record found, turn needs ≤ recorded tier | **recorded model**, not just the recorded tier | `STICKY` |
+| later turn, record found, turn needs more | the higher tier's first model; the record moves up and never comes back down | `UPGRADED` |
+| later turn, no record | max(last turn, first user message), then recorded | `FIRST_TURN_FLOOR` |
+| pinned (any turn) | untouched, never recorded | null |
+
+The upsert never downgrades, atomically, so two nodes writing one conversation
+leave the higher tier. A store that cannot be read or written degrades to the
+first-turn floor and never fails a request. Retention is
+`gatewai.routing.conversation-ttl` (24 h since the last turn); the purge runs on
+one node at a time ([`clustering.md`](clustering.md#conversation-records-v4-a3)).
+
+What it costs and where it is wrong:
+[`limitations.md`](../functional/limitations.md#conversation-sticky-routing).
 
 ## Traced decisions (v2 batch 2)
 
@@ -266,6 +305,12 @@ the decision-only latency, and the version of the rules in force. See
 A **pinned** request is the one row with no justification at all: no classifier
 ran, and `chosen_model_id` / `chosen_tier` already say everything a `Pinned`
 justification variant could have carried.
+
+Since v4 A.3 a row also says how its conversation bore on it:
+`conversation_routing` (`STICKY` · `UPGRADED` · `FIRST_TURN_FLOOR`, null on a
+first turn or a pin), `classified_tier` (what the last turn alone was worth) and
+`conversation_fingerprint`. `chosen_tier` is where the request went;
+`decision_reason` still summarises the classifier only.
 
 Two things it deliberately does **not** do. It never blocks or throws — a
 database that is down costs the trace, not the completion. And **a cache hit
@@ -333,6 +378,9 @@ Ollama instances pull their registry models at startup per
 
 ## Configuration reference
 
+`gatewai.routing.*`: `conversation-ttl` (default `24h`, since the last turn),
+`conversation-purge-interval-ms` (default 3 600 000), `config-sync-interval-ms`
+(see [Hot configuration](#hot-configuration)).
 `gatewai.classifier.*`: `strategy` (`embedding`|`heuristic`|`llm`|`cascade`),
 `cascade-margin-band` (0..1, default 0.02), `client-pinning` (default true),
 `model-id` (blank → entry model), `temperature`, `fallback-to-heuristic`,

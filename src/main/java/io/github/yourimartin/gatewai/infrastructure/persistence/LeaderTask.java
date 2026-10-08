@@ -28,7 +28,10 @@ enum LeaderTask {
   DECISION_PURGE(1),
 
   /** Creating the bootstrap admin client at startup. */
-  ADMIN_SEED(2);
+  ADMIN_SEED(2),
+
+  /** Dropping conversation records past their retention (v4 A.3, ADR 0015). */
+  CONVERSATION_AFFINITY_PURGE(3);
 
   private final int lockId;
 

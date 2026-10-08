@@ -20,3 +20,4 @@ part that ages well.
 | [0012](0012-region-on-the-provider-instance.md) | Region attribution belongs to the provider instance (and a dispatch zone never overrides a hosted API) | Accepted |
 | [0013](0013-sourced-and-labelled-not-measured.md) | Energy figures are sourced and labelled, never presented as measured | Accepted |
 | [0014](0014-scope-the-cache-by-conversation-context.md) | Scope the semantic cache by conversation context: similarity on the last turn only inside an identical context | Accepted |
+| [0015](0015-conversation-sticky-routing.md) | Conversation-sticky routing: a conversation keeps its model unless a later turn needs a higher tier | Accepted |

@@ -134,7 +134,7 @@ class MicrometerDecisionMetricsRecorderTest {
     recorder.record(new RoutingDecision(UUID.randomUUID(), "corr", Instant.now(),
         "hash", 10, null, "cfg", ClassificationStrategy.EMBEDDING, null, null,
         DecisionReason.CLIENT_PINNED, ModelTier.CLOUD_PREMIUM, "qwen2.5:3b",
-        1L, null, null, null));
+        1L, null, null, null, null, null, null));
 
     assertEquals(1.0, registry.get("gatewai.routing.decisions")
         .tag("reason", "client_pinned")
@@ -215,7 +215,8 @@ class MicrometerDecisionMetricsRecorderTest {
     return new RoutingDecision(UUID.randomUUID(), "corr", Instant.now(),
         "hash", 42, "nomic-embed-text", "cfg", strategy,
         justification.strategy(), justification, reason, tier, "model-x", 3L,
-        conformalSet, conformalSet == null ? null : 0.10, escalatedTo);
+        conformalSet, conformalSet == null ? null : 0.10, escalatedTo,
+        null, null, null);
   }
 
   private static CacheDecision cache(CacheOutcome outcome,

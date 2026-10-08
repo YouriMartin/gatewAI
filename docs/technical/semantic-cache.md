@@ -64,7 +64,8 @@ captures everything needed to replay the answer and account for it later:
 | Metadata key | Meaning |
 |---|---|
 | `cached_response` | the assistant answer text |
-| `cached_model` | the model that produced it |
+| `cached_model` | the model that produced it, as the provider named it |
+| `routed_model` | the **registry** model id the router sent the request to (v4 A.3); absent on a pinned answer. A cached first turn starts its conversation on this model ([ADR 0015](adr/0015-conversation-sticky-routing.md)) |
 | `cached_finish_reason` | finish reason, always `stop` since v4 A.2 — nothing else is stored |
 | `cached_prompt_tokens` / `cached_completion_tokens` | original token counts |
 | `created_at` | epoch millis (used for TTL filtering) |

@@ -11,11 +11,13 @@ import io.github.yourimartin.gatewai.domain.model.calibration.ConformalPredictio
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationOutcome;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ConversationOpening;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
@@ -34,6 +36,8 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.Ordered;
@@ -54,6 +58,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   private final RoutingConfigVersionTracker configVersion;
   private final CalibrationUseCase calibrations;
   private final ClassifierProperties properties;
+  private final ConversationStickiness stickiness;
 
   RoutingAdvisor(ComplexityClassifier classifier,
                  ModelRegistry modelRegistry,
@@ -61,7 +66,8 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
                  DecisionMetricsRecorder decisionMetrics,
                  RoutingConfigVersionTracker configVersion,
                  CalibrationUseCase calibrations,
-                 ClassifierProperties properties) {
+                 ClassifierProperties properties,
+                 ConversationStickiness stickiness) {
     this.classifier = classifier;
     this.modelRegistry = modelRegistry;
     this.decisionRecorder = decisionRecorder;
@@ -69,6 +75,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     this.configVersion = configVersion;
     this.calibrations = calibrations;
     this.properties = properties;
+    this.stickiness = stickiness;
   }
 
   @Override
@@ -83,19 +90,18 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextCall(request);
     }
 
-    ModelDefinition target = route(userText);
+    List<ConversationOpening.Turn> turns =
+        ConversationStickiness.turns(request.prompt());
+    ModelDefinition target = route(userText, turns);
     if (target == null) {
       return chain.nextCall(request);
     }
 
-    Prompt routedPrompt = reroutePrompt(request.prompt(),
-        target.modelId());
-    ChatClientRequest routedRequest = ChatClientRequest.builder()
-        .prompt(routedPrompt)
-        .context(request.context())
-        .build();
-
-    return chain.nextCall(routedRequest);
+    ChatClientResponse response = chain.nextCall(reroute(request, target));
+    if (!ConversationOpening.hasHistory(turns)) {
+      stickiness.recordFirstTurn(turns, answerText(response), target);
+    }
+    return stampRoutedModel(response, target.modelId());
   }
 
   @Override
@@ -110,18 +116,67 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
       return chain.nextStream(request);
     }
 
-    ModelDefinition target = route(userText);
+    List<ConversationOpening.Turn> turns =
+        ConversationStickiness.turns(request.prompt());
+    ModelDefinition target = route(userText, turns);
     if (target == null) {
       return chain.nextStream(request);
     }
 
-    Prompt routedPrompt = reroutePrompt(request.prompt(), target.modelId());
-    ChatClientRequest routedRequest = ChatClientRequest.builder()
-        .prompt(routedPrompt)
+    Flux<ChatClientResponse> stream = chain.nextStream(reroute(request, target));
+    if (!ConversationOpening.hasHistory(turns)) {
+      // A first turn is recorded on completion, with the answer as the client
+      // received it: the concatenated deltas it will send back next turn.
+      StringBuilder answer = new StringBuilder();
+      stream = stream
+          .doOnNext(response -> appendDelta(answer, response))
+          .doOnComplete(() ->
+              stickiness.recordFirstTurn(turns, answer.toString(), target));
+    }
+    return stream.map(response -> stampRoutedModel(response, target.modelId()));
+  }
+
+  private static ChatClientRequest reroute(ChatClientRequest request,
+                                           ModelDefinition target) {
+    return ChatClientRequest.builder()
+        .prompt(reroutePrompt(request.prompt(), target.modelId()))
         .context(request.context())
         .build();
+  }
 
-    return chain.nextStream(routedRequest);
+  /**
+   * Tells the advisors upstream which registry model answered (v4 A.3). The
+   * provider reports its own name for the model — often a dated variant of the
+   * registry id — so the cache stores this one, and a cached first turn can
+   * then start a conversation on a model the registry knows.
+   */
+  private static ChatClientResponse stampRoutedModel(ChatClientResponse response,
+                                                     String modelId) {
+    if (response == null || response.chatResponse() == null) {
+      return response;
+    }
+    return ChatClientResponse.builder()
+        .chatResponse(ChatResponse.builder()
+            .from(response.chatResponse())
+            .metadata(LlmResponse.ROUTED_MODEL_METADATA_KEY, modelId)
+            .build())
+        .context(response.context())
+        .build();
+  }
+
+  private static String answerText(ChatClientResponse response) {
+    StringBuilder answer = new StringBuilder();
+    appendDelta(answer, response);
+    return answer.toString();
+  }
+
+  private static void appendDelta(StringBuilder answer, ChatClientResponse response) {
+    ChatResponse chatResponse = response == null ? null : response.chatResponse();
+    Generation result = chatResponse == null ? null : chatResponse.getResult();
+    if (result != null && result.getOutput() != null
+        && result.getOutput().getText() != null) {
+      answer.append(result.getOutput().getText());
+    }
   }
 
   /**
@@ -163,28 +218,29 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   }
 
   /**
-   * Classifies, picks the target model and records the decision.
+   * Classifies, places the request in its conversation and records the
+   * decision.
    *
    * @return the model to rewrite to, or null when the request must pass through
-   *         because no model is registered for the classified tier
+   *         because no model is registered for the tier
    */
-  private ModelDefinition route(String userText) {
+  private ModelDefinition route(String userText, List<ConversationOpening.Turn> turns) {
     long startNanos = System.nanoTime();
 
     ClassificationOutcome outcome = classifier.classify(userText);
-    List<ModelDefinition> candidates =
-        modelRegistry.findByTier(outcome.tier());
-    ModelDefinition target = candidates.isEmpty() ? null : candidates.getFirst();
+    ConversationStickiness.Placement placement =
+        stickiness.place(turns, userText, outcome);
+    ModelDefinition target = placement.model();
 
     if (target == null) {
-      LOG.info("No model configured for tier {}, using default", outcome.tier());
+      LOG.info("No model configured for tier {}, using default", placement.tier());
     } else {
-      LOG.info("Routing to {} (tier={}, model={})",
-          target.provider(), outcome.tier(), target.modelId());
+      LOG.info("Routing to {} (tier={}, model={}, conversation={})",
+          target.provider(), placement.tier(), target.modelId(), placement.routing());
     }
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-    recordDecision(userText, outcome, target, latencyMs);
+    recordDecision(userText, outcome, placement, latencyMs);
     return target;
   }
 
@@ -194,8 +250,10 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
    * config version) happens here and must be equally harmless.
    */
   private void recordDecision(String userText, ClassificationOutcome outcome,
-                              ModelDefinition target, long latencyMs) {
+                              ConversationStickiness.Placement placement,
+                              long latencyMs) {
     try {
+      ModelDefinition target = placement.model();
       ClassificationJustification justification = outcome.justification();
       DecisionReason reason = target == null
           ? DecisionReason.NO_MODEL_FOR_TIER
@@ -217,12 +275,15 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           justification.strategy(),
           justification,
           reason,
-          outcome.tier(),
+          placement.tier(),
           target == null ? null : target.modelId(),
           latencyMs,
           conformalSet(justification, calibration),
           calibration.isApplied() ? calibration.calibration().alpha() : null,
-          escalatedTo(justification)));
+          escalatedTo(justification),
+          placement.routing(),
+          placement.classifiedTier(),
+          placement.fingerprint()));
     } catch (RuntimeException e) {
       LOG.warn("Could not build routing decision: {}", e.toString());
     }
@@ -254,6 +315,9 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           pinned.tier(),
           pinned.modelId(),
           latencyMs,
+          null,
+          null,
+          null,
           null,
           null,
           null));

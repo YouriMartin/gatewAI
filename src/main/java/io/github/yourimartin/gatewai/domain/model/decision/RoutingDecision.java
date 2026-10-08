@@ -8,6 +8,7 @@ import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
+import io.github.yourimartin.gatewai.domain.model.routing.ConversationRouting;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
@@ -40,7 +41,9 @@ import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
  *                              the client asked for is already the answer
  *                              ({@code chosenModelId}, {@code chosenTier})
  * @param decisionReason        one-word summary of the justification
- * @param chosenTier            the tier the request was classified into
+ * @param chosenTier            the tier the request was sent to: the
+ *                              classified tier, or the conversation's floor
+ *                              when that is higher (v4 A.3)
  * @param chosenModelId         the model it was rewritten to, null when the
  *                              router passed the request through
  * @param routingLatencyMs      time spent deciding, excluding the LLM call
@@ -55,6 +58,13 @@ import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
  *                              4), null when the configured strategy was not
  *                              the cascade — which is what makes the escalation
  *                              rate countable from this table alone
+ * @param conversationRouting   how the conversation bore on the decision (ADR
+ *                              0015), null on a first turn or a pin
+ * @param classifiedTier        the last user turn's own tier, before the
+ *                              conversation's floor; null with
+ *                              {@code conversationRouting}
+ * @param conversationFingerprint the opening's hash, null with
+ *                              {@code conversationRouting}
  */
 public record RoutingDecision(
     UUID id,
@@ -73,7 +83,10 @@ public record RoutingDecision(
     long routingLatencyMs,
     List<ModelTier> conformalSet,
     Double conformalAlpha,
-    CascadeLevel escalatedTo
+    CascadeLevel escalatedTo,
+    ConversationRouting conversationRouting,
+    ModelTier classifiedTier,
+    String conversationFingerprint
 ) {
 
   public RoutingDecision {

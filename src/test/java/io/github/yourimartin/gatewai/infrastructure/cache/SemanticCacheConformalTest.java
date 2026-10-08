@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
+import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 
@@ -65,7 +66,8 @@ class SemanticCacheConformalTest {
   void setUp() {
     properties = new SemanticCacheProperties();
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
-        CalibrationFixtures.none(properties::getSimilarityThreshold), mock(ModelRegistry.class), text -> true);
+        CalibrationFixtures.none(properties::getSimilarityThreshold), mock(ModelRegistry.class), text -> true,
+        new InMemoryConversationAffinityStore());
   }
 
   // ---- Conformal prediction set (v2 batch 3) ----
@@ -131,7 +133,8 @@ class SemanticCacheConformalTest {
     advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer,
         CalibrationFixtures.stale(
             CalibrationFixtures.calibration(CalibrationTarget.CACHE, 0.80),
-            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
+            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true,
+        new InMemoryConversationAffinityStore());
     ChatClientRequest request = buildRequest("What is Spring?");
     when(vectorStore.similaritySearch(any(SearchRequest.class)))
         .thenReturn(List.of(cached("What is Spring?", "A framework.", 0.85)));
@@ -150,7 +153,8 @@ class SemanticCacheConformalTest {
     return new SemanticCacheAdvisor(vectorStore, properties, tracer,
         CalibrationFixtures.applied(
             CalibrationFixtures.calibration(CalibrationTarget.CACHE, threshold),
-            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true);
+            properties.getSimilarityThreshold()), mock(ModelRegistry.class), text -> true,
+        new InMemoryConversationAffinityStore());
   }
 
   private static Document cached(String question, String answer, double score) {

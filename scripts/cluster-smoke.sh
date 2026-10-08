@@ -4,7 +4,8 @@
 #   docker compose -f docker-compose.cluster.yml up --build -d
 #   ./scripts/cluster-smoke.sh
 #
-# Five checks, one per mechanism the lot introduced. Each prints PASS or FAIL and
+# Six checks: one per mechanism v3 lot B introduced, and v4 A.3's shared
+# conversation records. Each prints PASS or FAIL and
 # the script exits non-zero if any failed, so it can be read by a person or by
 # CI. It talks to the balancer (:8080) for anything a client would do, and to a
 # specific node (:8081 / :8082) only where the question is "what does *that* node
@@ -184,6 +185,46 @@ for node in "$N1:gateway-1" "$N2:gateway-2"; do
     fail "$name does not carry its instance tag"
   fi
 done
+
+# ---------------------------------------------------------------------------
+section "6. A conversation started on one node is sticky on the other (v4 A.3)"
+# ---------------------------------------------------------------------------
+# Turn 1 on node 1; turn 2 -- the same history, resent as a client resends it --
+# on node 2. Node 2 can only know the conversation from the shared table: a
+# per-node record would make it FIRST_TURN_FLOOR. The probe is random, so turn 1
+# is a cache miss and goes through the router.
+psql_q "DELETE FROM rate_limit_bucket;" > /dev/null
+probe="sticky probe $RANDOM$RANDOM: compare Raft and Paxos for a replicated log"
+turn1=$(curl -s -D - -X POST "${AUTH[@]}" "${JSON[@]}" \
+  -d "{\"model\":\"gatewai-auto\",\"messages\":[{\"role\":\"user\",\"content\":\"$probe\"}]}" \
+  "$N1/v1/chat/completions")
+id1=$(printf '%s' "$turn1" | grep -i '^x-request-id:' | tr -d '\r' | awk '{print $2}')
+answer=$(printf '%s' "$turn1" | sed -n 's/.*"content":"\([^"]*\)".*/\1/p' | head -1)
+
+turn2=$(curl -s -D - -o /dev/null -X POST "${AUTH[@]}" "${JSON[@]}" \
+  -d "{\"model\":\"gatewai-auto\",\"messages\":[{\"role\":\"user\",\"content\":\"$probe\"},{\"role\":\"assistant\",\"content\":\"$answer\"},{\"role\":\"user\",\"content\":\"ok\"}]}" \
+  "$N2/v1/chat/completions")
+id2=$(printf '%s' "$turn2" | grep -i '^x-request-id:' | tr -d '\r' | awk '{print $2}')
+
+# Decisions are recorded off the request path: give the recorder a moment.
+row=""
+for _ in $(seq 1 20); do
+  row=$(psql_q "SELECT coalesce(conversation_routing, 'none') || ' ' || coalesce(chosen_model_id, '-')
+                FROM routing_decision WHERE correlation_id = '${id2}';")
+  [ -n "$row" ] && break
+  sleep 0.5
+done
+model1=$(psql_q "SELECT chosen_model_id FROM routing_decision WHERE correlation_id = '${id1}';")
+routing2="${row%% *}"; model2="${row#* }"
+if [ -z "$id1" ] || [ -z "$answer" ] || [ -z "$id2" ]; then
+  fail "could not run the two turns (turn 1 id='${id1}', answer='${answer}', turn 2 id='${id2}')"
+elif [ "$routing2" = "STICKY" ] && [ "$model2" = "$model1" ]; then
+  pass "turn 2 on node 2 kept node 1's model ($model1, STICKY)"
+elif [ "$routing2" = "UPGRADED" ]; then
+  pass "turn 2 on node 2 found node 1's record and moved up ($model1 -> $model2)"
+else
+  fail "turn 2 on node 2 was '${row:-not recorded}', turn 1 ran on '${model1:-?}'"
+fi
 
 printf '\n'
 if [ "$failures" -eq 0 ]; then
