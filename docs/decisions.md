@@ -7,6 +7,28 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.2 (`GET /v1/models`)
+
+- **`created` is always `0`.** The roadmap asked for a value that is stable across
+  restarts. The registry records no date, and a startup time or a hash of the id
+  would look like a date without being one; `0` is stable and reads as "unknown".
+  `limitations.md` says so.
+- **`auto` is a reserved id.** The roadmap only said `auto` means "let gatewAI
+  route". A registry entry with `model-id: auto` would pin every request that asks
+  for routing, so the startup check that already rejects duplicate ids now rejects
+  that one too.
+- **The streaming fix was not in the plan.** Testing the walkthrough showed every
+  streamed response was cut short after `[DONE]`: the async dispatch that ends an SSE
+  response was denied, because `ApiKeyAuthenticationFilter` only set the
+  thread-local context. It now also saves it in the request attributes, which
+  Spring Security reloads on that dispatch. The alternative — `permitAll()` on
+  async and error dispatches — is shorter but stops authorizing them instead of
+  restoring the identity.
+- **The walkthrough was run through Open WebUI's API, not by clicking.** The four
+  checks used the endpoints its UI calls (`/api/models`, `/api/chat/completions`,
+  `/api/v1/tasks/title/completions`), against the published v0.12.0 image. It
+  proves the integration end to end, but not the UI rendering itself.
+
 ## v4 lot B — B.1 (message shapes, forwarded parameters)
 
 - **The egress options fix was not in the plan.** The roadmap asked for forwarded

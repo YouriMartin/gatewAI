@@ -27,6 +27,7 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ApiKeyAuthenticationFilterTest {
@@ -81,6 +82,24 @@ class ApiKeyAuthenticationFilterTest {
 
     assertTrue(scopedValueBound[0]);
     assertEquals(clientId.toString(), capturedClientId[0]);
+  }
+
+  @Test
+  void validKeySavesTheContextForTheAsyncAndErrorDispatches() throws Exception {
+    String rawKey = "sk-test-key-12345";
+    String keyHash = ApiKeyAuthenticationFilter.hashApiKey(rawKey);
+    when(apiClientRepository.findByApiKeyHash(keyHash)).thenReturn(
+        Optional.of(new ApiClient(UUID.randomUUID(), "acme", keyHash, true,
+            Instant.now(), false)));
+    request.addHeader("Authorization", "Bearer " + rawKey);
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    // What SecurityContextHolderFilter reloads on a dispatch this filter skips.
+    var saved = new RequestAttributeSecurityContextRepository()
+        .loadDeferredContext(request).get().getAuthentication();
+    assertInstanceOf(ApiKeyAuthentication.class, saved);
+    assertEquals("acme", ((ApiKeyAuthentication) saved).getClientName());
   }
 
   @Test

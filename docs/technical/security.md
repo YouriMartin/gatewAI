@@ -16,6 +16,13 @@ ApiKeyAuthenticationFilter, ApiKeyAuthentication}`,
   looks up an **enabled** `ApiClient` by hash. On success it sets an
   `ApiKeyAuthentication` in the Spring `SecurityContext` and binds a
   `RequestContext(clientId)` Scoped Value around the rest of the filter chain.
+- It also saves that context in the request attributes
+  (`RequestAttributeSecurityContextRepository`). A streamed response ends with an
+  **async dispatch** — and a failure with an error dispatch — that runs the security
+  chain again but skips this filter; it reloads the context from there. Before v4
+  B.2 it did not, so that dispatch was denied after the stream was committed and the
+  chunked body was cut short, after `[DONE]`: curl printed the whole stream and only
+  its exit code (18) told, Open WebUI's client (aiohttp) reported the stream failed.
 - No match → no authentication is set; the request proceeds and is rejected by the
   authorization rules (401) unless it targets a public path.
 

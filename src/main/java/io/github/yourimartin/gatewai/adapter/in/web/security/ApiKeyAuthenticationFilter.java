@@ -16,12 +16,26 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
   private static final String BEARER_PREFIX = "Bearer ";
+
+  /**
+   * Where the authenticated context is saved for the rest of the request. A
+   * streamed response ends with an async dispatch — and a failure with an error
+   * dispatch — that runs the security chain again without this filter
+   * ({@link OncePerRequestFilter} skips them); both reload the context from the
+   * request attributes. Without it that dispatch was denied after the response
+   * was committed, and the stream's chunked body was cut short.
+   */
+  private final SecurityContextRepository contextRepository =
+      new RequestAttributeSecurityContextRepository();
 
   private final ApiClientRepository apiClientRepository;
 
@@ -56,7 +70,10 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     ApiKeyAuthentication authentication = new ApiKeyAuthentication(
         client.id().toString(), client.name(), authorities(client));
-    SecurityContextHolder.getContext().setAuthentication(authentication);
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(authentication);
+    SecurityContextHolder.setContext(context);
+    contextRepository.saveContext(context, request, response);
 
     RequestContext ctx = new RequestContext(
         client.id().toString(), CorrelationIdFilter.from(request));

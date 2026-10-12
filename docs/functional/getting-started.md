@@ -1,8 +1,8 @@
 # Getting started
 
 This guide takes you from nothing to a first answer through gatewAI: deploy, get
-an API key, send a request via the OpenAI SDK **and** via MCP, and open the
-dashboard.
+an API key, send a request via the OpenAI SDK **and** via MCP, plug in a chat UI,
+and open the dashboard.
 
 ## 1. Prerequisites
 
@@ -140,7 +140,71 @@ print("served by:", resp.model)
 Send a **second, slightly reworded** version of the same question and watch it
 come back from the semantic cache (instantly, no model call).
 
-## 5. First request — MCP
+## 5. Use it from a chat UI — Open WebUI
+
+Chat UIs that speak the OpenAI API fill their model picker from `GET /v1/models`,
+so gatewAI shows up as one connection with `auto` and every registered model.
+The four checks below were run on 2026-10-12 against **Open WebUI v0.12.0** and
+the stack from step 2 (default registry, all-Ollama), through Open WebUI's own
+API — the model list, streamed chats and a title task its UI requests — rather
+than by clicking through the UI.
+
+Create a dedicated client key for it (step 3), then start Open WebUI next to the
+stack:
+
+```bash
+docker run -d --name open-webui -p 3000:8080 \
+  --add-host=host.docker.internal:host-gateway \
+  -e OPENAI_API_BASE_URL=http://host.docker.internal:8080/v1 \
+  -e OPENAI_API_KEY=gw_your_open_webui_key \
+  -e ENABLE_OLLAMA_API=false \
+  -e TASK_MODEL_EXTERNAL=qwen2.5:0.5b \
+  -e WEBUI_AUTH=false \
+  -v open-webui:/app/backend/data \
+  ghcr.io/open-webui/open-webui:v0.12.0
+```
+
+- `--add-host=host.docker.internal:host-gateway` lets the container reach the
+  gateway's published port 8080 on Linux (Docker Desktop resolves the name anyway).
+- `ENABLE_OLLAMA_API=false`: Open WebUI would otherwise look for an Ollama of its
+  own. All traffic should go through gatewAI.
+- `TASK_MODEL_EXTERNAL`: Open WebUI also sends background requests — a chat
+  title, tags, follow-up suggestions — through the same connection, by default on
+  the model selected for the chat. They are real chat completions, routed, cached
+  and accounted like any other, so they show up in the reports. Sending them to
+  the smallest model keeps them cheap; set `ENABLE_TITLE_GENERATION`,
+  `ENABLE_TAGS_GENERATION` and `ENABLE_FOLLOW_UP_GENERATION` to `false` to drop
+  them.
+- `WEBUI_AUTH=false` skips Open WebUI's own login: fine for a local, single-user
+  try, not for a shared instance.
+- Open WebUI saves these settings in its volume on first start; change them later
+  under *Admin Panel → Settings → Connections*, not by editing the variables.
+
+Open <http://localhost:3000> and check four things. Keep the gateway log open
+to see what the router did:
+
+```bash
+docker compose -f docker-compose.yml logs -f gateway | grep -E 'Routing to|pinned'
+```
+
+1. **Models are listed.** The picker shows `auto`, `qwen2.5:0.5b`, `qwen2.5:1.5b`
+   and `qwen2.5:3b` — exactly what `GET /v1/models` returns.
+2. **Streaming works.** Pick `auto` and ask a question: the answer arrives token
+   by token.
+3. **`auto` routes.** The log shows the router's choice, e.g.
+   `Routing to ollama (tier=CLOUD_ENTRY, model=qwen2.5:1.5b, …)`.
+4. **A registered id pins.** Pick `qwen2.5:3b` and ask the same short question:
+   the log shows `Client pinned qwen2.5:3b (tier=CLOUD_PREMIUM), skipping
+   classification` — the router does not pick a smaller model. The cache keeps
+   pinned and routed answers apart, so this is a miss even right after the `auto`
+   turn. A question the cache already holds *for that model* comes back as a
+   `Cache HIT` with no routing line at all; ask something new to see the pin.
+
+Open WebUI labels each answer with the model picked in the UI (`auto`), not the
+one that served it; the served model is in the gateway log, in the `model` field
+of the response, and on the dashboard.
+
+## 6. First request — MCP
 
 gatewAI is also an **MCP server** at `http://localhost:8080/mcp`, secured with the
 same Bearer key. An MCP-capable assistant can call its tools: `routed_chat`,
@@ -163,7 +227,7 @@ Then ask the assistant to "use routed_chat to answer …" or "show the green_rep
 for the last 7 days". See [`../technical/mcp.md`](../technical/mcp.md) for the tool
 details.
 
-## 6. Open the dashboard
+## 7. Open the dashboard
 
 Browse to <http://localhost:8080/>. Paste your API key, click **Test connection**,
 and you get the KPIs (€ saved, gCO2 avoided, cache hit rate), trends, model mix,
@@ -171,7 +235,7 @@ CSRD report downloads, and — with an **admin** key — key administration and 
 routing configuration. A full tour is in
 [`dashboard-guide.md`](dashboard-guide.md).
 
-## 7. Next steps
+## 8. Next steps
 
 - Understand each capability: [`features.md`](features.md)
 - Know the boundaries before relying on the numbers: [`limitations.md`](limitations.md)

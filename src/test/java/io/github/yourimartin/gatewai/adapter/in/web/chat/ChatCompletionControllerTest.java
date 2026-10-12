@@ -16,11 +16,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
+import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ApiKeyHasher;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
@@ -199,6 +204,40 @@ class ChatCompletionControllerTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
         .andExpect(content().string(
             org.hamcrest.Matchers.containsString("chat.completion.chunk")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("[DONE]")));
+  }
+
+  /**
+   * The stream ends with an async dispatch that runs the security chain again.
+   * With a real Bearer key (not the test {@code authentication()} helper, which
+   * stores the context where any dispatch finds it), that dispatch used to be
+   * denied after the response was committed, so the chunked body was cut short
+   * and strict clients (Open WebUI's aiohttp) dropped the stream.
+   */
+  @Test
+  void aStreamAuthenticatedByABearerKeyCompletesItsAsyncDispatch() throws Exception {
+    String rawKey = "gw_stream-key";
+    when(apiClientRepository.findByApiKeyHash(ApiKeyHasher.hash(rawKey)))
+        .thenReturn(Optional.of(new ApiClient(UUID.randomUUID(), "open-webui",
+            ApiKeyHasher.hash(rawKey), true, Instant.now(), false)));
+    doAnswer(invocation -> {
+      Consumer<LlmStreamChunk> sink = invocation.getArgument(1);
+      sink.accept(new LlmStreamChunk("qwen2.5:3b", "Hi", "stop", false, 4, 1, 5, true));
+      return null;
+    }).when(streamUseCase).streamComplete(any(), any());
+
+    MvcResult result = mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .header("Authorization", "Bearer " + rawKey)
+            .content("""
+                {"model": "auto", "messages": [{"role": "user", "content": "Hi"}],
+                 "stream": true}
+                """))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("[DONE]")));
   }
 
