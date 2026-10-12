@@ -163,6 +163,22 @@ class EgressProviderConfigurationTest {
   }
 
   @Test
+  void failsOnARegistryEntryThatClaimsTheRoutedAlias() {
+    // v4 B.2: "auto" means "let gatewAI route"; an entry by that id would pin it.
+    ModelRegistry registry = registry(
+        model("ollama", "auto", ModelTier.LOCAL),
+        model("ollama", "qwen2.5:1.5b", ModelTier.CLOUD_ENTRY),
+        model("ollama", "qwen2.5:3b", ModelTier.CLOUD_PREMIUM));
+
+    assertThatThrownBy(() -> configuration.create(
+        providers(Map.of("ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null))),
+        registry, tools, observations))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("reserved")
+        .hasMessageContaining(".model-id");
+  }
+
+  @Test
   void failsWhenProviderHasNoType() {
     assertThatThrownBy(() -> configuration.create(
         providers(Map.of("ollama", entry(null, null, null))),

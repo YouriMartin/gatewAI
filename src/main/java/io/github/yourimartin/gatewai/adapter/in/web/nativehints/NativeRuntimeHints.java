@@ -20,6 +20,8 @@ import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatRequestMessage;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChunkChoice;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.DeferredJobResponse;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.TokenUsage;
+import io.github.yourimartin.gatewai.adapter.in.web.models.ModelListView;
+import io.github.yourimartin.gatewai.adapter.in.web.models.ModelView;
 import io.github.yourimartin.gatewai.adapter.in.web.report.GreenReportResponse;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 
@@ -48,6 +50,9 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       ChatChoice.class,
       TokenUsage.class,
       DeferredJobResponse.class,
+      // Model discovery (v4 B.2).
+      ModelListView.class,
+      ModelView.class,
       GreenReportResponse.class,
       ApiClientView.class,
       CreatedClientView.class,

@@ -2,7 +2,8 @@
 
 All `/v1/**` endpoints require `Authorization: Bearer <key>`; `/v1/admin/**`
 require an **admin** key. JSON bodies use **snake_case**. `POST
-/v1/chat/completions*` is rate-limited (see [`security.md`](security.md)).
+/v1/chat/completions*` is rate-limited (see [`security.md`](security.md)); `GET
+/v1/models` is not.
 
 ## Chat completions (OpenAI-compatible)
 
@@ -23,8 +24,9 @@ Honored: `model`, `messages`, `temperature`, `max_tokens` (or
 `max_completion_tokens`, which wins when both are sent), **`stream`**,
 `stream_options.include_usage`, `stop`, `user`, and since v4 B.1 `top_p`,
 `presence_penalty`, `frequency_penalty` and `seed` — forwarded where the provider
-supports them (table below). `model` is a **hint** — the router may override it; a
-registered model id pins. Unknown fields are ignored, never rejected.
+supports them (table below). `model` is a **hint**: `auto` — or any name the registry
+does not hold — is routed; a registered model id pins. [`GET /v1/models`](#get-v1models)
+lists exactly those choices. Unknown fields are ignored, never rejected.
 
 **Message shapes (v4 B.1).** `content` is a string, an array of parts, or `null`
 (an assistant message that only calls tools). An array of `text` parts is joined
@@ -146,6 +148,47 @@ client SDKs parse them like any other OpenAI error:
 Upstream provider details are logged server-side but **not echoed** to the caller.
 Streaming (`"stream": true`) reports failures inline on the SSE stream rather than
 as this envelope, since the response is already committed when the egress fails.
+
+## Models (OpenAI-compatible, v4 B.2)
+
+Chat UIs fill their model picker from this endpoint. Same Bearer key as the rest of
+`/v1/**`, no admin role; not rate-limited (it costs no model call).
+
+### `GET /v1/models`
+
+```json
+{
+  "object": "list",
+  "data": [
+    {"id": "auto",        "object": "model", "created": 0, "owned_by": "gatewai"},
+    {"id": "qwen2.5:0.5b", "object": "model", "created": 0, "owned_by": "ollama"},
+    {"id": "qwen2.5:1.5b", "object": "model", "created": 0, "owned_by": "ollama"},
+    {"id": "qwen2.5:3b",   "object": "model", "created": 0, "owned_by": "ollama"}
+  ]
+}
+```
+
+- `auto` comes first: it means "let gatewAI route". It is not a registry entry, and
+  the id is **reserved** — a registry entry with `model-id: auto` fails the startup.
+- Then every `gatewai.models.registry` entry, in declaration order. `id` is the
+  entry's `model-id` — the value that **pins** a request to it — and `owned_by` is the
+  name of the provider instance that serves it (`gatewai.providers.<name>`), not the
+  vendor.
+- `created` is always `0`. The registry records no creation date, and the field must
+  stay the same across restarts; read it as "unknown", not as 1970.
+
+### `GET /v1/models/{id}`
+
+One entry in the same shape, `auto` included. An id may contain `/`
+(`Qwen/Qwen2.5-7B-Instruct`). An id the registry does not hold is a `404`:
+
+```json
+{"error": {"message": "The model 'gpt-9' does not exist.",
+           "type": "invalid_request_error", "param": "model", "code": "model_not_found"}}
+```
+
+A `404` here does not mean a chat request naming that id fails: an unregistered name
+in `POST /v1/chat/completions` is routed, like `auto`.
 
 ## Asynchronous, carbon-aware completions
 
@@ -415,6 +458,7 @@ Tools: `routed_chat`, `green_report`, `carbon_intensity`. See [`mcp.md`](mcp.md)
 
 `200` ok · `201` client created · `202` async accepted · `204` revoked · `400`
 bad input · `401` missing/invalid key · `403` non-admin on admin route · `404`
-unknown async id or unrecorded correlation id · `409` calibration impossible on
+unknown async id, unrecorded correlation id, or model id not in the registry
+(`GET /v1/models/{id}`) · `409` calibration impossible on
 the labelled set · `429` rate limited (`Retry-After`) · `500` internal error ·
 `502`/`503` upstream provider error (chat ingress, see [Errors](#errors)).

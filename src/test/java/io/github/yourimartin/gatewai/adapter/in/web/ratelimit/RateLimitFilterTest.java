@@ -117,6 +117,20 @@ class RateLimitFilterTest {
   }
 
   @Test
+  void doesNotLimitModelDiscovery() throws Exception {
+    // v4 B.2: chat UIs list models on every page load; that costs no model call.
+    properties.setRequestsPerMinute(1);
+    authenticate("client");
+    filter.doFilter(post(), new MockHttpServletResponse(), new MockFilterChain());
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(new MockHttpServletRequest("GET", "/v1/models"),
+        new MockHttpServletResponse(), chain);
+
+    assertNotNull(chain.getRequest(), "listing models must work with the budget spent");
+  }
+
+  @Test
   void doesNotLimitUnauthenticatedRequests() throws Exception {
     properties.setRequestsPerMinute(1);
     MockFilterChain chain = new MockFilterChain();

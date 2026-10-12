@@ -69,8 +69,9 @@ type). In particular:
 - **Anthropic ignores `presence_penalty`, `frequency_penalty` and `seed`**: the
   Messages API has no such parameters. A `seed` beyond 32 bits is not sent to any
   provider (the OpenAI and Ollama clients take a 32-bit seed).
-- Only `/v1/chat/completions` is implemented from the OpenAI surface (no
-  `/v1/embeddings`, `/v1/models`, etc.).
+- Only `/v1/chat/completions` and `/v1/models` are implemented from the OpenAI
+  surface (no `/v1/embeddings`, `/v1/responses`, etc.). `/v1/models` lists the
+  registry plus `auto`; its `created` is always `0` — the registry has no dates.
 
 ## Semantic cache trade-offs
 

@@ -81,8 +81,9 @@ password` log does not appear.
 ## Rate limiting
 
 `RateLimitFilter` runs **after** authentication (so the client id is known) and
-limits only `POST /v1/chat/completions*` (sync + async submit); status polls,
-admin and report calls are not limited. Over the limit → **`429`** with a
+limits only `POST /v1/chat/completions*` (sync + async submit) and `POST
+/v1/admin/decisions/explain`; status polls, `GET /v1/models`, admin reads and report
+calls are not limited. Over the limit → **`429`** with a
 `Retry-After` header and a JSON error body.
 
 `RateLimiter` is a **Bucket4j** token bucket, **one bucket per client id**.

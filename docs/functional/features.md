@@ -12,7 +12,10 @@ using a gatewAI API key. The **ingress** (OpenAI format) and the **egress** (the
 provider actually called) are independent: you can switch or add providers without
 touching client code.
 
-- The `model` you pass is a **hint**; the router may override it (see Routing).
+- The `model` you pass is a **hint**: `auto` (or any unregistered name) lets the
+  router pick; a registered model id pins that model (see Routing).
+- **`GET /v1/models`** (v4 B.2) lists `auto` and every registered model, so chat UIs
+  that discover models (Open WebUI, LibreChat…) show a populated picker.
 - Responses are OpenAI-shaped, including `usage` token counts. The `model` field
   reports the model that actually served the request.
 - **Streaming** is supported: pass `"stream": true` and the gateway returns

@@ -148,6 +148,23 @@ class RoutingAdvisorPinningTest {
   }
 
   @Test
+  void theRoutedAliasIsClassifiedLikeAnyUnregisteredName() {
+    // v4 B.2: "auto" is what GET /v1/models offers for "let gatewAI route".
+    ChatClientRequest request = buildRequest("Refactor this", ModelDefinition.ROUTED_MODEL_ID);
+    when(classifier.classify(any())).thenReturn(outcome(ModelTier.CLOUD_PREMIUM));
+    when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
+        .thenReturn(List.of(premiumModel()));
+    when(callChain.nextCall(any())).thenReturn(chainResponse);
+
+    advisor.adviseCall(request, callChain);
+
+    verify(classifier).classify("Refactor this");
+    verify(callChain).nextCall(requestCaptor.capture());
+    assertEquals("claude-sonnet-4-20250514",
+        requestCaptor.getValue().prompt().getOptions().getModel());
+  }
+
+  @Test
   void pinningCanBeTurnedOffToMakeRoutingMandatory() {
     properties.setClientPinning(false);
     ChatClientRequest request = buildRequest("Hello", "claude-haiku-4-20250506");

@@ -28,6 +28,13 @@ public record ModelDefinition(
     ModelTier tier
 ) {
 
+  /**
+   * The model id that asks gatewAI to route (v4 B.2): listed first by
+   * {@code GET /v1/models}, never a registry entry. Like any unregistered name,
+   * it is classified; reserving it keeps a registry entry from shadowing it.
+   */
+  public static final String ROUTED_MODEL_ID = "auto";
+
   public ModelDefinition {
     if (energy == null) {
       energy = EnergyProfile.NOT_ACCOUNTED;

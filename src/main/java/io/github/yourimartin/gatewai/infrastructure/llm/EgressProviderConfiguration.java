@@ -50,7 +50,8 @@ import org.springframework.context.annotation.Profile;
  * <ul>
  *   <li>every routing tier has at least one registry entry (with no fallback
  *       provider, an empty tier would have nowhere to send its traffic);</li>
- *   <li>model ids are unique across the registry (dispatch resolves by id);</li>
+ *   <li>model ids are unique across the registry (dispatch resolves by id), and
+ *       none is the reserved routed alias {@code auto} (v4 B.2);</li>
  *   <li>every registry entry references a declared provider instance;</li>
  *   <li>referenced instances have the credentials their type requires.</li>
  * </ul>
@@ -160,6 +161,12 @@ class EgressProviderConfiguration {
     }
     Set<String> seen = new HashSet<>();
     for (ModelDefinition model : modelRegistry.allModels()) {
+      if (ModelDefinition.ROUTED_MODEL_ID.equals(model.modelId())) {
+        throw new IllegalStateException("Registry entry '" + model.key() + "' uses the model id '"
+            + ModelDefinition.ROUTED_MODEL_ID + "', which is reserved: clients send it to let"
+            + " gatewAI route. Give gatewai.models.registry." + model.key()
+            + ".model-id another value.");
+      }
       if (!seen.add(model.modelId())) {
         throw new IllegalStateException("Duplicate model id '" + model.modelId()
             + "' in gatewai.models.registry — dispatch resolves by model id, so each id must be unique.");
