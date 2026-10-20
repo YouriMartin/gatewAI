@@ -37,7 +37,20 @@ public enum DecisionReason {
    * The request was classified, but the registry holds no model for that tier,
    * so the router passed the request through untouched.
    */
-  NO_MODEL_FOR_TIER;
+  NO_MODEL_FOR_TIER,
+
+  /**
+   * The request needs pass-through (ADR 0016, v4 B.3) and names a registered
+   * model, so it was forwarded there. Nothing was classified.
+   */
+  PASSTHROUGH_PINNED,
+
+  /**
+   * The request needs pass-through and names no registered model, so it was
+   * forwarded to {@code gatewai.passthrough.default-model}. Nothing was
+   * classified.
+   */
+  PASSTHROUGH_DEFAULT;
 
   /**
    * Summarizes a justification. Anything that is not a hand-over is a

@@ -7,7 +7,7 @@ part that ages well.
 | ADR | Decision | Status |
 |---|---|---|
 | [0001](0001-single-postgres-pgvector.md) | One PostgreSQL (pgvector) for cache **and** metrics | Accepted |
-| [0002](0002-thin-gateway-advisor-chain.md) | Thin gateway over a Spring AI advisor chain | Accepted |
+| [0002](0002-thin-gateway-advisor-chain.md) | Thin gateway over a Spring AI advisor chain | Accepted, amended by 0016 |
 | [0003](0003-ingress-egress-separation.md) | Separate ingress (OpenAI/MCP) from egress (provider) | Accepted |
 | [0004](0004-scoped-values-no-structured-concurrency.md) | Scoped Values for context; avoid Structured Concurrency | Accepted |
 | [0005](0005-depend-on-vectorstore-interface.md) | Depend on the `VectorStore` interface, not pgvector | Accepted |
@@ -21,3 +21,4 @@ part that ages well.
 | [0013](0013-sourced-and-labelled-not-measured.md) | Energy figures are sourced and labelled, never presented as measured | Accepted |
 | [0014](0014-scope-the-cache-by-conversation-context.md) | Scope the semantic cache by conversation context: similarity on the last turn only inside an identical context | Accepted |
 | [0015](0015-conversation-sticky-routing.md) | Conversation-sticky routing: a conversation keeps its model unless a later turn needs a higher tier | Accepted |
+| [0016](0016-pass-through-what-the-chain-cannot-honour.md) | Pass through what the advisor chain cannot honour: one registered model, the original body, still traced and accounted | Accepted |

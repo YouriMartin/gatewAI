@@ -7,6 +7,40 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.3 (pass-through, non-streaming)
+
+- **What Anthropic's compatibility layer ignores is refused, not forwarded.** The
+  roadmap forwards every marked request to the target's OpenAI-format endpoint.
+  Anthropic's page (read 2026-10-20) documents that its layer ignores
+  `response_format`, `logprobs`, `logit_bias`, audio and file parts, and requires
+  `n` = 1. Forwarding those would answer a different request, which B.1 exists to
+  refuse. The outbound port therefore declares, per provider type, what an endpoint
+  ignores, and the service refuses those requests with a 400 before anything is sent
+  or traced. Nothing is declared for `openai`, `openai-compatible` or `ollama`: their
+  upstream answers for itself.
+- **Upstream errors are mapped by who has to act, not all to 502.** The roadmap said
+  "relayed, mapped to the OpenAI envelope under the no-leak rule". The chain maps
+  every provider rejection to 502. On pass-through a 400/413/422 is usually the
+  client's request (a tool schema the model refuses), so it comes back as a 400
+  `upstream_rejected` naming the status. A 429 stays a 429 so SDKs back off, 401/403/404
+  stay 502 (the gateway's configuration), and a timeout is a 504. The upstream body is
+  never relayed.
+- **`default-model` takes a registry model id, and is checked at startup.** "A
+  registry id" could have meant the registry key. The model id is what a client pins
+  with and what `GET /v1/models` lists, so one name works everywhere. An id the
+  registry does not hold fails startup instead of failing the first tool call.
+- **The accounting moved to `RequestAccounting`.** "The same code as the chain" is
+  now literal: both services build one from the same collaborators.
+  `ChatCompletionService` kept its constructor, so its tests did not change.
+- **The pass-through routing decision carries no strategy and no config version.**
+  Nothing was classified, and both values live in the infrastructure layer. A
+  `CLIENT_PINNED` row records the configured strategy; a `PASSTHROUGH_*` row records
+  none rather than a strategy that did not run.
+- **The credential guard checks every declared `anthropic` instance**, not only the
+  referenced ones. The scope boundary says "an `anthropic` instance". An unused
+  subscription token in the configuration is the same mistake, waiting for a registry
+  edit to become live.
+
 ## v4 lot B — B.2 (`GET /v1/models`)
 
 - **`created` is always `0`.** The roadmap asked for a value that is stable across

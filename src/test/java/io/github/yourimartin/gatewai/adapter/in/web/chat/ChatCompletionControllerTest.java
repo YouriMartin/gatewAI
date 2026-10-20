@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -29,7 +30,12 @@ import io.github.yourimartin.gatewai.domain.model.client.ApiKeyHasher;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
+import io.github.yourimartin.gatewai.domain.port.in.PassThroughUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
@@ -55,6 +61,9 @@ class ChatCompletionControllerTest {
 
   @MockitoBean
   private StreamChatCompletionUseCase streamUseCase;
+
+  @MockitoBean
+  private PassThroughUseCase passThroughUseCase;
 
   @MockitoBean
   private ApiClientRepository apiClientRepository;
@@ -330,5 +339,67 @@ class ChatCompletionControllerTest {
     assertEquals("Hi", captured.getValue().messages().get(1).content());
     assertEquals(300, captured.getValue().maxTokens());
     assertEquals(7L, captured.getValue().sampling().seed());
+  }
+
+  private static final String TOOLS_JSON = """
+      {"model": "auto", "parallel_tool_calls": false,
+       "messages": [{"role": "user", "content": "Weather in Paris?"}],
+       "tools": [{"type": "function", "function": {"name": "get_weather"}}]}
+      """;
+
+  @Test
+  void aMarkedRequestIsForwardedAsWrittenAndItsAnswerRelayed() throws Exception {
+    String upstream = "{\"id\":\"chatcmpl-up\",\"object\":\"chat.completion\","
+        + "\"choices\":[{\"index\":0,\"finish_reason\":\"tool_calls\"}],\"x_vendor\":1}";
+    when(passThroughUseCase.forward(any())).thenReturn(new PassThroughResponse(
+        200, upstream, "qwen2.5:3b", new TokenUsage(5, 3, 8)));
+    ArgumentCaptor<PassThroughRequest> captured =
+        ArgumentCaptor.forClass(PassThroughRequest.class);
+
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(TOOLS_JSON)
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isOk())
+        .andExpect(header().string(ChatCompletionController.CACHE_HEADER, "BYPASS"))
+        .andExpect(header().string(ChatCompletionController.MODEL_HEADER, "qwen2.5:3b"))
+        .andExpect(content().json(upstream, org.springframework.test.json.JsonCompareMode.STRICT));
+
+    verify(passThroughUseCase).forward(captured.capture());
+    verifyNoInteractions(useCase, streamUseCase);
+    PassThroughRequest forwarded = captured.getValue();
+    assertTrue(forwarded.request().passThrough().contains(PassThroughFeature.TOOLS));
+    // Unknown fields survive: the body is what the client wrote, not a re-serialised DTO.
+    assertTrue(forwarded.body().contains("\"parallel_tool_calls\":false"));
+    assertTrue(forwarded.body().contains("\"get_weather\""));
+  }
+
+  @Test
+  void aMarkedStreamIsRefusedUntilStreamedPassThroughExists() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(TOOLS_JSON.replace("\"model\": \"auto\",", "\"model\": \"auto\", \"stream\": true,"))
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
+        .andExpect(jsonPath("$.error.param").value("tools"))
+        .andExpect(jsonPath("$.error.message")
+            .value(org.hamcrest.Matchers.containsString("stream=false")));
+    verifyNoInteractions(passThroughUseCase, streamUseCase);
+  }
+
+  @Test
+  void aBodyThatIsNotTheChatCompletionsShapeIsA400() throws Exception {
+    mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"model\": \"auto\", \"messages\": \"Hi\"}")
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.type").value("invalid_request_error"))
+        .andExpect(jsonPath("$.error.message")
+            .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("java"))));
   }
 }

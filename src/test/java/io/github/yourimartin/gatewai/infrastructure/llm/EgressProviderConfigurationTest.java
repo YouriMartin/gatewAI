@@ -18,6 +18,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.ollama.management.PullModelStrategy;
@@ -254,6 +256,34 @@ class EgressProviderConfigurationTest {
     } finally {
       release(logs);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sk-ant-oat01-abcdef", "sk-ant-ort01-abcdef", "  sk-ant-oat01-x"})
+  void startupFailsOnAnAnthropicSubscriptionToken(String key) {
+    ProviderProperties providers = providers(Map.of(
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null),
+        // Declared but referenced by no registry entry: refused all the same.
+        "claude", entry(ProviderProperties.ProviderType.ANTHROPIC, key, null)));
+
+    assertThatThrownBy(() -> configuration.create(providers, localOnlyRegistry(), tools,
+        observations))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("gatewai.providers.claude.api-key")
+        .hasMessageContaining("Claude Code and Claude.ai")
+        .hasMessageContaining("https://code.claude.com/docs/en/legal-and-compliance")
+        .hasMessageNotContaining("abcdef");
+  }
+
+  @Test
+  void aConsoleApiKeyAndAnOtherVendorsTokenShapePassTheGuard() {
+    ProviderProperties providers = providers(Map.of(
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null),
+        "claude", entry(ProviderProperties.ProviderType.ANTHROPIC, "sk-ant-api03-abc", null),
+        "openai", entry(ProviderProperties.ProviderType.OPENAI, "sk-ant-oat-not-anthropic", null)));
+
+    assertThat(configuration.create(providers, localOnlyRegistry(), tools, observations)
+        .find("ollama")).isPresent();
   }
 
   private static ListAppender<ILoggingEvent> capture() {

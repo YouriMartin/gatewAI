@@ -36,9 +36,10 @@ import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
  *                              from {@code strategy} on a hand-over
  * @param justification         the full reason, serialized as JSON.
  *                              <b>Null exactly when</b> {@code decisionReason}
- *                              is {@link DecisionReason#CLIENT_PINNED} — the one
- *                              path where no classifier ran, and where the model
- *                              the client asked for is already the answer
+ *                              is {@link DecisionReason#CLIENT_PINNED} or a
+ *                              {@code PASSTHROUGH_*} reason (ADR 0016) — the
+ *                              paths where no classifier ran, and where the
+ *                              target is already the answer
  *                              ({@code chosenModelId}, {@code chosenTier})
  * @param decisionReason        one-word summary of the justification
  * @param chosenTier            the tier the request was sent to: the

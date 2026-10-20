@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.adapter.in.web.error;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionController;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
+import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +51,9 @@ class ApiExceptionHandler {
   }
 
   /**
-   * A request the advisor chain cannot honour — tools, non-text parts,
-   * {@code response_format}… (v4 B.1). Refused with the features named, until
-   * pass-through (B.3) forwards it instead.
+   * A request marked for pass-through (v4 B.1) on a path that cannot forward it —
+   * streaming, deferred, MCP — or for a target that would ignore one of its
+   * features (ADR 0016). Refused with the features named.
    */
   @ExceptionHandler(UnsupportedFeatureException.class)
   ResponseEntity<ApiError> handleUnsupportedFeature(UnsupportedFeatureException e) {
@@ -61,10 +62,34 @@ class ApiExceptionHandler {
         e.features().getFirst().param(), "unsupported_feature"));
   }
 
+  /**
+   * The upstream of a pass-through request failed (ADR 0016). The client learns
+   * who has to act, and the upstream status when it is the client; never the
+   * upstream body, which the adapter has already logged.
+   */
+  @ExceptionHandler(UpstreamFailureException.class)
+  ResponseEntity<ApiError> handleUpstreamFailure(UpstreamFailureException e) {
+    return switch (e.kind()) {
+      case REJECTED -> build(HttpStatus.BAD_REQUEST, "The upstream model provider rejected the"
+          + " request (HTTP " + e.upstreamStatus() + "). Check the fields this model supports.",
+          INVALID_REQUEST, "upstream_rejected");
+      case RATE_LIMITED -> build(HttpStatus.TOO_MANY_REQUESTS,
+          "The upstream model provider is rate-limiting requests. Please retry later.",
+          API_ERROR, "upstream_rate_limited");
+      case MISCONFIGURED -> build(HttpStatus.BAD_GATEWAY,
+          "The upstream model provider rejected the request.", API_ERROR, null);
+      case UNAVAILABLE -> build(HttpStatus.BAD_GATEWAY,
+          "The upstream model provider is unavailable or unreachable.", API_ERROR, null);
+      case TIMEOUT -> build(HttpStatus.GATEWAY_TIMEOUT,
+          "The upstream model provider did not answer in time.", API_ERROR, null);
+    };
+  }
+
   /** Semantically invalid request (e.g. missing {@code messages}). */
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<ApiError> handleInvalid(IllegalArgumentException e) {
-    LOG.warn("Invalid request on /v1/chat/completions: {}", e.getMessage());
+    LOG.warn("Invalid request on /v1/chat/completions: {}{}", e.getMessage(),
+        e.getCause() == null ? "" : " (" + e.getCause().getMessage() + ")");
     return build(HttpStatus.BAD_REQUEST, e.getMessage(), INVALID_REQUEST, null);
   }
 

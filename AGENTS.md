@@ -26,14 +26,24 @@ Client → OpenAI-format ingress (/v1/chat/completions) → DTO mapping → Prom
    → [Advisor 3] green accounting  ── € cost + gCO2
       → egress: real ChatModel (any configured provider mix; local-first default)
    ← remap response → OpenAI DTO → Client
+
+Marked request (B.1) → pass-through: pinned or default model, body forwarded with only
+   `model` rewritten → OpenAI-format endpoint of its provider → relayed as-is
+   (cache decision BYPASS, routing decision PASSTHROUGH_*, same request_log + green accounting)
 ```
 
 Non-negotiable:
+- The chain is the path for **every request it can honour**. A request it cannot honour
+  (the B.1 markers: tools, non-text parts, `response_format`, `n > 1`…) takes the explicit
+  **pass-through** path: one registered model, the original body, still rate-limited,
+  traced and accounted, and never classified or cached (ADR 0016). Never serve a marked
+  request on the chain with its features dropped.
 - **Ingress** (the OpenAI format clients speak) and **egress** (the provider called) are independent.
 - Egress is **provider-agnostic and local-first**: providers are declared under
   `gatewai.providers.<name>` (anthropic | openai | openai-compatible | ollama); the model
   registry references them by name; **no fallback provider** (unknown model id → 400);
-  no API key required by default.
+  no API key required by default. An `anthropic` instance takes Console API keys only:
+  subscription OAuth tokens (`sk-ant-oat…`, `sk-ant-ort…`) fail startup.
 - The cache implements `CallAdvisor`/`StreamAdvisor`, low `getOrder()`, and short-circuits by
   **not calling** `chain.nextCall()`.
 - All persistence goes into the **same PostgreSQL**.
@@ -98,4 +108,4 @@ io.github.yourimartin.gatewai
 - End every implementation with a proposed commit message: short, English, imperative mood.
 
 ## Status
-v4 in progress — lot A done (A.1–A.3), B.1–B.2 done; next: batch B.3 (docs/developpment/roadmap-v4.md)
+v4 in progress — lot A done (A.1–A.3), B.1–B.3 done; next: batch B.4 (docs/developpment/roadmap-v4.md)

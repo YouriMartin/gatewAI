@@ -6,8 +6,9 @@ import java.util.stream.Collectors;
 
 /**
  * Thrown when a request marked for pass-through reaches a path that cannot
- * forward it (v4 B.1): the request is refused with the features named, rather
- * than served by the advisor chain with those features silently dropped.
+ * forward it (v4 B.1), or a target whose endpoint would ignore one of its
+ * features (ADR 0016, v4 B.3). The request is refused with the features named,
+ * rather than served with those features silently dropped.
  */
 public class UnsupportedFeatureException extends RuntimeException {
 
@@ -15,9 +16,32 @@ public class UnsupportedFeatureException extends RuntimeException {
 
   private final PassThroughFeature[] features;
 
+  /** A marked request on a path with no pass-through: streaming, deferred, MCP. */
   public UnsupportedFeatureException(Set<PassThroughFeature> features) {
-    super(message(features));
+    this(features, "This request uses " + describe(features)
+        + ", which gatewAI forwards to the model as-is, but only on POST /v1/chat/completions"
+        + " and not as a stream yet. Send it to that endpoint with stream=false, or send"
+        + " text-only messages without these fields.");
+  }
+
+  private UnsupportedFeatureException(Set<PassThroughFeature> features, String message) {
+    super(message);
     this.features = features.stream().sorted().toArray(PassThroughFeature[]::new);
+  }
+
+  /**
+   * A pass-through request whose target endpoint is documented to ignore some of
+   * its features (ADR 0016).
+   *
+   * @param ignored  the features the target would drop
+   * @param modelId  the registry model id of the target
+   * @param endpoint what the target's endpoint is, for the client to read
+   */
+  public static UnsupportedFeatureException notHonouredBy(Set<PassThroughFeature> ignored,
+                                                          String modelId, String endpoint) {
+    return new UnsupportedFeatureException(ignored, "This request uses " + describe(ignored)
+        + ", which model '" + modelId + "' would silently ignore (" + endpoint + ")."
+        + " Pin a model on another provider, or remove these fields.");
   }
 
   /** The features, in declaration order. */
@@ -25,11 +49,9 @@ public class UnsupportedFeatureException extends RuntimeException {
     return List.of(features);
   }
 
-  private static String message(Set<PassThroughFeature> features) {
-    return "This request uses " + features.stream().sorted()
+  private static String describe(Set<PassThroughFeature> features) {
+    return features.stream().sorted()
         .map(PassThroughFeature::description)
-        .collect(Collectors.joining(", "))
-        + ", which this gateway cannot serve yet. Send text-only messages without these"
-        + " fields.";
+        .collect(Collectors.joining(", "));
   }
 }

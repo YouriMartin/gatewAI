@@ -43,7 +43,9 @@ class OpenAiMapperTest {
       "vercel-ai-multipart-text.json",
       "chat-ui-image.json",
       "langchain-tool-calling-turn.json",
-      "developer-max-completion-tokens.json"})
+      "developer-max-completion-tokens.json",
+      "openai-tools-first-turn.json",
+      "openai-response-format-json-schema.json"})
   void everyFixtureDeserialisesAndMaps(String name) throws IOException {
     LlmRequest request = OpenAiMapper.toLlmRequest(fixture(name));
 

@@ -90,7 +90,9 @@ password` log does not appear.
 `RateLimitFilter` runs **after** authentication (so the client id is known) and
 limits only `POST /v1/chat/completions*` (sync + async submit) and `POST
 /v1/admin/decisions/explain`; status polls, `GET /v1/models`, admin reads and report
-calls are not limited. Over the limit → **`429`** with a
+calls are not limited. A pass-through request (ADR 0016) is a `POST
+/v1/chat/completions` like any other: authenticated, limited and counted the same
+way. Over the limit → **`429`** with a
 `Retry-After` header and a JSON error body.
 
 `RateLimiter` is a **Bucket4j** token bucket, **one bucket per client id**.
@@ -202,6 +204,27 @@ SSR path, which this client-only dashboard never builds.)
 **When a finding does not apply.** Add an entry to an `osv-scanner.toml` ignore
 file with a reason **and an expiry date**, so a suppression cannot quietly become
 permanent. Do not disable the job.
+
+## Provider credentials and pass-through (v4 B.3)
+
+- **Anthropic takes Console API keys only.** Startup fails when an `anthropic`
+  instance, referenced by the registry or not, holds a key shaped like a
+  subscription OAuth token (`sk-ant-oat…`, `sk-ant-ort…`). Anthropic reserves Free,
+  Pro and Max plan credentials for Claude Code and Claude.ai, and does not permit
+  third-party products to route requests through them
+  (<https://code.claude.com/docs/en/legal-and-compliance>, read 2026-09-28). The
+  message names the property to fix. It never prints the key.
+- **The provider key never reaches the client, and the client's key never reaches the
+  provider.** A pass-through request is forwarded with the provider instance's own
+  `Authorization: Bearer` header (none for a keyless self-hosted server). The
+  client's `Authorization` header, like every other client header, is not forwarded:
+  only the body is.
+- **Upstream error bodies are not relayed.** On a pass-through error the client gets
+  the OpenAI envelope with a status and a generic message. The upstream body (which
+  can name hosts, accounts or quotas) is logged server-side, truncated to 512
+  characters.
+- **Nothing of the body is stored.** The trace and `request_log` keep hashes, token
+  counts and ids, as on the chain.
 
 ## Honest security boundaries
 

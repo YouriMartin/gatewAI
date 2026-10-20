@@ -1,6 +1,7 @@
 # ADR 0002 — Thin gateway over a Spring AI advisor chain
 
-**Status:** Accepted
+**Status:** Accepted. Amended by [ADR 0016](0016-pass-through-what-the-chain-cannot-honour.md)
+(v4 B.3): the chain is the path for every request it can honour, not for every request.
 
 ## Context
 

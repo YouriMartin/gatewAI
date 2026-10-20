@@ -63,15 +63,46 @@ type). In particular:
   Events (`chat.completion.chunk` deltas + `[DONE]`), including a synthetic stream
   on a cache hit, and a final usage chunk with `stream_options.include_usage`.
 - **Tools, images, audio, files, `response_format`, `n > 1`, `logprobs` and
-  `logit_bias` are refused with a 400 that names them** — the advisor chain cannot
-  honour them, and serving the request without them would be a wrong answer.
-  Pass-through (v4 B.3–B.4) lifts this.
+  `logit_bias` are passed through, not routed or cached** (v4 B.3, ADR 0016): see
+  the next section.
 - **Anthropic ignores `presence_penalty`, `frequency_penalty` and `seed`**: the
   Messages API has no such parameters. A `seed` beyond 32 bits is not sent to any
   provider (the OpenAI and Ollama clients take a 32-bit seed).
 - Only `/v1/chat/completions` and `/v1/models` are implemented from the OpenAI
   surface (no `/v1/embeddings`, `/v1/responses`, etc.). `/v1/models` lists the
   registry plus `auto`; its `created` is always `0` — the registry has no dates.
+
+## Pass-through: forwarded, traced and accounted, but not optimised
+
+A request the advisor chain cannot honour (tools, non-text parts, `response_format`…)
+is forwarded as-is to one model ([ADR 0016](../technical/adr/0016-pass-through-what-the-chain-cannot-honour.md)).
+What that costs:
+
+- **No semantic cache and no routing.** Those requests are never classified and
+  never cached. The default target is the **first `cloud-premium` entry**, the
+  expensive choice. Set `gatewai.passthrough.default-model` (a local model with tool
+  support keeps tool calls local-first), or pin a model per request.
+- **Not streamed yet.** A marked request with `stream: true` is a 400 until B.4. The
+  deferred endpoint and MCP keep refusing marked requests.
+- **No retry, no failover.** One upstream call. Failover inside a tier is B.5.
+- **Anthropic goes through its OpenAI SDK compatibility layer.** Anthropic presents it
+  as a way to test and compare models, "not considered a long-term or
+  production-ready solution for most use cases", and it **does not support prompt
+  caching** (<https://platform.claude.com/docs/en/api/openai-sdk>, read 2026-10-20).
+  It also hoists every system message to the top of the conversation. The layer
+  ignores `response_format`, `logprobs`, `logit_bias`, audio and file parts, and
+  requires `n` = 1. gatewAI refuses those requests with a 400 for an `anthropic`
+  target rather than forward them to be silently degraded. A native OpenAI →
+  Messages translation is not planned before a user asks.
+- **Upstream support is the upstream's business.** A self-hosted
+  `openai-compatible` server, or an Ollama model without tool support, answers for
+  itself. Its 400/422 comes back as `upstream_rejected`, without its body.
+- **Usage is what the upstream reports.** An answer without `usage` is logged with
+  zero tokens and a warning in the log. In the green report that zero means *not
+  reported*, not *measured zero*. OpenAI, Anthropic's layer, Ollama and vLLM all
+  report usage on a non-streamed answer.
+- **The response's `model` is the provider's name**, often a dated variant. The
+  registry id is in `X-GatewAI-Model` and in `request_log`.
 
 ## Semantic cache trade-offs
 

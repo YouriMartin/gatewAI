@@ -34,21 +34,44 @@ with `\n` and behaves exactly like the string form: same cache scope, same
 embedding, same routing. Roles: `system`, `developer` (treated as `system`),
 `user`, `assistant`, `tool`, `function`; anything else is a 400.
 
-**What the advisor chain cannot serve is refused, not degraded.** A request that
-uses one of the features below gets a 400 naming them, with
-`"code": "unsupported_feature"` and `param` set to the field at fault — never a
-deserialisation error, and never an answer with the feature silently dropped.
-Batch B.3 forwards these requests as-is instead (pass-through, ADR 0016).
+**What the advisor chain cannot serve is passed through, not degraded (v4 B.3,
+[ADR 0016](adr/0016-pass-through-what-the-chain-cannot-honour.md)).** A request that
+uses one of the features below is **marked**, and forwarded as the client wrote it:
 
-| Feature | Marked when |
-|---|---|
-| tools | `tools` or legacy `functions` is non-empty |
-| tool messages | a `tool`/`function` message, or an assistant message with `tool_calls`/`function_call` |
-| non-text content | an `image_url`, `input_audio`, `file` or unknown part type in `content` |
-| `response_format` | any `type` other than `text` |
-| `n` | greater than 1 |
-| `logprobs` | `logprobs: true` or `top_logprobs > 0` |
-| `logit_bias` | non-empty |
+| Feature | Marked when | Cache reason (`cache_decision.reason`) |
+|---|---|---|
+| tools | `tools` or legacy `functions` is non-empty | `PASSTHROUGH_TOOLS` |
+| tool messages | a `tool`/`function` message, or an assistant message with `tool_calls`/`function_call` | `PASSTHROUGH_TOOL_MESSAGES` |
+| non-text content | an `image_url`, `input_audio`, `file` or unknown part type in `content` | `PASSTHROUGH_IMAGE_INPUT`, `_AUDIO_INPUT`, `_FILE_INPUT`, `_OTHER_CONTENT` |
+| `response_format` | any `type` other than `text` | `PASSTHROUGH_RESPONSE_FORMAT` |
+| `n` | greater than 1 | `PASSTHROUGH_MULTIPLE_CHOICES` |
+| `logprobs` | `logprobs: true` or `top_logprobs > 0` | `PASSTHROUGH_LOGPROBS` |
+| `logit_bias` | non-empty | `PASSTHROUGH_LOGIT_BIAS` |
+
+How a marked request is served:
+
+- **Target.** A registered model id in `model` pins it. Anything else, `auto`
+  included, goes to `gatewai.passthrough.default-model` (a registry model id;
+  default: the first `cloud-premium` entry). It is **never classified**.
+- **Body.** The original JSON, with only `model` rewritten to the target's id. Fields
+  gatewAI does not model (`tool_choice`, `parallel_tool_calls`, `strict`…) reach the
+  provider untouched. It is POSTed to the provider instance's OpenAI-format endpoint:
+  `{base-url}/chat/completions` for `openai` (default `https://api.openai.com/v1`) and
+  `openai-compatible`, `{base-url}/v1/chat/completions` for `ollama` and for
+  `anthropic` (Anthropic's OpenAI SDK compatibility layer). No retry.
+- **Answer.** The upstream status and body, as sent. The model in the body is the
+  provider's own name. `X-GatewAI-Model` carries the registry id.
+- **Trace.** A `BYPASS` cache decision with the reason in the table (the first marked
+  feature in declaration order). A routing decision with reason `PASSTHROUGH_PINNED`
+  or `PASSTHROUGH_DEFAULT`, the target's tier and id, and no justification. Then a
+  `request_log` row with the upstream's `usage`, accounted like any other request.
+- **Refused instead (400, `"code": "unsupported_feature"`, `param` = the field):**
+  - a marked request with `"stream": true` (streamed pass-through is B.4);
+  - a marked request to `POST /v1/chat/completions/async` or over MCP;
+  - a feature the target's endpoint is documented to ignore. For an `anthropic`
+    target: `response_format`, `logprobs`, `logit_bias`, `input_audio` and `file`
+    parts, `n > 1`. The message names the feature and the model; pin a model on
+    another provider.
 
 **Forwarded parameters, per provider type** — what the egress puts on the wire,
 checked against a stub server for each type (`DelegatingChatModelWireTest`):
@@ -60,7 +83,7 @@ checked against a stub server for each type (`DelegatingChatModelWireTest`):
 | `presence_penalty`, `frequency_penalty` | sent | sent | sent (`options`) | ignored — the Messages API has none |
 | `seed` | sent if it fits in 32 bits | sent if it fits in 32 bits | sent if it fits in 32 bits | ignored — the Messages API has none |
 | `user` | never sent — a cache-scope key only | never sent | never sent | never sent |
-| tools, non-text parts, `response_format`, `n > 1`, `logprobs`, `logit_bias` | refused (400) until B.3 | refused (400) until B.3 | refused (400) until B.3 | refused (400) until B.3 |
+| tools, non-text parts, `response_format`, `n > 1`, `logprobs`, `logit_bias` | pass-through: the body as sent | pass-through: the body as sent | pass-through: the body as sent | pass-through, except `response_format`, `logprobs`, `logit_bias`, audio and file parts, `n > 1`: refused (400), because the compatibility layer ignores them |
 
 "Sent" means the field is in the request gatewAI makes; whether a self-hosted
 server applies it is that server's business. The `mock` profile echoes and applies
@@ -119,8 +142,8 @@ Response headers (non-streaming):
 | Header | Value |
 |---|---|
 | `X-Request-Id` | the correlation id — the key of the decision API and the carbon record |
-| `X-GatewAI-Cache` | `HIT`, `MISS` or `BYPASS` — what the semantic cache did (v4 A.2) |
-| `X-GatewAI-Model` | the model that produced the answer; on a hit, the one that produced it first |
+| `X-GatewAI-Cache` | `HIT`, `MISS` or `BYPASS` — what the semantic cache did (v4 A.2); always `BYPASS` on pass-through |
+| `X-GatewAI-Model` | the model that produced the answer; on a hit, the one that produced it first; on pass-through, the registry id it was forwarded to |
 
 Streaming responses carry `X-Request-Id` only: headers leave before the cache
 outcome is known to the client-facing layer, so a streaming caller reads the
@@ -138,11 +161,15 @@ client SDKs parse them like any other OpenAI error:
 
 | Status | `type` | When |
 |---|---|---|
-| `400` | `invalid_request_error` | Malformed JSON, or missing/empty `messages` |
+| `400` | `invalid_request_error` | Malformed JSON, a body that is not the Chat Completions shape, or missing/empty `messages` |
+| `400` | `invalid_request_error`, code `unsupported_feature` | A marked request on a path or a target that cannot honour it (above) |
+| `400` | `invalid_request_error`, code `upstream_rejected` | Pass-through: the upstream answered 400, 413 or 422. The message names the status |
 | `401` | — | Missing/invalid API key (Spring Security entry point, no body) |
 | `429` | — | Rate limit exceeded (`Retry-After` header) |
-| `502` | `api_error` | Upstream provider rejected the request (auth, unknown model) or is unreachable |
-| `503` | `api_error` | Upstream provider temporarily unavailable / rate-limited after retries |
+| `429` | `api_error`, code `upstream_rate_limited` | Pass-through: the upstream answered 429 |
+| `502` | `api_error` | Upstream provider rejected the request (auth, unknown model) or is unreachable. On pass-through: any other upstream 4xx, a 5xx, or no connection |
+| `503` | `api_error` | Upstream provider temporarily unavailable / rate-limited after retries (chain only) |
+| `504` | `api_error` | Pass-through: no answer within `gatewai.passthrough.timeout` (default 5 min) |
 | `500` | `api_error` | Unexpected internal error |
 
 Upstream provider details are logged server-side but **not echoed** to the caller.
@@ -461,4 +488,4 @@ bad input · `401` missing/invalid key · `403` non-admin on admin route · `404
 unknown async id, unrecorded correlation id, or model id not in the registry
 (`GET /v1/models/{id}`) · `409` calibration impossible on
 the labelled set · `429` rate limited (`Retry-After`) · `500` internal error ·
-`502`/`503` upstream provider error (chat ingress, see [Errors](#errors)).
+`502`/`503`/`504` upstream provider error (chat ingress, see [Errors](#errors)).

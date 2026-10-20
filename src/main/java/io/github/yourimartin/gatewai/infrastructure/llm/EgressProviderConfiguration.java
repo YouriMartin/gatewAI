@@ -53,7 +53,9 @@ import org.springframework.context.annotation.Profile;
  *   <li>model ids are unique across the registry (dispatch resolves by id), and
  *       none is the reserved routed alias {@code auto} (v4 B.2);</li>
  *   <li>every registry entry references a declared provider instance;</li>
- *   <li>referenced instances have the credentials their type requires.</li>
+ *   <li>referenced instances have the credentials their type requires;</li>
+ *   <li>no {@code anthropic} instance, referenced or not, holds a subscription
+ *       OAuth token instead of an API key (v4 B.3, ADR 0016).</li>
  * </ul>
  *
  * <p>One check is a <b>warning</b>, not a failure: a referenced non-Ollama instance
@@ -90,6 +92,7 @@ class EgressProviderConfiguration {
     validateRegistry(modelRegistry);
 
     Map<String, ProviderProperties.ProviderEntry> declared = lowercaseKeys(providerProperties);
+    declared.forEach(EgressProviderConfiguration::refuseSubscriptionToken);
     Map<String, List<ModelDefinition>> referenced = modelsByProvider(modelRegistry);
 
     Map<String, ProviderChatModels.ProviderInstance> instances = new LinkedHashMap<>();
@@ -251,6 +254,28 @@ class EgressProviderConfiguration {
         .toolCallingManager(tools)
         .observationRegistry(observations)
         .build();
+  }
+
+  /**
+   * An {@code anthropic} instance takes Console API keys only (v4 B.3). Anthropic
+   * reserves the OAuth tokens of Free/Pro/Max plans for Claude Code and Claude.ai,
+   * and does not permit third-party products to route requests through them
+   * (https://code.claude.com/docs/en/legal-and-compliance, read 2026-09-28). Checked
+   * on every declared instance, referenced or not; the key is never printed.
+   */
+  static void refuseSubscriptionToken(String name, ProviderProperties.ProviderEntry entry) {
+    if (entry.getType() != ProviderProperties.ProviderType.ANTHROPIC || entry.getApiKey() == null) {
+      return;
+    }
+    String key = entry.getApiKey().strip();
+    if (key.startsWith("sk-ant-oat") || key.startsWith("sk-ant-ort")) {
+      throw new IllegalStateException("Provider '" + name + "' is configured with an Anthropic"
+          + " subscription OAuth token (sk-ant-oat…/sk-ant-ort…), not an API key. Anthropic reserves"
+          + " Free/Pro/Max plan credentials for Claude Code and Claude.ai and does not permit routing"
+          + " third-party requests through them (https://code.claude.com/docs/en/legal-and-compliance)."
+          + " Set gatewai.providers." + name + ".api-key to a Console API key"
+          + " (https://platform.claude.com/settings/keys).");
+    }
   }
 
   private static void requireApiKey(String name, ProviderProperties.ProviderEntry entry,

@@ -24,7 +24,28 @@ Client → OpenAI ingress (/v1/chat/completions)
          ← LlmResponse (model used, tokens, cacheHit flag)
          → green accounting (service-level) → persist RequestLog → record metrics
    ← OpenAiMapper → OpenAI DTO → Client
+
+Marked request (B.1: tools, non-text parts, response_format, n > 1, logprobs, logit_bias)
+   → ChatCompletionController → PassThroughService.forward(...)        (ADR 0016)
+      → target: the registered model it pins, else gatewai.passthrough.default-model
+      → trace: cache_decision BYPASS (PASSTHROUGH_<FEATURE>), routing_decision PASSTHROUGH_*
+      → PassThroughClient: original body, only `model` rewritten
+            → the provider's OpenAI-format endpoint (no advisor, no Spring AI)
+      → same green accounting → persist RequestLog → record metrics
+   ← upstream status + body, as sent (errors → OpenAI envelope, upstream body never relayed)
 ```
+
+### Two paths, one switch
+
+The chain is the path for **every request it can honour** (ADR 0002, amended by
+[ADR 0016](adr/0016-pass-through-what-the-chain-cannot-honour.md)). A request the
+ingress marks as needing a feature the chain cannot carry (tools, images, a
+`response_format`…) takes the **pass-through** path instead: forwarded as the client
+wrote it to one registered model, never classified and never cached, but
+authenticated, rate-limited, traced and accounted like any other. Both paths share
+`RequestAccounting` (application layer) and the trace tables, so a report never needs
+to know which path a request took. In B.3 the path is non-streaming; a marked request
+with `stream: true` is still a 400.
 
 ### Accurate vs conceptual
 
@@ -99,7 +120,9 @@ fast when a layering rule is broken. See
    a **Scoped Value** for the duration of the request.
 2. **Rate-limit filter** (`RateLimitFilter`) checks the per-client token bucket for
    `POST /v1/chat/completions*`.
-3. **Controller** maps the OpenAI DTO to a domain `LlmRequest`.
+3. **Controller** reads the body as JSON, then maps it to a domain `LlmRequest`. A
+   request marked for pass-through goes to `PassThroughService` with the original
+   body (see above); every other request continues below.
 4. **`ChatCompletionService`** calls the `LlmClient` out port.
 5. **`SpringAiLlmClient`** invokes the `ChatClient`, running the advisor chain
    (cache → routing → model).
