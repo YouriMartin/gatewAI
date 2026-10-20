@@ -221,20 +221,24 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
-  void aStreamedImageIsRefusedBeforeAnyEventIsSent() throws Exception {
+  void aStreamedFeatureTheTargetWouldIgnoreIsRefusedBeforeAnyEventIsSent() throws Exception {
+    when(passThroughUseCase.openStream(any())).thenThrow(UnsupportedFeatureException.notHonouredBy(
+        Set.of(PassThroughFeature.FILE_INPUT), "claude-opus-4-8",
+        "Anthropic's OpenAI SDK compatibility layer documents it as ignored"));
+
     mockMvc.perform(post("/v1/chat/completions")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"model": "auto", "stream": true, "messages": [{"role": "user", "content": [
-                  {"type": "text", "text": "What is this?"},
-                  {"type": "image_url", "image_url": {"url": "https://example.com/a.png"}}]}]}
+                {"model": "claude-opus-4-8", "stream": true, "messages": [{"role": "user",
+                  "content": [{"type": "text", "text": "Summarise this."},
+                  {"type": "file", "file": {"file_id": "file-1"}}]}]}
                 """)
             .with(authentication(auth())))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
         .andExpect(jsonPath("$.error.param").value("messages"))
         .andExpect(jsonPath("$.error.message")
-            .value(org.hamcrest.Matchers.containsString("image_url")));
+            .value(org.hamcrest.Matchers.containsString("file content parts")));
     verifyNoInteractions(streamUseCase);
   }
 }

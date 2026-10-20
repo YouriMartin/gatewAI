@@ -35,12 +35,14 @@ final class PassThroughJson {
    * the two phases.
    */
   static TokenUsage usage(String body) {
-    JsonNode usage;
     try {
-      usage = MAPPER.readTree(body).get("usage");
+      return usageOf(MAPPER.readTree(body).get("usage"));
     } catch (JacksonException e) {
       return null;
     }
+  }
+
+  private static TokenUsage usageOf(JsonNode usage) {
     if (usage == null || !usage.isObject()) {
       return null;
     }
@@ -50,5 +52,65 @@ final class PassThroughJson {
     return total == null || !total.isNumber()
         ? TokenUsage.of(prompt, completion)
         : new TokenUsage(prompt, completion, total.asInt());
+  }
+
+  /**
+   * {@code body} for a streamed call (v4 B.4): {@code model} rewritten and
+   * {@code stream_options.include_usage} turned on, the other stream options kept.
+   * Without it OpenAI-format servers send no usage at all on a stream, and the
+   * request could not be accounted.
+   */
+  static String forStream(String body, String modelId) {
+    JsonNode tree = MAPPER.readTree(body);
+    if (!(tree instanceof ObjectNode object)) {
+      throw new IllegalArgumentException("A Chat Completions request body must be a JSON object.");
+    }
+    object.put("model", modelId);
+    object.put("stream", true);
+    JsonNode options = object.get("stream_options");
+    ObjectNode streamOptions = options instanceof ObjectNode existing
+        ? existing : object.putObject("stream_options");
+    streamOptions.put("include_usage", true);
+    return MAPPER.writeValueAsString(object);
+  }
+
+  /** True when the client itself asked for the final usage chunk. */
+  static boolean clientWantsUsage(String body) {
+    return MAPPER.readTree(body).path("stream_options").path("include_usage").asBoolean(false);
+  }
+
+  /**
+   * What a stream event says about usage.
+   *
+   * @param usage     the usage it carries, null when none
+   * @param usageOnly true for the chunk {@code include_usage} adds at the end: no
+   *                  choices, only the usage — the one to drop when the client did
+   *                  not ask for it
+   */
+  record ChunkUsage(TokenUsage usage, boolean usageOnly) {
+
+    static final ChunkUsage NONE = new ChunkUsage(null, false);
+  }
+
+  /**
+   * Reads the usage of one stream event's {@code data}. A chunk that does not even
+   * name a {@code usage} field — most of them — is not parsed.
+   */
+  static ChunkUsage chunkUsage(String data) {
+    if (data == null || !data.contains("\"usage\"")) {
+      return ChunkUsage.NONE;
+    }
+    JsonNode chunk;
+    try {
+      chunk = MAPPER.readTree(data);
+    } catch (JacksonException e) {
+      return ChunkUsage.NONE;
+    }
+    TokenUsage usage = usageOf(chunk.get("usage"));
+    if (usage == null) {
+      return ChunkUsage.NONE;
+    }
+    JsonNode choices = chunk.get("choices");
+    return new ChunkUsage(usage, choices == null || choices.isNull() || choices.isEmpty());
   }
 }

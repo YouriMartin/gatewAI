@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,6 +20,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
+import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,31 +97,65 @@ class OpenAiFormatPassThroughClient implements PassThroughClient {
 
   @Override
   public PassThroughResponse forward(ModelDefinition target, String body) {
-    ProviderProperties.ProviderEntry entry = entry(target);
-    HttpRequest.Builder request = HttpRequest.newBuilder(endpoint(entry))
-        .timeout(timeout)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .POST(HttpRequest.BodyPublishers.ofString(
-            PassThroughJson.withModel(body, target.modelId()), StandardCharsets.UTF_8));
-    if (entry.getApiKey() != null && !entry.getApiKey().isBlank()) {
-      request.header("Authorization", "Bearer " + entry.getApiKey());
-    }
-
-    HttpResponse<String> response = send(request.build(), target);
+    HttpResponse<String> response = send(
+        request(target, PassThroughJson.withModel(body, target.modelId()), "application/json"),
+        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8), target);
     int status = response.statusCode();
     if (status < 200 || status >= 300) {
-      LOG.warn("Pass-through upstream of model '{}' answered HTTP {}: {}", target.modelId(),
-          status, truncate(response.body()));
-      throw UpstreamFailureException.forStatus(status, target.modelId());
+      throw failure(target, status, response.body());
     }
     return new PassThroughResponse(status, response.body(), target.modelId(),
         PassThroughJson.usage(response.body()));
   }
 
-  private HttpResponse<String> send(HttpRequest request, ModelDefinition target) {
+  /**
+   * Streams (v4 B.4). {@code gatewai.passthrough.timeout} bounds the wait for the
+   * upstream's first byte, not the stream: a long answer is not cut, the SSE
+   * timeout of the ingress bounds it.
+   */
+  @Override
+  public UpstreamEventStream openStream(ModelDefinition target, String body) {
+    HttpResponse<InputStream> response = send(
+        request(target, PassThroughJson.forStream(body, target.modelId()), "text/event-stream"),
+        HttpResponse.BodyHandlers.ofInputStream(), target);
+    int status = response.statusCode();
+    if (status < 200 || status >= 300) {
+      String error;
+      try (InputStream in = response.body()) {
+        error = new String(in.readNBytes(LOGGED_ERROR_CHARS), StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        error = e.toString();
+      }
+      throw failure(target, status, error);
+    }
+    return new SseUpstreamStream(response.body(), PassThroughJson.clientWantsUsage(body),
+        target.modelId());
+  }
+
+  private HttpRequest request(ModelDefinition target, String body, String accept) {
+    ProviderProperties.ProviderEntry entry = entry(target);
+    HttpRequest.Builder request = HttpRequest.newBuilder(endpoint(entry))
+        .timeout(timeout)
+        .header("Content-Type", "application/json")
+        .header("Accept", accept)
+        .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+    if (entry.getApiKey() != null && !entry.getApiKey().isBlank()) {
+      request.header("Authorization", "Bearer " + entry.getApiKey());
+    }
+    return request.build();
+  }
+
+  private static UpstreamFailureException failure(ModelDefinition target, int status,
+                                                  String body) {
+    LOG.warn("Pass-through upstream of model '{}' answered HTTP {}: {}", target.modelId(),
+        status, truncate(body));
+    return UpstreamFailureException.forStatus(status, target.modelId());
+  }
+
+  private <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> handler,
+                                   ModelDefinition target) {
     try {
-      return http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      return http.send(request, handler);
     } catch (HttpTimeoutException e) {
       LOG.warn("Pass-through upstream of model '{}' did not answer within {}",
           target.modelId(), timeout);

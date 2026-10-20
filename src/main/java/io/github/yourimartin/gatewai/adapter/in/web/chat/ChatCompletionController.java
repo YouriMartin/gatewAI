@@ -7,12 +7,14 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
+import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
+import io.github.yourimartin.gatewai.domain.port.in.PassThroughStream;
 import io.github.yourimartin.gatewai.domain.port.in.PassThroughUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 
@@ -67,12 +69,8 @@ public class ChatCompletionController {
     LlmRequest llmRequest = OpenAiMapper.toLlmRequest(request);
     boolean stream = Boolean.TRUE.equals(request.stream());
     if (llmRequest.needsPassThrough()) {
-      if (stream) {
-        // Streamed pass-through is B.4. Refused before any SSE is opened, so the
-        // client gets a 400, not an error event.
-        llmRequest.requireServableByChain();
-      }
-      return passThrough(llmRequest, body);
+      PassThroughRequest passThrough = new PassThroughRequest(llmRequest, body.toString());
+      return stream ? streamPassThrough(passThrough) : passThrough(passThrough);
     }
     if (stream) {
       return stream(llmRequest, request.includeUsage());
@@ -89,14 +87,59 @@ public class ChatCompletionController {
   }
 
   /** The upstream's status and body, as they came (ADR 0016). */
-  private ResponseEntity<String> passThrough(LlmRequest llmRequest, JsonNode body) {
-    PassThroughResponse answer = passThroughUseCase.forward(
-        new PassThroughRequest(llmRequest, body.toString()));
+  private ResponseEntity<String> passThrough(PassThroughRequest passThrough) {
+    PassThroughResponse answer = passThroughUseCase.forward(passThrough);
     return ResponseEntity.status(answer.status())
         .contentType(MediaType.APPLICATION_JSON)
         .header(CACHE_HEADER, BYPASS)
         .header(MODEL_HEADER, answer.model())
         .body(answer.body());
+  }
+
+  /**
+   * The upstream's events, relayed one by one as they arrive (v4 B.4). The upstream
+   * is opened here, on the request thread: a refusal is still an HTTP error in the
+   * OpenAI envelope, and the answer can carry the gateway's headers, which the
+   * chain's streams cannot.
+   */
+  private ResponseEntity<SseEmitter> streamPassThrough(PassThroughRequest passThrough) {
+    PassThroughStream upstream = passThroughUseCase.openStream(passThrough);
+    SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+    // The container noticed the client is gone (or the stream timed out): stop the
+    // upstream now rather than at its next chunk.
+    emitter.onError(error -> upstream.cancel());
+    emitter.onTimeout(upstream::cancel);
+
+    RequestContext context = RequestContext.CURRENT.isBound()
+        ? RequestContext.CURRENT.get() : null;
+    Runnable task = () -> {
+      try {
+        upstream.relay(data -> sendRaw(emitter, data));
+        emitter.complete();
+      } catch (ClientDisconnectedException e) {
+        // Recorded by the use case; there is nobody left to tell.
+        emitter.complete();
+      } catch (RuntimeException e) {
+        emitter.completeWithError(e);
+      }
+    };
+    Thread.ofVirtual().name("sse-passthrough").start(context == null
+        ? task
+        : () -> ScopedValue.where(RequestContext.CURRENT, context).run(task));
+
+    return ResponseEntity.ok()
+        .header(CACHE_HEADER, BYPASS)
+        .header(MODEL_HEADER, upstream.model())
+        .body(emitter);
+  }
+
+  /** One upstream event, as it came; a failed write means the client is gone. */
+  private static void sendRaw(SseEmitter emitter, String data) {
+    try {
+      emitter.send(SseEmitter.event().data(data, MediaType.TEXT_PLAIN));
+    } catch (IOException | IllegalStateException e) {
+      throw new ClientDisconnectedException("The client of a pass-through stream went away", e);
+    }
   }
 
   private ChatCompletionRequest read(JsonNode body) {

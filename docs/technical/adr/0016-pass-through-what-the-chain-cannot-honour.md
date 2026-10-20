@@ -120,9 +120,39 @@ server-side, truncated. The answer carries `X-GatewAI-Cache: BYPASS` and
 - **Hashes only.** Neither the body nor the answer is stored.
 - A request refused or failed upstream gets no `request_log` row, as on the chain.
 
-### Scope of the path in B.3
+### Streaming (B.4)
 
-- Non-streaming only. A marked request with `stream: true` stays a 400 until B.4.
+A marked request with `stream: true` is relayed **event by event**:
+
+- **Opened on the request thread.** The upstream is connected, and has answered 2xx,
+  before any SSE response exists. A refusal is therefore an HTTP error in the OpenAI
+  envelope, like the non-streamed path, and the stream carries the gateway's
+  `X-GatewAI-Cache` and `X-GatewAI-Model` headers. `gatewai.passthrough.timeout`
+  bounds that wait for the first byte, not the stream.
+- **Relayed as it arrives.** Each event's `data` goes to the client when its blank
+  line is read: nothing is buffered beyond one event, and `[DONE]` is relayed as the
+  upstream sent it. Comments and `event:`/`id:`/`retry:` fields are not relayed.
+  OpenAI-format servers put everything in `data`.
+- **Usage.** `stream_options.include_usage` is turned on upstream, so the request can
+  be accounted. The usage-only chunk it adds (no choices) is read, then dropped
+  before the client unless the client asked for it. A chunk that carries usage
+  *and* choices (vLLM's continuous usage stats) is relayed unchanged.
+- **Accounting on completion**, through the same code as every other request.
+- **A client that goes away cancels the upstream call**, either when a write to it
+  fails or when the container reports the disconnect, whichever comes first. The
+  tokens already produced are billed by the provider but cannot be accounted: their
+  count only arrives in the last chunk. So the stream is **recorded as a disconnect**
+  (a WARN log with the correlation id and the `gatewai.passthrough.streams` counter,
+  `outcome=client_disconnected`), never as a zero-token `request_log` row, which
+  would read as a measured zero. The counter has `completed` and `upstream_failed`
+  beside it, so the share of streams the green report cannot see is a ratio, not a
+  guess.
+- An upstream that fails after the stream has started ends it the way the chain's
+  streams end (an error after the response is committed). There is no envelope left
+  to send.
+
+### Scope of the path
+
 - The deferred endpoint (`/v1/chat/completions/async`) and the MCP ingress keep refusing
   marked requests. Neither has a client that needs pass-through yet.
 - The `mock` profile gets a built-in OpenAI-format echo in place of an HTTP upstream,

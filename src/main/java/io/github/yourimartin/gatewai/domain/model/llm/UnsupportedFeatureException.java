@@ -16,12 +16,11 @@ public class UnsupportedFeatureException extends RuntimeException {
 
   private final PassThroughFeature[] features;
 
-  /** A marked request on a path with no pass-through: streaming, deferred, MCP. */
+  /** A marked request on a path with no pass-through: the deferred endpoint, MCP. */
   public UnsupportedFeatureException(Set<PassThroughFeature> features) {
     this(features, "This request uses " + describe(features)
-        + ", which gatewAI forwards to the model as-is, but only on POST /v1/chat/completions"
-        + " and not as a stream yet. Send it to that endpoint with stream=false, or send"
-        + " text-only messages without these fields.");
+        + ", which gatewAI forwards to the model as-is only on POST /v1/chat/completions."
+        + " Send it to that endpoint, or send text-only messages without these fields.");
   }
 
   private UnsupportedFeatureException(Set<PassThroughFeature> features, String message) {

@@ -1,5 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -8,6 +10,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
+import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -98,6 +101,74 @@ class MockPassThroughClient implements PassThroughClient {
 
     String json = MAPPER.writeValueAsString(answer);
     return new PassThroughResponse(200, json, target.modelId(), PassThroughJson.usage(json));
+  }
+
+  /**
+   * The same scripted answer, as an OpenAI-format stream (v4 B.4): per choice a
+   * role chunk, the content word by word (or the tool call in one delta), a
+   * finish chunk; then the usage-only chunk and {@code [DONE]}. It goes through
+   * the same reader as a real upstream, which drops the usage chunk unless the
+   * client asked for it.
+   */
+  @Override
+  public UpstreamEventStream openStream(ModelDefinition target, String body) {
+    JsonNode answer = MAPPER.readTree(forward(target, body).body());
+    StringBuilder sse = new StringBuilder();
+    for (JsonNode choice : answer.path("choices")) {
+      int index = choice.path("index").asInt();
+      JsonNode message = choice.path("message");
+      ObjectNode role = MAPPER.createObjectNode().put("role", "assistant");
+      event(sse, chunk(answer, index, role, null));
+      if (message.has("tool_calls")) {
+        ObjectNode delta = MAPPER.createObjectNode();
+        ArrayNode calls = delta.putArray("tool_calls");
+        for (JsonNode call : message.path("tool_calls")) {
+          ObjectNode streamed = calls.addObject().put("index", calls.size() - 1);
+          streamed.setAll((ObjectNode) call);
+        }
+        event(sse, chunk(answer, index, delta, null));
+      } else {
+        for (String piece : message.path("content").asString("").split("(?<= )")) {
+          event(sse, chunk(answer, index, MAPPER.createObjectNode().put("content", piece), null));
+        }
+      }
+      event(sse, chunk(answer, index, MAPPER.createObjectNode(),
+          choice.path("finish_reason").asString()));
+    }
+    ObjectNode usage = base(answer);
+    usage.putArray("choices");
+    usage.set("usage", answer.path("usage"));
+    event(sse, usage.toString());
+    sse.append("data: [DONE]\n\n");
+    return new SseUpstreamStream(
+        new ByteArrayInputStream(sse.toString().getBytes(StandardCharsets.UTF_8)),
+        PassThroughJson.clientWantsUsage(body), target.modelId());
+  }
+
+  private static String chunk(JsonNode answer, int index, ObjectNode delta, String finish) {
+    ObjectNode chunk = base(answer);
+    ObjectNode choice = chunk.putArray("choices").addObject();
+    choice.put("index", index);
+    choice.set("delta", delta);
+    if (finish == null) {
+      choice.putNull("finish_reason");
+    } else {
+      choice.put("finish_reason", finish);
+    }
+    return chunk.toString();
+  }
+
+  private static ObjectNode base(JsonNode answer) {
+    ObjectNode chunk = MAPPER.createObjectNode();
+    chunk.put("id", answer.path("id").asString());
+    chunk.put("object", "chat.completion.chunk");
+    chunk.put("created", answer.path("created").asLong());
+    chunk.put("model", answer.path("model").asString());
+    return chunk;
+  }
+
+  private static void event(StringBuilder sse, String data) {
+    sse.append("data: ").append(data).append("\n\n");
   }
 
   private static ObjectNode choice(ArrayNode choices, int index, String finishReason) {

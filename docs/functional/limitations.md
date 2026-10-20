@@ -82,8 +82,15 @@ What that costs:
   never cached. The default target is the **first `cloud-premium` entry**, the
   expensive choice. Set `gatewai.passthrough.default-model` (a local model with tool
   support keeps tool calls local-first), or pin a model per request.
-- **Not streamed yet.** A marked request with `stream: true` is a 400 until B.4. The
-  deferred endpoint and MCP keep refusing marked requests.
+- **A stream the client abandons is not accounted.** A disconnect cancels the upstream
+  call, but the provider bills what it already generated, and the token count only
+  arrives in the stream's last chunk. The stream is counted
+  (`gatewai_passthrough_streams_total{outcome="client_disconnected"}`) and logged
+  with its correlation id, but it has no `request_log` row. A green report
+  under-counts by exactly those streams.
+- **Only `data` is relayed on a stream.** SSE comments and `event:`/`id:` fields
+  from the upstream are dropped. OpenAI-format servers do not use them.
+- **The deferred endpoint and MCP still refuse marked requests.**
 - **No retry, no failover.** One upstream call. Failover inside a tier is B.5.
 - **Anthropic goes through its OpenAI SDK compatibility layer.** Anthropic presents it
   as a way to test and compare models, "not considered a long-term or
@@ -100,7 +107,9 @@ What that costs:
 - **Usage is what the upstream reports.** An answer without `usage` is logged with
   zero tokens and a warning in the log. In the green report that zero means *not
   reported*, not *measured zero*. OpenAI, Anthropic's layer, Ollama and vLLM all
-  report usage on a non-streamed answer.
+  report usage on a non-streamed answer. On a stream, gatewAI asks for it with
+  `stream_options.include_usage`. A server that ignores that option leaves the stream
+  logged with zero tokens and the same warning.
 - **The response's `model` is the provider's name**, often a dated variant. The
   registry id is in `X-GatewAI-Model` and in `request_log`.
 

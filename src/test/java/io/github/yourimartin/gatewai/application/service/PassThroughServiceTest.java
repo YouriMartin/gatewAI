@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
@@ -25,12 +26,14 @@ import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
@@ -39,6 +42,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.port.in.PassThroughStream;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
@@ -48,6 +52,7 @@ import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
+import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -249,6 +254,118 @@ class PassThroughServiceTest {
     RoutingDecision routing = routingDecision();
     assertThat(routing.promptHash()).isEqualTo(PromptHash.of("Weather in Paris?"));
     assertThat(routing.promptLength()).isEqualTo("Weather in Paris?".length());
+  }
+
+  @Test
+  void aStreamIsOpenedOnItsTargetAndAccountedOnlyOnceItEnds() {
+    FakeUpstream upstream = new FakeUpstream(new TokenUsage(30, 10, 40), null);
+    when(client.openStream(PREMIUM, BODY)).thenReturn(upstream);
+
+    PassThroughStream stream = service("").openStream(request("auto", PassThroughFeature.TOOLS));
+
+    assertThat(stream.model()).isEqualTo("gpt-5");
+    routingDecision();
+    verifyNoInteractions(requestLogRepository);
+    List<String> events = new java.util.ArrayList<>();
+    stream.relay(events::add);
+    assertThat(events).containsExactly("a", "[DONE]");
+    ArgumentCaptor<RequestLog> log = ArgumentCaptor.forClass(RequestLog.class);
+    verify(requestLogRepository).save(log.capture());
+    assertThat(log.getValue().totalTokens()).isEqualTo(40);
+    verify(metricsRecorder).recordPassThroughStream("gpt-5", PassThroughStreamOutcome.COMPLETED);
+  }
+
+  @Test
+  void aStreamIsAccountedUnderTheContextOfTheRequestThatOpenedIt() throws Exception {
+    when(client.openStream(any(), anyString()))
+        .thenReturn(new FakeUpstream(new TokenUsage(1, 1, 2), null));
+    PassThroughStream stream = ScopedValue.where(RequestContext.CURRENT,
+        new RequestContext("client-7", "trace-42")).call(() ->
+        service("").openStream(request("auto", PassThroughFeature.TOOLS)));
+
+    // Relayed from another thread, where the Scoped Value is unbound.
+    Thread relay = Thread.ofVirtual().start(() -> stream.relay(event -> { }));
+    relay.join();
+
+    ArgumentCaptor<RequestLog> log = ArgumentCaptor.forClass(RequestLog.class);
+    verify(requestLogRepository).save(log.capture());
+    assertThat(log.getValue().clientId()).isEqualTo("client-7");
+    assertThat(log.getValue().correlationId()).isEqualTo("trace-42");
+  }
+
+  @Test
+  void aClientThatGoesAwayIsRecordedButNotAccounted() {
+    when(client.openStream(any(), anyString())).thenReturn(new FakeUpstream(null,
+        new ClientDisconnectedException("gone", null)));
+    PassThroughStream stream = service("").openStream(request("auto", PassThroughFeature.TOOLS));
+
+    assertThatThrownBy(() -> stream.relay(event -> { }))
+        .isInstanceOf(ClientDisconnectedException.class);
+    verify(metricsRecorder).recordPassThroughStream("gpt-5",
+        PassThroughStreamOutcome.CLIENT_DISCONNECTED);
+    verifyNoInteractions(requestLogRepository);
+  }
+
+  @Test
+  void anUpstreamThatFailsMidStreamIsRecordedButNotAccounted() {
+    when(client.openStream(any(), anyString())).thenReturn(new FakeUpstream(null,
+        new UpstreamFailureException(UpstreamFailureException.Kind.UNAVAILABLE, 0, "reset")));
+    PassThroughStream stream = service("").openStream(request("auto", PassThroughFeature.TOOLS));
+
+    assertThatThrownBy(() -> stream.relay(event -> { }))
+        .isInstanceOf(UpstreamFailureException.class);
+    verify(metricsRecorder).recordPassThroughStream("gpt-5",
+        PassThroughStreamOutcome.UPSTREAM_FAILED);
+    verifyNoInteractions(requestLogRepository);
+  }
+
+  @Test
+  void cancellingTheStreamCancelsTheUpstream() {
+    FakeUpstream upstream = new FakeUpstream(null, null);
+    when(client.openStream(any(), anyString())).thenReturn(upstream);
+
+    service("").openStream(request("auto", PassThroughFeature.TOOLS)).cancel();
+
+    assertThat(upstream.cancelled).isTrue();
+  }
+
+  @Test
+  void aStreamedFeatureTheTargetWouldIgnoreIsRefusedBeforeTheUpstreamIsOpened() {
+    when(client.ignoredFeatures(PREMIUM)).thenReturn(Set.of(PassThroughFeature.FILE_INPUT));
+    when(client.describeEndpoint(PREMIUM)).thenReturn("ignored there");
+
+    assertThatThrownBy(() -> service("").openStream(
+        request("auto", PassThroughFeature.FILE_INPUT)))
+        .isInstanceOf(UnsupportedFeatureException.class);
+    verify(client, never()).openStream(any(), anyString());
+  }
+
+  /** Relays "a" and [DONE], then returns {@code usage} or throws {@code failure}. */
+  private static final class FakeUpstream implements UpstreamEventStream {
+
+    private final TokenUsage usage;
+    private final RuntimeException failure;
+    private boolean cancelled;
+
+    FakeUpstream(TokenUsage usage, RuntimeException failure) {
+      this.usage = usage;
+      this.failure = failure;
+    }
+
+    @Override
+    public TokenUsage relay(Consumer<String> onEvent) {
+      onEvent.accept("a");
+      if (failure != null) {
+        throw failure;
+      }
+      onEvent.accept("[DONE]");
+      return usage;
+    }
+
+    @Override
+    public void cancel() {
+      cancelled = true;
+    }
   }
 
   private RoutingDecision routingDecision() {

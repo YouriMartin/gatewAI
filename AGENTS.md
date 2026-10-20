@@ -108,4 +108,4 @@ io.github.yourimartin.gatewai
 - End every implementation with a proposed commit message: short, English, imperative mood.
 
 ## Status
-v4 in progress — lot A done (A.1–A.3), B.1–B.3 done; next: batch B.4 (docs/developpment/roadmap-v4.md)
+v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open); next: B.4 manual check, then B.5 (docs/developpment/roadmap-v4.md)

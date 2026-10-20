@@ -44,8 +44,10 @@ ingress marks as needing a feature the chain cannot carry (tools, images, a
 wrote it to one registered model, never classified and never cached, but
 authenticated, rate-limited, traced and accounted like any other. Both paths share
 `RequestAccounting` (application layer) and the trace tables, so a report never needs
-to know which path a request took. In B.3 the path is non-streaming; a marked request
-with `stream: true` is still a 400.
+to know which path a request took. Since B.4 a marked request with `stream: true` is
+relayed event by event. The upstream is opened on the request thread, so a refusal is
+still an HTTP error, then relayed from a virtual thread and accounted when it ends. A
+client that goes away cancels the upstream call.
 
 ### Accurate vs conceptual
 

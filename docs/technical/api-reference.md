@@ -61,12 +61,19 @@ How a marked request is served:
   `anthropic` (Anthropic's OpenAI SDK compatibility layer). No retry.
 - **Answer.** The upstream status and body, as sent. The model in the body is the
   provider's own name. `X-GatewAI-Model` carries the registry id.
+- **Streaming (v4 B.4).** With `"stream": true` the upstream's events are relayed one
+  by one as they arrive, `[DONE]` included. gatewAI turns
+  `stream_options.include_usage` on upstream to account the request. The usage-only
+  chunk it adds is dropped before the client unless the client asked for it. The
+  upstream is connected before the SSE response starts: a refusal is an HTTP error
+  (table below), not an error event, and the stream carries `X-GatewAI-Cache` and
+  `X-GatewAI-Model`. A client that disconnects cancels the upstream call. Its tokens
+  are not accounted, and the disconnect is counted (`gatewai.passthrough.streams`).
 - **Trace.** A `BYPASS` cache decision with the reason in the table (the first marked
   feature in declaration order). A routing decision with reason `PASSTHROUGH_PINNED`
   or `PASSTHROUGH_DEFAULT`, the target's tier and id, and no justification. Then a
   `request_log` row with the upstream's `usage`, accounted like any other request.
 - **Refused instead (400, `"code": "unsupported_feature"`, `param` = the field):**
-  - a marked request with `"stream": true` (streamed pass-through is B.4);
   - a marked request to `POST /v1/chat/completions/async` or over MCP;
   - a feature the target's endpoint is documented to ignore. For an `anthropic`
     target: `response_format`, `logprobs`, `logit_bias`, `input_audio` and `file`
@@ -145,9 +152,10 @@ Response headers (non-streaming):
 | `X-GatewAI-Cache` | `HIT`, `MISS` or `BYPASS` — what the semantic cache did (v4 A.2); always `BYPASS` on pass-through |
 | `X-GatewAI-Model` | the model that produced the answer; on a hit, the one that produced it first; on pass-through, the registry id it was forwarded to |
 
-Streaming responses carry `X-Request-Id` only: headers leave before the cache
-outcome is known to the client-facing layer, so a streaming caller reads the
-decision back by id.
+Streaming responses from the chain carry `X-Request-Id` only: headers leave before
+the cache outcome is known to the client-facing layer, so a streaming caller reads
+the decision back by id. A streamed **pass-through** carries all three, since its
+target is chosen before the stream opens.
 
 ### Errors
 
@@ -169,12 +177,14 @@ client SDKs parse them like any other OpenAI error:
 | `429` | `api_error`, code `upstream_rate_limited` | Pass-through: the upstream answered 429 |
 | `502` | `api_error` | Upstream provider rejected the request (auth, unknown model) or is unreachable. On pass-through: any other upstream 4xx, a 5xx, or no connection |
 | `503` | `api_error` | Upstream provider temporarily unavailable / rate-limited after retries (chain only) |
-| `504` | `api_error` | Pass-through: no answer within `gatewai.passthrough.timeout` (default 5 min) |
+| `504` | `api_error` | Pass-through: no answer within `gatewai.passthrough.timeout` (default 5 min). For a stream, that is the wait for the first byte |
 | `500` | `api_error` | Unexpected internal error |
 
 Upstream provider details are logged server-side but **not echoed** to the caller.
 Streaming (`"stream": true`) reports failures inline on the SSE stream rather than
 as this envelope, since the response is already committed when the egress fails.
+A streamed pass-through is the exception up to its first byte: the upstream is
+connected before the stream starts, so a refusal there gets the envelope.
 
 ## Models (OpenAI-compatible, v4 B.2)
 

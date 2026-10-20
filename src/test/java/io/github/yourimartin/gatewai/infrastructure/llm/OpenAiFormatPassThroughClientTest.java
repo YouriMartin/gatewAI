@@ -9,17 +9,24 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.net.httpserver.HttpServer;
 
+import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -162,6 +169,96 @@ class OpenAiFormatPassThroughClientTest {
     assertThatThrownBy(() -> client.forward(TARGET, "{}"))
         .isInstanceOfSatisfying(UpstreamFailureException.class,
             e -> assertThat(e.kind()).isEqualTo(UpstreamFailureException.Kind.TIMEOUT));
+  }
+
+  @Test
+  void aStreamGoesUpWithItsUsageTurnedOnAndComesBackEventByEvent() throws Exception {
+    AtomicReference<String> received = new AtomicReference<>();
+    CountDownLatch firstSeen = new CountDownLatch(1);
+    server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    server.createContext("/v1/chat/completions", exchange -> {
+      received.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+      exchange.sendResponseHeaders(200, 0);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write("data: {\"n\":1}\n\n".getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        // Not a byte more until the gateway has handed the first event on.
+        await(firstSeen);
+        out.write(("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":2,"
+            + "\"completion_tokens\":1,\"total_tokens\":3}}\n\ndata: [DONE]\n\n")
+            .getBytes(StandardCharsets.UTF_8));
+      }
+    });
+    server.start();
+    List<String> events = new CopyOnWriteArrayList<>();
+
+    TokenUsage usage = client(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, base(), null)
+        .openStream(TARGET, "{\"model\":\"auto\",\"stream\":true,\"messages\":[],"
+            + "\"stream_options\":{\"x\":1}}")
+        .relay(event -> {
+          events.add(event);
+          firstSeen.countDown();
+        });
+
+    assertThat(received.get()).isEqualTo("{\"model\":\"served-model\",\"stream\":true,"
+        + "\"messages\":[],\"stream_options\":{\"x\":1,\"include_usage\":true}}");
+    assertThat(events).containsExactly("{\"n\":1}", "[DONE]");
+    assertThat(usage).isEqualTo(new TokenUsage(2, 1, 3));
+  }
+
+  @Test
+  void aStreamTheUpstreamRefusesFailsBeforeAnyEvent() throws IOException {
+    start(429, "{\"error\":{}}", new AtomicReference<>(), new AtomicReference<>());
+
+    assertThatThrownBy(() -> client(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, base(),
+        null).openStream(TARGET, "{\"stream\":true}"))
+        .isInstanceOfSatisfying(UpstreamFailureException.class,
+            e -> assertThat(e.kind()).isEqualTo(UpstreamFailureException.Kind.RATE_LIMITED));
+  }
+
+  @Test
+  void cancellingAStalledStreamEndsTheRelay() throws Exception {
+    CountDownLatch stop = new CountDownLatch(1);
+    server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    server.createContext("/v1/chat/completions", exchange -> {
+      exchange.sendResponseHeaders(200, 0);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write("data: {\"n\":1}\n\n".getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        await(stop); // an upstream that stalls mid-answer
+      } catch (IOException e) {
+        // the gateway hung up
+      }
+    });
+    server.start();
+    UpstreamEventStream stream = client(ProviderProperties.ProviderType.OPENAI_COMPATIBLE,
+        base(), null).openStream(TARGET, "{\"stream\":true}");
+    CompletableFuture<Throwable> outcome = CompletableFuture.supplyAsync(() -> {
+      try {
+        stream.relay(event -> { });
+        return null;
+      } catch (RuntimeException e) {
+        return e;
+      }
+    });
+
+    Thread.sleep(200);
+    stream.cancel();
+
+    try {
+      assertThat(outcome.get(5, TimeUnit.SECONDS))
+          .isInstanceOf(ClientDisconnectedException.class);
+    } finally {
+      stop.countDown();
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      latch.await(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private void start(int status, String body, AtomicReference<String> received,

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -66,5 +67,17 @@ class MicrometerMetricsRecorderTest {
 
     assertEquals(1.0, registry.get("gatewai.requests")
         .tags("model", "unknown", "cache_hit", "false").counter().count(), DELTA);
+  }
+
+  @Test
+  void countsHowEachPassThroughStreamEnded() {
+    recorder.recordPassThroughStream("gpt-5", PassThroughStreamOutcome.COMPLETED);
+    recorder.recordPassThroughStream("gpt-5", PassThroughStreamOutcome.COMPLETED);
+    recorder.recordPassThroughStream("gpt-5", PassThroughStreamOutcome.CLIENT_DISCONNECTED);
+
+    assertEquals(2.0, registry.get("gatewai.passthrough.streams")
+        .tags("model", "gpt-5", "outcome", "completed").counter().count(), DELTA);
+    assertEquals(1.0, registry.get("gatewai.passthrough.streams")
+        .tags("model", "gpt-5", "outcome", "client_disconnected").counter().count(), DELTA);
   }
 }

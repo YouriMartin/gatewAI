@@ -2,8 +2,12 @@ package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.Test;
@@ -79,5 +83,43 @@ class MockPassThroughClientTest {
 
   private JsonNode forward(String body) {
     return JSON.readTree(client.forward(TARGET, body).body());
+  }
+
+  @Test
+  void streamsTheScriptedToolCallTheOpenAiWay() {
+    List<String> events = new ArrayList<>();
+
+    TokenUsage usage = client.openStream(TARGET, """
+        {"stream": true, "messages": [{"role": "user", "content": "Weather?"}],
+         "tools": [{"type": "function", "function": {"name": "get_weather"}}]}
+        """).relay(events::add);
+
+    assertThat(events.getFirst()).contains("\"role\":\"assistant\"");
+    JsonNode call = JSON.readTree(events.get(1)).path("choices").get(0).path("delta")
+        .path("tool_calls").get(0);
+    assertThat(call.path("index").asInt()).isZero();
+    assertThat(call.path("function").path("name").asString()).isEqualTo("get_weather");
+    assertThat(events.get(2)).contains("\"finish_reason\":\"tool_calls\"");
+    // The usage chunk is read but kept from a client that did not ask for it.
+    assertThat(events.getLast()).isEqualTo("[DONE]");
+    assertThat(events).noneMatch(event -> event.contains("\"choices\":[]"));
+    assertThat(usage).isNotNull();
+  }
+
+  @Test
+  void streamsTextWordByWordAndTheUsageChunkWhenAskedFor() {
+    List<String> events = new ArrayList<>();
+
+    client.openStream(TARGET, """
+        {"stream": true, "stream_options": {"include_usage": true},
+         "messages": [{"role": "user", "content": "one two"}]}
+        """).relay(events::add);
+
+    StringBuilder text = new StringBuilder();
+    events.stream().filter(event -> event.contains("\"content\""))
+        .forEach(event -> text.append(JSON.readTree(event).path("choices").get(0)
+            .path("delta").path("content").asString()));
+    assertThat(text).hasToString("[mock] echo: one two");
+    assertThat(events.get(events.size() - 2)).contains("\"choices\":[]").contains("\"usage\"");
   }
 }

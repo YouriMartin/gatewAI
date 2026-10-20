@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -14,17 +15,20 @@ import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.port.in.PassThroughStream;
 import io.github.yourimartin.gatewai.domain.port.in.PassThroughUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
@@ -35,6 +39,7 @@ import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
+import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +64,7 @@ final class PassThroughService implements PassThroughUseCase {
   private final DecisionRecorder decisionRecorder;
   private final DecisionMetricsRecorder decisionMetrics;
   private final RequestAccounting accounting;
+  private final MetricsRecorder metricsRecorder;
   private final ModelDefinition defaultTarget;
 
   PassThroughService(PassThroughClient client,
@@ -79,6 +85,7 @@ final class PassThroughService implements PassThroughUseCase {
     this.accounting = new RequestAccounting(requestLogRepository, modelRegistry,
         carbonIntensityProvider, greenAccountant, metricsRecorder, providerRegions,
         cloudRegionZones);
+    this.metricsRecorder = metricsRecorder;
     this.defaultTarget = resolveDefault(modelRegistry, defaultModel);
   }
 
@@ -100,11 +107,27 @@ final class PassThroughService implements PassThroughUseCase {
 
   @Override
   public PassThroughResponse forward(PassThroughRequest passThrough) {
-    LlmRequest request = passThrough.request();
-    String correlationId = RequestAccounting.correlationId();
-    String clientId = RequestAccounting.clientId();
-    long startNanos = System.nanoTime();
+    Prepared prepared = prepare(passThrough.request());
+    PassThroughResponse response = client.forward(prepared.target(), passThrough.body());
+    account(prepared, response.usage());
+    return response;
+  }
 
+  @Override
+  public PassThroughStream openStream(PassThroughRequest passThrough) {
+    Prepared prepared = prepare(passThrough.request());
+    UpstreamEventStream upstream = client.openStream(prepared.target(), passThrough.body());
+    return new RelayedStream(prepared, upstream);
+  }
+
+  /**
+   * What both paths share, on the request thread: the target, the refusal of what
+   * it would ignore, and the trace — recorded before the upstream is called, so a
+   * failed call still explains where it was sent.
+   */
+  private Prepared prepare(LlmRequest request) {
+    long startNanos = System.nanoTime();
+    String correlationId = RequestAccounting.correlationId();
     Optional<ModelDefinition> pinned = request.model() == null
         ? Optional.empty() : modelRegistry.findByModelId(request.model());
     ModelDefinition target = pinned.orElse(defaultTarget);
@@ -121,20 +144,77 @@ final class PassThroughService implements PassThroughUseCase {
     recordRouting(userText, target,
         pinned.isPresent() ? DecisionReason.PASSTHROUGH_PINNED : DecisionReason.PASSTHROUGH_DEFAULT,
         decisionMs, correlationId);
+    return new Prepared(request, target, startNanos, correlationId,
+        RequestAccounting.clientId());
+  }
 
-    PassThroughResponse response = client.forward(target, passThrough.body());
+  /**
+   * A request on its way, with the context captured on the request thread: a
+   * stream is relayed from another one, where the Scoped Value is unbound.
+   */
+  private record Prepared(LlmRequest request, ModelDefinition target, long startNanos,
+                          String correlationId, String clientId) {
+  }
 
-    long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-    TokenUsage usage = response.usage();
+  /** Accounts a served request through the chain's code (ADR 0016). */
+  private void account(Prepared prepared, TokenUsage reported) {
+    long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - prepared.startNanos());
+    TokenUsage usage = reported;
     if (usage == null) {
       LOG.warn("Upstream of model '{}' reported no usage: request {} is logged with zero"
-          + " tokens, which means not accounted, not measured zero", target.modelId(),
-          correlationId);
+          + " tokens, which means not accounted, not measured zero",
+          prepared.target().modelId(), prepared.correlationId());
       usage = TokenUsage.NONE;
     }
-    accounting.record(request, target.modelId(), usage, false, latencyMs, correlationId,
-        clientId);
-    return response;
+    accounting.record(prepared.request(), prepared.target().modelId(), usage, false, latencyMs,
+        prepared.correlationId(), prepared.clientId());
+  }
+
+  /**
+   * A streamed pass-through (v4 B.4): relayed as it arrives, accounted once the
+   * upstream ends, and counted however it ends. A client that goes away cancels
+   * the upstream call; its tokens are billed by the provider but cannot be
+   * accounted, since their count only comes in the last chunk — so the stream is
+   * recorded as a disconnect, never as a zero-token request.
+   */
+  private final class RelayedStream implements PassThroughStream {
+
+    private final Prepared prepared;
+    private final UpstreamEventStream upstream;
+
+    RelayedStream(Prepared prepared, UpstreamEventStream upstream) {
+      this.prepared = prepared;
+      this.upstream = upstream;
+    }
+
+    @Override
+    public String model() {
+      return prepared.target().modelId();
+    }
+
+    @Override
+    public void relay(Consumer<String> onEvent) {
+      String model = model();
+      // Anything that is neither a clean end nor a disconnect is the upstream's.
+      PassThroughStreamOutcome outcome = PassThroughStreamOutcome.UPSTREAM_FAILED;
+      try {
+        TokenUsage usage = upstream.relay(onEvent);
+        outcome = PassThroughStreamOutcome.COMPLETED;
+        account(prepared, usage);
+      } catch (ClientDisconnectedException e) {
+        outcome = PassThroughStreamOutcome.CLIENT_DISCONNECTED;
+        LOG.warn("Client of request {} went away mid-stream: the call to model '{}' was"
+            + " cancelled, and its tokens are not accounted", prepared.correlationId(), model);
+        throw e;
+      } finally {
+        metricsRecorder.recordPassThroughStream(model, outcome);
+      }
+    }
+
+    @Override
+    public void cancel() {
+      upstream.cancel();
+    }
   }
 
   /** Refuses, before anything is sent or traced, what the target would silently drop. */

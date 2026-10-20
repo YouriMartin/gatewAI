@@ -52,7 +52,7 @@ class ApiExceptionHandler {
 
   /**
    * A request marked for pass-through (v4 B.1) on a path that cannot forward it —
-   * streaming, deferred, MCP — or for a target that would ignore one of its
+   * the deferred endpoint, MCP — or for a target that would ignore one of its
    * features (ADR 0016). Refused with the features named.
    */
   @ExceptionHandler(UnsupportedFeatureException.class)

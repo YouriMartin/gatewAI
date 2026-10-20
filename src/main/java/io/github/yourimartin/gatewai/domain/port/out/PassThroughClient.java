@@ -33,4 +33,14 @@ public interface PassThroughClient {
    *                                  or a timeout
    */
   PassThroughResponse forward(ModelDefinition target, String body);
+
+  /**
+   * Opens a streamed call (v4 B.4): {@code body} with {@code model} rewritten and
+   * {@code stream_options.include_usage} turned on, so the request can be
+   * accounted. Returns once the upstream has answered 2xx.
+   *
+   * @throws UpstreamFailureException on a non-2xx answer, a transport failure or a
+   *                                  timeout before the first byte
+   */
+  UpstreamEventStream openStream(ModelDefinition target, String body);
 }

@@ -7,6 +7,31 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.4 (pass-through, streaming)
+
+- **A disconnect is recorded as a counter and a log line, not as a `request_log` row.**
+  The roadmap says a disconnect "is recorded" without saying where. The tokens of a
+  cut stream are unknown: their count only arrives in the last chunk. A row would
+  hold either a zero, which reads as a measured zero, or an estimate, which this
+  project does not present as data. So: a WARN log with the correlation id, and
+  `gatewai.passthrough.streams{outcome}`, with `completed` and `upstream_failed` counted
+  beside it so the disconnect share is a ratio.
+- **The upstream is opened before the SSE response.** Not in the plan, which only
+  said "relayed". Opening it on the request thread costs nothing, turns an upstream
+  refusal into an HTTP error in the OpenAI envelope instead of an error inside a
+  committed stream, and lets the stream carry `X-GatewAI-Cache`/`X-GatewAI-Model`,
+  which the chain's streams cannot.
+- **`gatewai.passthrough.timeout` bounds the first byte of a stream, not its length.**
+  A five-minute cap on a whole agent turn would cut legitimate answers. The ingress's
+  SSE timeout (10 min) still bounds the stream.
+- **Only the usage-only chunk is dropped.** "The usage chunk is dropped" could also
+  mean stripping `usage` from every chunk. A chunk with choices *and* usage (vLLM's
+  continuous usage stats) is relayed unchanged: rewriting content chunks would break
+  "relayed as it came" for a field clients ignore.
+- **The manual coding-agent check is not done yet.** It needs the maintainer's pick of
+  agent, a local Ollama model with tool support and a cloud key. B.4's code and stub
+  tests are complete. The `getting-started.md` record waits for that run.
+
 ## v4 lot B — B.3 (pass-through, non-streaming)
 
 - **What Anthropic's compatibility layer ignores is refused, not forwarded.** The

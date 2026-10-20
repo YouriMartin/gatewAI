@@ -115,6 +115,20 @@ p95**, against **21–24 µs** in the heap. That is why the batching optimisatio
 not built — see [`security.md`](security.md#rate-limiting). Only checks that
 actually run are timed (unlimited paths are not), which a test asserts.
 
+## Streamed pass-through (v4 B.4)
+
+Emitted by `PassThroughService` through `MetricsRecorder`, once per streamed
+pass-through, however it ends.
+
+| Metric | Type | Tags | Meaning |
+|---|---|---|---|
+| `gatewai_passthrough_streams_total` | counter | `model`, `outcome` (`completed`/`client_disconnected`/`upstream_failed`) | how streamed pass-through requests ended |
+
+`client_disconnected` is the part of streamed pass-through traffic the green report
+cannot see. The provider billed those tokens, but their count only arrives in the
+last chunk, so no `request_log` row exists for them (ADR 0016). Read it as a ratio
+over all three outcomes.
+
 ### Deprecated: `gatewai_cache_hits_total` / `gatewai_cache_misses_total`
 
 Superseded by `gatewai_cache_decisions_total{outcome}`, which distinguishes what

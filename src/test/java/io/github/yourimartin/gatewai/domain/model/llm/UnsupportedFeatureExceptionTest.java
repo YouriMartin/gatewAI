@@ -15,7 +15,7 @@ class UnsupportedFeatureExceptionTest {
 
     assertThat(e.features()).containsExactly(PassThroughFeature.TOOLS, PassThroughFeature.LOGIT_BIAS);
     assertThat(e.getMessage()).contains("tools, logit_bias")
-        .contains("POST /v1/chat/completions").contains("stream=false");
+        .contains("POST /v1/chat/completions");
   }
 
   @Test

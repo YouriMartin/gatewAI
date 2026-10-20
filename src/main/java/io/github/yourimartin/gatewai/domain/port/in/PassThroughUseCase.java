@@ -22,4 +22,15 @@ public interface PassThroughUseCase {
    * @throws UnknownModelException       when no target can be resolved
    */
   PassThroughResponse forward(PassThroughRequest request);
+
+  /**
+   * Opens a streamed pass-through (v4 B.4): picks the target, records the
+   * decisions and connects to the upstream, which has answered 2xx when this
+   * returns. The caller then relays it.
+   *
+   * @throws UnsupportedFeatureException as {@link #forward}
+   * @throws UpstreamFailureException    when the upstream refuses the request
+   * @throws UnknownModelException       when no target can be resolved
+   */
+  PassThroughStream openStream(PassThroughRequest request);
 }

@@ -1,8 +1,10 @@
 package io.github.yourimartin.gatewai.infrastructure.metrics;
 
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 
@@ -52,5 +54,17 @@ class MicrometerMetricsRecorder implements MetricsRecorder {
       registry.counter("gatewai.co2.avoided.grams")
           .increment(green.gramsCo2Avoided());
     }
+  }
+
+  /**
+   * {@code gatewai.passthrough.streams}, tagged by model and outcome (v4 B.4). The
+   * {@code client_disconnected} share is the part of streamed pass-through traffic
+   * that the green report cannot see.
+   */
+  @Override
+  public void recordPassThroughStream(String model, PassThroughStreamOutcome outcome) {
+    registry.counter("gatewai.passthrough.streams",
+        "model", model == null ? "unknown" : model,
+        "outcome", outcome.name().toLowerCase(Locale.ROOT)).increment();
   }
 }

@@ -35,6 +35,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
+import io.github.yourimartin.gatewai.domain.port.in.PassThroughStream;
 import io.github.yourimartin.gatewai.domain.port.in.PassThroughUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
@@ -376,18 +377,61 @@ class ChatCompletionControllerTest {
   }
 
   @Test
-  void aMarkedStreamIsRefusedUntilStreamedPassThroughExists() throws Exception {
+  void aMarkedStreamIsRelayedEventByEventWithTheGatewayHeaders() throws Exception {
+    List<String> events = List.of(
+        "{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}",
+        "{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}",
+        "[DONE]");
+    when(passThroughUseCase.openStream(any())).thenReturn(new PassThroughStream() {
+      @Override
+      public String model() {
+        return "qwen2.5:3b";
+      }
+
+      @Override
+      public void relay(Consumer<String> onEvent) {
+        events.forEach(onEvent);
+      }
+
+      @Override
+      public void cancel() {
+      }
+    });
+
+    MvcResult result = mockMvc.perform(post("/v1/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(TOOLS_JSON.replace("\"model\": \"auto\",", "\"model\": \"auto\", \"stream\": true,"))
+            .with(authentication(
+                new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(request().asyncStarted())
+        .andExpect(header().string(ChatCompletionController.CACHE_HEADER, "BYPASS"))
+        .andExpect(header().string(ChatCompletionController.MODEL_HEADER, "qwen2.5:3b"))
+        .andReturn();
+
+    String body = mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+        .andReturn().getResponse().getContentAsString();
+    // Each upstream event is one SSE event, as it came, in order.
+    assertEquals("data:" + events.get(0) + "\n\ndata:" + events.get(1) + "\n\ndata:[DONE]\n\n",
+        body);
+    verifyNoInteractions(useCase, streamUseCase);
+  }
+
+  @Test
+  void aStreamTheUpstreamRefusesIsAnHttpErrorNotAnErrorEvent() throws Exception {
+    when(passThroughUseCase.openStream(any())).thenThrow(
+        io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException.forStatus(
+            422, "qwen2.5:3b"));
+
     mockMvc.perform(post("/v1/chat/completions")
             .contentType(MediaType.APPLICATION_JSON)
             .content(TOOLS_JSON.replace("\"model\": \"auto\",", "\"model\": \"auto\", \"stream\": true,"))
             .with(authentication(
                 new ApiKeyAuthentication("test-client-id", "test-client"))))
+        .andExpect(request().asyncNotStarted())
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("unsupported_feature"))
-        .andExpect(jsonPath("$.error.param").value("tools"))
-        .andExpect(jsonPath("$.error.message")
-            .value(org.hamcrest.Matchers.containsString("stream=false")));
-    verifyNoInteractions(passThroughUseCase, streamUseCase);
+        .andExpect(jsonPath("$.error.code").value("upstream_rejected"));
   }
 
   @Test
