@@ -87,7 +87,8 @@ final class RequestAccounting {
         clientId,
         accounted.metrics(),
         accounted.provenance(),
-        cacheHit
+        cacheHit,
+        usage.cachedPromptTokens()
     );
     requestLogRepository.save(log);
     metricsRecorder.record(log);

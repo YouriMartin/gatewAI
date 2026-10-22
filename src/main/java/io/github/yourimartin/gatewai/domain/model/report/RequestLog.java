@@ -18,6 +18,9 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
  *                      {@code green} (v3 lot C.5); {@code null} is read as
  *                      {@link GreenProvenance#UNKNOWN}, which is also how rows
  *                      written before C.5 come back
+ * @param cachedPromptTokens prompt tokens the provider served from its cache (v4
+ *                      B.6); {@code null} when it did not report them, and on
+ *                      every row written before B.6
  */
 public record RequestLog(
     UUID id,
@@ -32,7 +35,8 @@ public record RequestLog(
     String clientId,
     GreenMetrics green,
     GreenProvenance provenance,
-    boolean cacheHit
+    boolean cacheHit,
+    Integer cachedPromptTokens
 ) {
 
   public RequestLog {

@@ -21,6 +21,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
@@ -36,7 +37,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class OpenAiFormatPassThroughClientTest {
 
   private static final ModelDefinition TARGET =
-      new ModelDefinition("k", "stub", "served-model", 0.0, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("k", "stub", "served-model", ModelPricing.NONE, null, ModelTier.CLOUD_PREMIUM);
 
   private HttpServer server;
 

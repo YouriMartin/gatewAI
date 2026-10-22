@@ -7,8 +7,21 @@ export interface GreenReport {
   total_requests: number;
   cache_hits: number;
   cache_hit_rate: number;
-  total_cost_eur: number;
-  total_cost_avoided_eur: number;
+  // Costs (v4 B.6): always with their ISO 4217 currency and pricing basis. A
+  // period that spans a change of currency has no grand total: total_cost and
+  // currency are null, and cost_by_currency holds one figure per currency.
+  total_cost: number | null;
+  total_cost_avoided: number | null;
+  currency: string | null;
+  cost_by_currency: Record<string, number>;
+  cost_avoided_by_currency: Record<string, number>;
+  pricing_basis: 'SPLIT' | 'BLENDED' | 'NONE' | 'MIXED';
+  requests_by_pricing_basis: Record<string, number>;
+  pricing_note: string;
+  /** @deprecated copy of total_cost, whatever the currency; removed next release. */
+  total_cost_eur: number | null;
+  /** @deprecated copy of total_cost_avoided; removed next release. */
+  total_cost_avoided_eur: number | null;
   total_energy_kwh: number;
   total_grams_co2: number;
   total_grams_co2_avoided: number;

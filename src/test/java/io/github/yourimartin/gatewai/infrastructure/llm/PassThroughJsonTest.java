@@ -80,4 +80,18 @@ class PassThroughJsonTest {
         .isEqualTo(PassThroughJson.ChunkUsage.NONE);
     assertThat(PassThroughJson.chunkUsage("[DONE]")).isEqualTo(PassThroughJson.ChunkUsage.NONE);
   }
+
+  @Test
+  void readsTheCachedPromptTokensWhenTheUpstreamReportsThem() {
+    assertThat(PassThroughJson.usage("{\"usage\":{\"prompt_tokens\":10000,\"completion_tokens\":50,"
+        + "\"total_tokens\":10050,\"prompt_tokens_details\":{\"cached_tokens\":8000}}}"))
+        .isEqualTo(new TokenUsage(10_000, 50, 10_050, 8_000));
+  }
+
+  @Test
+  void anUpstreamThatSaysNothingAboutCachingLeavesTheCountUnreported() {
+    assertThat(PassThroughJson.usage(
+        "{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}")
+        .cachedPromptTokens()).isNull();
+  }
 }

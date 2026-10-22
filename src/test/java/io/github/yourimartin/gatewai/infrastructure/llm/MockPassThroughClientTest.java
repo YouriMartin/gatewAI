@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
@@ -19,7 +20,7 @@ class MockPassThroughClientTest {
 
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final ModelDefinition TARGET =
-      new ModelDefinition("k", "ollama", "qwen2.5:3b", 0.0, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("k", "ollama", "qwen2.5:3b", ModelPricing.NONE, null, ModelTier.CLOUD_PREMIUM);
 
   private final MockPassThroughClient client = new MockPassThroughClient();
 

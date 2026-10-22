@@ -26,7 +26,12 @@ class ModelRegistryProperties {
 
     private String provider;
     private String modelId;
-    private double costPer1kTokens;
+    /**
+     * The deprecated blended price per 1000 tokens (v4 B.6): still read, as
+     * {@code BLENDED}, with a startup warning. {@link #pricing} replaces it.
+     */
+    private Double costPer1kTokens;
+    private Pricing pricing = new Pricing();
     private Energy energy = new Energy();
     private ModelTier tier;
     /**
@@ -52,12 +57,20 @@ class ModelRegistryProperties {
       this.modelId = modelId;
     }
 
-    double getCostPer1kTokens() {
+    Double getCostPer1kTokens() {
       return costPer1kTokens;
     }
 
-    void setCostPer1kTokens(double costPer1kTokens) {
+    void setCostPer1kTokens(Double costPer1kTokens) {
       this.costPer1kTokens = costPer1kTokens;
+    }
+
+    Pricing getPricing() {
+      return pricing;
+    }
+
+    void setPricing(Pricing pricing) {
+      this.pricing = pricing;
     }
 
     Energy getEnergy() {
@@ -82,6 +95,45 @@ class ModelRegistryProperties {
 
     void setPriority(Integer priority) {
       this.priority = priority;
+    }
+  }
+
+  /**
+   * {@code gatewai.models.registry.<key>.pricing.*} — per million tokens, the unit
+   * providers publish, in {@code gatewai.billing.currency} (v4 B.6).
+   */
+  static class Pricing {
+
+    private Double inputPer1m;
+    private Double outputPer1m;
+    private Double cachedInputPer1m;
+
+    Double getInputPer1m() {
+      return inputPer1m;
+    }
+
+    void setInputPer1m(Double inputPer1m) {
+      this.inputPer1m = inputPer1m;
+    }
+
+    Double getOutputPer1m() {
+      return outputPer1m;
+    }
+
+    void setOutputPer1m(Double outputPer1m) {
+      this.outputPer1m = outputPer1m;
+    }
+
+    Double getCachedInputPer1m() {
+      return cachedInputPer1m;
+    }
+
+    void setCachedInputPer1m(Double cachedInputPer1m) {
+      this.cachedInputPer1m = cachedInputPer1m;
+    }
+
+    boolean isDeclared() {
+      return inputPer1m != null || outputPer1m != null || cachedInputPer1m != null;
     }
   }
 

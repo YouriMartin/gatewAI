@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,6 @@ class FailoverSequenceTest {
   }
 
   private static ModelDefinition model(String id, ModelTier tier) {
-    return new ModelDefinition(id, "provider", id, 0.0, EnergyProfile.NOT_ACCOUNTED, tier);
+    return new ModelDefinition(id, "provider", id, ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, tier);
   }
 }

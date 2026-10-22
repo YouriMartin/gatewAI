@@ -10,6 +10,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
@@ -25,7 +27,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
+        3, 1, CostSummary.of("EUR", 0.017, 0.028), 0.003, 1.61, 1.84,
         Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
 
     byte[] pdf = GreenReportPdfWriter.toPdf(report);
@@ -41,7 +43,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        4, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        4, 1, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L), EmissionsBreakdown.EMPTY);
 
     String text = text(GreenReportPdfWriter.toPdf(report));
@@ -63,7 +65,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        4, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
+        4, 0, CostSummary.of("EUR", 0.03, 0.05), 0.002, 1.2, 2.4,
         Map.of("claude-opus-4-8", 2L, "qwen2.5:3b", 2L),
         Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY);
 
@@ -78,7 +80,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        2, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
+        2, 0, CostSummary.of("EUR", 0.03, 0.05), 0.002, 1.2, 2.4,
         Map.of("claude-opus-4-8", 2L), Map.of(), EmissionsBreakdown.EMPTY);
 
     String text = text(GreenReportPdfWriter.toPdf(report));
@@ -94,7 +96,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        3, 0, CostSummary.of("EUR", 0.03, 0.0), 0.002, 3.5, 0.0,
         Map.of("claude-opus-4-8", 2L, "mistral-large", 1L), Map.of(),
         new EmissionsBreakdown(
             Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
@@ -118,7 +120,7 @@ class GreenReportPdfWriterTest {
     GreenReport report = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        1, 0, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 1L), Map.of("qwen2.5:3b", 1L),
         new EmissionsBreakdown(Map.of("unattributed", 0.0), Map.of("ollama", 0.0),
             List.of()));
@@ -127,6 +129,21 @@ class GreenReportPdfWriterTest {
 
     assertTrue(text.contains("no region attributed"), text);
     assertFalse(text.contains("unattributed 0.000000 known"), text);
+  }
+
+  @Test
+  void theCostRowsNameTheirCurrencyAndPricingBasis() throws IOException {
+    GreenReport report = new GreenReport(Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"), 4, 0,
+        new CostSummary("USD", Map.of("USD", 0.05), Map.of("USD", 0.3),
+            Map.of(PricingBasis.SPLIT, 4L), 1),
+        0.002, 1.2, 2.4, Map.of("gpt-a", 4L), Map.of(), EmissionsBreakdown.EMPTY);
+
+    String text = text(GreenReportPdfWriter.toPdf(report));
+
+    assertTrue(text.contains("0.0500 USD"), text);
+    assertTrue(text.contains("Cost incurred (SPLIT)"), text);
+    assertTrue(text.contains("did not report cached prompt tokens"), text);
   }
 
   private static String text(byte[] pdf) throws IOException {

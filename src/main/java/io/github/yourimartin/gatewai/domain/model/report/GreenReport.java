@@ -19,8 +19,8 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
  * @param to                   inclusive end of the range
  * @param totalRequests        number of requests served in the range
  * @param cacheHits            requests answered from the semantic cache
- * @param totalCostEur         total monetary cost actually incurred
- * @param totalCostAvoidedEur  money saved vs a premium-default baseline
+ * @param costs                cost incurred and avoided, with the currency and the
+ *                             pricing basis behind them (v4 B.6)
  * @param totalEnergyKwh       total estimated energy consumed
  * @param totalGramsCo2        total estimated emissions actually produced
  * @param totalGramsCo2Avoided total emissions avoided vs a premium baseline
@@ -35,8 +35,7 @@ public record GreenReport(
     Instant to,
     long totalRequests,
     long cacheHits,
-    double totalCostEur,
-    double totalCostAvoidedEur,
+    CostSummary costs,
     double totalEnergyKwh,
     double totalGramsCo2,
     double totalGramsCo2Avoided,
@@ -70,6 +69,19 @@ public record GreenReport(
     excludedModelMix =
         excludedModelMix == null ? Map.of() : Map.copyOf(excludedModelMix);
     breakdown = breakdown == null ? EmissionsBreakdown.EMPTY : breakdown;
+    if (costs == null) {
+      throw new IllegalArgumentException("A report needs its cost summary");
+    }
+  }
+
+  /** Cost incurred in the report's currency (see {@link CostSummary#totalCost()}). */
+  public double totalCost() {
+    return costs.totalCost();
+  }
+
+  /** Cost avoided in the report's currency (see {@link CostSummary#totalCostAvoided()}). */
+  public double totalCostAvoided() {
+    return costs.totalCostAvoided();
   }
 
   /** Share of requests served from cache, in {@code [0, 1]}. */

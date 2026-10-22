@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
@@ -22,7 +23,7 @@ class CarbonCalculatorTest {
   private final CarbonCalculator calculator = new CarbonCalculator();
 
   private static ModelDefinition model(EnergyProfile energy) {
-    return new ModelDefinition("key", "anthropic", "model-id", 0.015, energy,
+    return new ModelDefinition("key", "anthropic", "model-id", ModelPricing.blended(0.015), energy,
         ModelTier.CLOUD_PREMIUM);
   }
 

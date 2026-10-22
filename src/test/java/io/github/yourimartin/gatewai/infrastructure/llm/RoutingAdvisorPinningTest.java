@@ -19,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
@@ -216,14 +217,16 @@ class RoutingAdvisorPinningTest {
   private static ModelDefinition premiumModel() {
     return new ModelDefinition(
         "claude-sonnet", "anthropic",
-        "claude-sonnet-4-20250514", 0.015, new EnergyProfile(0.0, 0.6, 0.0, EnergySource.MODELLED, false),
+        "claude-sonnet-4-20250514", ModelPricing.blended(0.015), new EnergyProfile(0.0, 0.6, 0.0,
+            EnergySource.MODELLED, false),
         ModelTier.CLOUD_PREMIUM);
   }
 
   private static ModelDefinition entryModel() {
     return new ModelDefinition(
         "claude-haiku", "anthropic",
-        "claude-haiku-4-20250506", 0.002, new EnergyProfile(0.0, 0.15, 0.0, EnergySource.MODELLED, false),
+        "claude-haiku-4-20250506", ModelPricing.blended(0.002), new EnergyProfile(0.0, 0.15, 0.0,
+            EnergySource.MODELLED, false),
         ModelTier.CLOUD_ENTRY);
   }
 

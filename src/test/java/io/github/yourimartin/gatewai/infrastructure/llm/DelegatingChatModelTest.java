@@ -14,6 +14,7 @@ import java.util.Optional;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
@@ -66,7 +67,8 @@ class DelegatingChatModelTest {
 
   private void register(String modelId, String provider) {
     when(registry.findByModelId(modelId)).thenReturn(Optional.of(
-        new ModelDefinition("k", provider, modelId, 0.0, EnergyProfile.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
+        new ModelDefinition("k", provider, modelId, ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED,
+            ModelTier.CLOUD_PREMIUM)));
   }
 
   @Test

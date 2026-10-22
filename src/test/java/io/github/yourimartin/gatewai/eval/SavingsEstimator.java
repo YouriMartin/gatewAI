@@ -68,8 +68,8 @@ final class SavingsEstimator {
       ModelDefinition routedModel = config.modelFor(prediction.tier());
 
       totalTokens += tokens;
-      routedCost += cost(routedModel, tokens);
-      baselineCost += cost(baselineModel, tokens);
+      routedCost += routedModel.pricing().cost(usage);
+      baselineCost += baselineModel.pricing().cost(usage);
       routedGrams += footprint(routedModel, usage, gridIntensity).gramsCo2();
       baselineGrams += footprint(baselineModel, usage, gridIntensity).gramsCo2();
       if (!routedModel.energySource().accounted()) {
@@ -90,10 +90,6 @@ final class SavingsEstimator {
   private static TokenUsage usageFor(int promptChars) {
     return TokenUsage.of((int) Math.round(promptChars / CHARS_PER_TOKEN),
         ASSUMED_COMPLETION_TOKENS);
-  }
-
-  private static double cost(ModelDefinition model, long tokens) {
-    return tokens / 1000.0 * model.costPer1kTokens();
   }
 
   /**

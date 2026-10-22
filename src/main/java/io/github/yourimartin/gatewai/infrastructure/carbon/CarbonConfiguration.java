@@ -5,6 +5,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -25,9 +26,11 @@ class CarbonConfiguration {
     return new CarbonCalculator();
   }
 
+  /** Every configured price is in {@code gatewai.billing.currency} (v4 B.6). */
   @Bean
-  GreenAccountant greenAccountant(CarbonCalculator carbonCalculator) {
-    return new GreenAccountant(carbonCalculator);
+  GreenAccountant greenAccountant(CarbonCalculator carbonCalculator,
+                                  @Value("${gatewai.billing.currency:EUR}") String currency) {
+    return new GreenAccountant(carbonCalculator, currency);
   }
 
   @Bean

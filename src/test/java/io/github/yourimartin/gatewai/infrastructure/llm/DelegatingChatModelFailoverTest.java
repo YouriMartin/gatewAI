@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
@@ -239,7 +240,7 @@ class DelegatingChatModelFailoverTest {
   }
 
   private static ModelDefinition model(String id, String provider) {
-    return new ModelDefinition(id, provider, id, 0.0, EnergyProfile.NOT_ACCOUNTED,
+    return new ModelDefinition(id, provider, id, ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED,
         ModelTier.CLOUD_PREMIUM);
   }
 }

@@ -15,6 +15,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySourceLookup;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 
 /**
  * Aggregates persisted {@link RequestLog} rows into a {@link GreenReport}
@@ -26,6 +27,9 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
  * rather than "measured zero". Cache hits are never counted as excluded — no
  * inference ran, which is a genuine zero.
  *
+ * <p>Costs are summed per currency, with the pricing basis of every row (v4
+ * B.6): two currencies are never added together.
+ *
  * <p>It also splits emissions <b>by region and by provider</b> (v3 lot C.5) from what
  * each row stored about itself — never from the registry as it stands now, which is
  * what lets a report of last quarter still describe last quarter.
@@ -33,12 +37,15 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 public final class ReportAggregator {
 
   private final EnergySourceLookup energySources;
+  private final String billingCurrency;
 
   /**
-   * @param energySources resolves the energy provenance of a served model id
+   * @param energySources   resolves the energy provenance of a served model id
+   * @param billingCurrency the configured currency, which an empty period reports in
    */
-  public ReportAggregator(EnergySourceLookup energySources) {
+  public ReportAggregator(EnergySourceLookup energySources, String billingCurrency) {
     this.energySources = Objects.requireNonNull(energySources, "energySources");
+    this.billingCurrency = Objects.requireNonNull(billingCurrency, "billingCurrency");
   }
 
   /**
@@ -51,8 +58,10 @@ public final class ReportAggregator {
    */
   public GreenReport aggregate(List<RequestLog> logs, Instant from, Instant to) {
     long cacheHits = 0;
-    double costEur = 0.0;
-    double costAvoidedEur = 0.0;
+    Map<String, Double> costByCurrency = new LinkedHashMap<>();
+    Map<String, Double> costAvoidedByCurrency = new LinkedHashMap<>();
+    Map<PricingBasis, Long> requestsByBasis = new LinkedHashMap<>();
+    long cachedTokensUnreported = 0;
     double energyKwh = 0.0;
     double gramsCo2 = 0.0;
     double gramsCo2Avoided = 0.0;
@@ -68,8 +77,14 @@ public final class ReportAggregator {
       }
       GreenMetrics green = log.green();
       if (green != null) {
-        costEur += green.costEur();
-        costAvoidedEur += green.costAvoidedEur();
+        String currency = green.currency() == null ? billingCurrency : green.currency();
+        costByCurrency.merge(currency, green.cost(), Double::sum);
+        costAvoidedByCurrency.merge(currency, green.costAvoided(), Double::sum);
+        requestsByBasis.merge(green.pricingBasis(), 1L, Long::sum);
+        if (!log.cacheHit() && green.pricingBasis() == PricingBasis.SPLIT
+            && log.cachedPromptTokens() == null && log.promptTokens() > 0) {
+          cachedTokensUnreported++;
+        }
         energyKwh += green.energyKwh();
         gramsCo2 += green.gramsCo2();
         gramsCo2Avoided += green.gramsCo2Avoided();
@@ -83,8 +98,15 @@ public final class ReportAggregator {
       accumulateBreakdown(log, co2ByRegion, co2ByProvider, assumedRegions);
     }
 
+    String currency = switch (costByCurrency.size()) {
+      case 0 -> billingCurrency;
+      case 1 -> costByCurrency.keySet().iterator().next();
+      default -> null;
+    };
+    CostSummary costs = new CostSummary(currency, costByCurrency, costAvoidedByCurrency,
+        requestsByBasis, cachedTokensUnreported);
     return new GreenReport(from, to, logs.size(), cacheHits,
-        costEur, costAvoidedEur, energyKwh, gramsCo2, gramsCo2Avoided, modelMix,
+        costs, energyKwh, gramsCo2, gramsCo2Avoided, modelMix,
         excludedModelMix, new EmissionsBreakdown(
             co2ByRegion, co2ByProvider, List.copyOf(assumedRegions)));
   }

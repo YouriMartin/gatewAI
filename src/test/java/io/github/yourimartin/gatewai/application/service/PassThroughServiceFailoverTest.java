@@ -24,6 +24,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
@@ -62,11 +63,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PassThroughServiceFailoverTest {
 
   private static final ModelDefinition A =
-      new ModelDefinition("a", "openai", "gpt-a", 0.01, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("a", "openai", "gpt-a", ModelPricing.blended(0.01), null, ModelTier.CLOUD_PREMIUM);
   private static final ModelDefinition B =
-      new ModelDefinition("b", "anthropic", "claude-b", 0.01, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("b", "anthropic", "claude-b", ModelPricing.blended(0.01), null, ModelTier.CLOUD_PREMIUM);
   private static final ModelDefinition C =
-      new ModelDefinition("c", "vllm", "llama-c", 0.0, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("c", "vllm", "llama-c", ModelPricing.NONE, null, ModelTier.CLOUD_PREMIUM);
   private static final String BODY = "{\"model\":\"auto\"}";
 
   @Mock
@@ -254,7 +255,7 @@ class PassThroughServiceFailoverTest {
 
   private PassThroughService service(boolean failoverPinned) {
     return new PassThroughService(client, modelRegistry, decisionRecorder, decisionMetrics,
-        requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator()),
+        requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator(), "EUR"),
         metricsRecorder, providerRegions, cloudRegionZones, health, "", failoverPinned);
   }
 

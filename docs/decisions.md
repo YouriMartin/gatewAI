@@ -7,6 +7,46 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.6 (split pricing and an explicit currency)
+
+- **The `_eur` names are renamed, not kept.** The roadmap left the choice open. The
+  columns become `request_log.cost` / `cost_avoided` (`V13`), the domain fields
+  `cost` / `costAvoided`, the metrics `gatewai_cost_total{currency,pricing_basis}` /
+  `gatewai_cost_avoided_total{currency}`, and the report API fields `total_cost` /
+  `total_cost_avoided`, next to `currency`. A name that says EUR over a USD figure is
+  exactly the kind of wrong reading this project refuses. The report's old
+  `total_cost_eur` / `total_cost_avoided_eur` stay for one release as copies, as
+  `cost-per-1k-tokens` does. The metrics and the MCP tool result are renamed outright:
+  no committed dashboard read the old metrics, and the MCP schema is read by an
+  assistant, not by code that would break.
+- **A third pricing basis value means "no price".** The roadmap lists `NONE` without
+  defining it. It is a registry entry with no price at all, now the default for the
+  local models: their `cost-per-1k-tokens=0.0` lines are removed, so they read *not
+  priced* instead of *blended at zero*.
+- **Currencies are never added up.** The roadmap asks for an explicit currency, not
+  for mixed periods. A report that spans a change of `gatewai.billing.currency` has
+  one total per currency, `currency` and `total_cost` are `null` in the JSON, and the
+  CSV and PDF print one row per currency. Converting would need a rate source the
+  gateway does not have.
+- **The currency is validated once, in the `GreenAccountant` bean.** An unknown ISO
+  4217 code fails startup there. The accountant stamps the currency on every metric it
+  produces, so a row cannot be written without one.
+- **Anthropic's cache tokens are added back to the prompt.** Not in the plan, which
+  only says "read cache-read tokens". Spring AI passes Anthropic's `input_tokens` on as
+  the prompt, and that excludes cache reads and writes, while OpenAI's
+  `prompt_tokens` includes its cached tokens. Without the adjustment the same request
+  would have a different prompt count, and so a different energy figure, depending on
+  the provider.
+- **Cache writes are priced at the input rate, and storage fees are not priced.**
+  The roadmap only names cached input. The chain sends no `cache_control`, so it does
+  not cause Anthropic cache writes. Both gaps are in `limitations.md`.
+- **The example prices were fetched, not recalled.** Claude Opus 4.8 and Gemini 2.5
+  Flash list prices come from the vendors' pricing pages, read 2026-10-22, and are
+  quoted with their URL. They are in USD, and the comments say to set the currency
+  accordingly.
+- **No ADR.** The batch changes a unit and a label, not a structure. ADR 0006's
+  baseline is unchanged in what it compares, only in how it is priced.
+
 ## v4 lot B — B.5 (ordered failover inside a tier)
 
 - **The order is binding order plus an optional `priority`.** The roadmap left the

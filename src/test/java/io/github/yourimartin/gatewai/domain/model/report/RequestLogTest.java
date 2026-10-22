@@ -11,13 +11,14 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 
 import org.junit.jupiter.api.Test;
 
 class RequestLogTest {
 
   private static final GreenMetrics GREEN =
-      new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5);
+      new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5, PricingBasis.BLENDED, "EUR");
 
   @Test
   void fieldsAreAccessible() {
@@ -25,7 +26,7 @@ class RequestLogTest {
     Instant timestamp = Instant.now();
     RequestLog log = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "abc123", 10, 5, 15, 42L,
-        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
 
     assertEquals(id, log.id());
     assertEquals("corr-1", log.correlationId());
@@ -46,7 +47,7 @@ class RequestLogTest {
   void cacheHitIsCarried() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, true);
+        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, true, null);
 
     assertTrue(log.cacheHit());
   }
@@ -55,7 +56,7 @@ class RequestLogTest {
   void clientIdCanBeNull() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, null, GreenMetrics.ZERO, GreenProvenance.UNKNOWN, false);
+        10, 5, 15, 42L, null, GreenMetrics.none("EUR"), GreenProvenance.UNKNOWN, false, null);
 
     assertNull(log.clientId());
   }
@@ -66,7 +67,7 @@ class RequestLogTest {
     // calls, tests) have no correlation id; the log must still be valid.
     RequestLog log = new RequestLog(
         UUID.randomUUID(), null, Instant.now(), "claude-3", "abc123",
-        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        10, 5, 15, 42L, "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
 
     assertNull(log.correlationId());
   }
@@ -77,10 +78,10 @@ class RequestLogTest {
     Instant timestamp = Instant.parse("2026-01-01T00:00:00Z");
     RequestLog log1 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
-        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
     RequestLog log2 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash", 10, 5, 15, 100L,
-        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
 
     assertEquals(log1, log2);
     assertEquals(log1.hashCode(), log2.hashCode());
@@ -92,10 +93,10 @@ class RequestLogTest {
     Instant timestamp = Instant.now();
     RequestLog log1 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash1", 10, 5, 15, 100L,
-        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
     RequestLog log2 = new RequestLog(
         id, "corr-1", timestamp, "claude-3", "hash2", 10, 5, 15, 100L,
-        "client-1", GREEN, GreenProvenance.UNKNOWN, false);
+        "client-1", GREEN, GreenProvenance.UNKNOWN, false, null);
 
     assertNotEquals(log1, log2);
   }

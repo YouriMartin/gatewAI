@@ -10,10 +10,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.carbon.CarbonCalculator;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
@@ -43,21 +47,23 @@ class GreenReportServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new GreenReportService(requestLogRepository, modelRegistry);
+    service = new GreenReportService(requestLogRepository, modelRegistry,
+        new GreenAccountant(new CarbonCalculator(), "EUR"));
   }
 
   @Test
   void generatesReportFromRepositoryRows() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.now(), "haiku", "hash", 1, 1, 2, 0L,
-        "client", new GreenMetrics(0.002, 0.001, 0.46, 0.013, 0.69), GreenProvenance.UNKNOWN, false);
+        "client", new GreenMetrics(0.002, 0.001, 0.46, 0.013, 0.69, PricingBasis.BLENDED, "EUR"),
+            GreenProvenance.UNKNOWN, false, null);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
 
     GreenReport report = service.generate(FROM, TO);
 
     assertEquals(1, report.totalRequests());
     assertEquals(FROM, report.from());
-    assertEquals(0.013, report.totalCostAvoidedEur(), 1e-9);
+    assertEquals(0.013, report.totalCostAvoided(), 1e-9);
     verify(requestLogRepository).findBetween(FROM, TO);
   }
 
@@ -65,10 +71,11 @@ class GreenReportServiceTest {
   void marksRequestsServedByUnaccountedModelsAsExcludedFromScope() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-2", Instant.now(), "qwen2.5:3b", "hash", 1, 1, 2, 0L,
-        "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0), GreenProvenance.UNKNOWN, false);
+        "client", new GreenMetrics(0.0, 0.0, 0.0, 0.0, 0.0, PricingBasis.BLENDED, "EUR"), GreenProvenance.UNKNOWN,
+            false, null);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
     when(modelRegistry.findByModelId("qwen2.5:3b")).thenReturn(Optional.of(
-        new ModelDefinition("local-large", "ollama", "qwen2.5:3b", 0.0,
+        new ModelDefinition("local-large", "ollama", "qwen2.5:3b", ModelPricing.NONE,
             EnergyProfile.NOT_ACCOUNTED, ModelTier.CLOUD_PREMIUM)));
 
     GreenReport report = service.generate(FROM, TO);
@@ -81,7 +88,8 @@ class GreenReportServiceTest {
   void treatsAModelMissingFromTheRegistryAsAccountedRatherThanDroppingIt() {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-3", Instant.now(), "retired-model", "hash", 1, 1, 2,
-        0L, "client", new GreenMetrics(0.002, 0.001, 0.46, 0.0, 0.0), GreenProvenance.UNKNOWN, false);
+        0L, "client", new GreenMetrics(0.002, 0.001, 0.46, 0.0, 0.0, PricingBasis.BLENDED, "EUR"),
+            GreenProvenance.UNKNOWN, false, null);
     when(requestLogRepository.findBetween(FROM, TO)).thenReturn(List.of(log));
     when(modelRegistry.findByModelId("retired-model")).thenReturn(Optional.empty());
 

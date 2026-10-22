@@ -311,20 +311,70 @@ Measured on a real run (`mock` egress, premium tier repointed at `anthropic`
 
 ## Per-request accounting
 
-`GreenAccountant.account(used, premiumBaseline, totalTokens, gridIntensity,
-cacheHit)` produces a `GreenMetrics(costEur, energyKwh, gramsCo2, costAvoidedEur,
-gramsCo2Avoided)`:
+`GreenAccountant.account(used, premiumBaseline, usage, cacheHit)` produces a
+`GreenMetrics(cost, energyKwh, gramsCo2, costAvoided, gramsCo2Avoided, pricingBasis,
+currency)`:
 
-- `totalTokens <= 0` → `GreenMetrics.ZERO`.
+- `totalTokens <= 0` → `GreenMetrics.none(currency)`.
 - **Cache hit**: no inference happened → real cost/energy/CO2 = 0, and the **whole
   premium-default call is credited as avoided** (`avoidedCost`, `avoidedCo2`
   computed for the baseline). This makes the cache's saving visible — it would
   otherwise be invisible.
-- **Miss** with a known `used` model: compute real `costEur` and footprint, and the
+- **Miss** with a known `used` model: compute real `cost` and footprint, and the
   avoided figures = `max(0, baseline − actual)` for both cost and CO2 (the value of
   routing to a cheaper/greener model than the premium default).
 
-Cost = `(totalTokens / 1000) × costPer1kTokens`.
+### Cost: split prices and an explicit currency (v4 B.6)
+
+Until v4 the price was one blended rate per 1000 tokens, and the column was called
+`cost_eur` whatever currency it held. A blended rate cannot tell a 10k-token prompt
+with a 50-token answer (RAG, agents) from its mirror image, so it overstated the cost
+of input-heavy traffic and the savings computed from it.
+
+Each registry entry now carries a `ModelPricing`, in **one** billing currency
+(`gatewai.billing.currency`, ISO 4217, default `EUR`; an unknown code fails startup):
+
+| Basis | Declared as | Cost of one request |
+|---|---|---|
+| `SPLIT` | `pricing.input-per-1m`, `pricing.output-per-1m`, optional `pricing.cached-input-per-1m` | `(prompt − cached) × input + cached × cached-input + completion × output`, per million |
+| `BLENDED` | the deprecated `cost-per-1k-tokens` (startup warning) | `total / 1000 × rate` |
+| `NONE` | no price at all, the default for self-hosted models | `0`, which means **not priced**, not free |
+
+Per million is the unit providers publish, so a price is copied from the vendor page
+without arithmetic. Declaring both a split price and `cost-per-1k-tokens` fails
+startup, and so does a split price with a missing input or output rate: a missing
+rate would read as free.
+
+**Cached input.** `cached` is the number of prompt tokens the provider served from
+its own prompt cache, read from its usage report: OpenAI's
+`prompt_tokens_details.cached_tokens`, and Anthropic's cache reads through Spring AI.
+Anthropic counts cache reads and cache writes **apart** from `input_tokens`, so the
+chain adds them back to the prompt, which then means the same thing for every
+provider. When the provider reports nothing (Ollama, most self-hosted servers,
+Anthropic's OpenAI-compatibility layer) the count is stored as **NULL**, not zero,
+and every prompt token is priced at the input rate. A model declared without a cached
+rate does the same. Cache *writes* are priced at the input rate. Anthropic bills them
+higher (1.25× for a 5-minute write), but the gateway sends no `cache_control`, so the
+chain does not cause any.
+
+**The avoided cost** compares the two sides' own prices for the same usage:
+`max(0, baseline.cost(usage) − used.cost(usage))`, so it uses split prices whenever
+the registry declares them (ADR 0006's baseline, priced properly). A row's
+`pricing_basis` is the served model's; on a cache hit, where only the avoided figure
+exists, it is the baseline's.
+
+**Never converted.** The gateway does no currency conversion. Every row stores its
+currency. A report sums cost per currency, and a period that spans a change of
+`gatewai.billing.currency` has one total per currency and **no grand total**.
+
+**Pre-v4 rows** keep what they were: `BLENDED`, `EUR`, cached count NULL
+(`V13__split_pricing.sql`). They are never back-dated to a split price.
+
+**Every figure says what it is in.** The JSON report carries `currency`,
+`pricing_basis` (`SPLIT`, `BLENDED`, `NONE` or `MIXED`), `requests_by_pricing_basis`
+and a `pricing_note` sentence. The CSV puts the currency in the unit column and the
+basis in the reference column. The PDF names both on each cost row and prints the
+note. The dashboard labels its saving tile `<currency> saved · <basis>`.
 
 The **premium baseline** is the first `CLOUD_PREMIUM` model in the registry
 (`ChatCompletionService.accountGreen`). Each side's grid intensity comes from

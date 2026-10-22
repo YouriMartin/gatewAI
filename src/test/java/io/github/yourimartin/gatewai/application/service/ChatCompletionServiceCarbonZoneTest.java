@@ -27,6 +27,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
@@ -65,17 +66,17 @@ class ChatCompletionServiceCarbonZoneTest {
    * {@code CarbonCalculatorTest}.
    */
   private static final ModelDefinition CLAUDE = new ModelDefinition(
-      "claude-premium", "anthropic", "claude-opus-4-8", 0.015,
+      "claude-premium", "anthropic", "claude-opus-4-8", ModelPricing.blended(0.015),
       new EnergyProfile(0.001, 0.005, 0.0, EnergySource.MODELLED, false),
       ModelTier.CLOUD_PREMIUM);
 
   /** Local tier on the operator's own box: excluded from scope (lot C.1). */
   private static final ModelDefinition QWEN = new ModelDefinition(
-      "local-small", "ollama", "qwen2.5:0.5b", 0.0, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
+      "local-small", "ollama", "qwen2.5:0.5b", ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
 
   /** A self-hosted box with a real coefficient, to see the dispatch zone bite. */
   private static final ModelDefinition VLLM = new ModelDefinition(
-      "vllm-medium", "vllm", "mistral-large", 0.0,
+      "vllm-medium", "vllm", "mistral-large", ModelPricing.NONE,
       new EnergyProfile(0.001, 0.004, 0.0, EnergySource.MODELLED, false),
       ModelTier.CLOUD_ENTRY);
 
@@ -105,7 +106,7 @@ class ChatCompletionServiceCarbonZoneTest {
   @BeforeEach
   void setUp() {
     service = new ChatCompletionService(llmClient, requestLogRepository, modelRegistry,
-        carbonIntensityProvider, new GreenAccountant(new CarbonCalculator()),
+        carbonIntensityProvider, new GreenAccountant(new CarbonCalculator(), "EUR"),
         metricsRecorder, providerRegions, cloudRegionZones);
 
     lenient().when(modelRegistry.findByModelId("claude-opus-4-8"))
@@ -243,7 +244,7 @@ class ChatCompletionServiceCarbonZoneTest {
     assertTrue(logs.get(1).green().gramsCo2() > logs.get(0).green().gramsCo2(),
         "a scalar per-1k-token coefficient would have made these two identical");
     // Cost is billed on the total, so it is the same both ways — as it should be.
-    assertEquals(logs.get(0).green().costEur(), logs.get(1).green().costEur(), 1e-12);
+    assertEquals(logs.get(0).green().cost(), logs.get(1).green().cost(), 1e-12);
   }
 
   private static LlmRequest request() {
@@ -292,7 +293,7 @@ class ChatCompletionServiceCarbonZoneTest {
 
     // The operator sources a better decode figure and doubles it.
     ModelDefinition rebased = new ModelDefinition(
-        "claude-premium", "anthropic", "claude-opus-4-8", 0.015,
+        "claude-premium", "anthropic", "claude-opus-4-8", ModelPricing.blended(0.015),
         new EnergyProfile(0.001, 0.010, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_PREMIUM);
     when(modelRegistry.findByModelId("claude-opus-4-8")).thenReturn(Optional.of(rebased));

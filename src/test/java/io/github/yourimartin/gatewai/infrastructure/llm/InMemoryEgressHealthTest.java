@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -14,9 +15,9 @@ import org.junit.jupiter.api.Test;
 
 class InMemoryEgressHealthTest {
 
-  private static final ModelDefinition MODEL = new ModelDefinition("k", "p", "m", 0.0,
+  private static final ModelDefinition MODEL = new ModelDefinition("k", "p", "m", ModelPricing.NONE,
       EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
-  private static final ModelDefinition OTHER = new ModelDefinition("k2", "p", "m2", 0.0,
+  private static final ModelDefinition OTHER = new ModelDefinition("k2", "p", "m2", ModelPricing.NONE,
       EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
   private static final long COOLDOWN = Duration.ofSeconds(30).toNanos();
 

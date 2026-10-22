@@ -5,11 +5,13 @@ import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
@@ -208,9 +210,20 @@ final class GreenReportPdfWriter {
         fmt(r.cacheHitRate() * 100.0, 1) + " %", true);
     metricRow(t, "Avoided emissions" + avoidedScopeSuffix(r),
         fmt(r.totalGramsCo2Avoided() / 1000.0, 3) + " kg CO2e", false);
-    metricRow(t, "Cost incurred", fmt(r.totalCostEur(), 4) + " EUR", true);
-    metricRow(t, "Cost avoided", fmt(r.totalCostAvoidedEur(), 4) + " EUR", false);
+    // Per currency, never summed across currencies (v4 B.6).
+    CostSummary costs = r.costs();
+    List<String> currencies = costs.costByCurrency().isEmpty() && costs.currency() != null
+        ? List.of(costs.currency())
+        : costs.costByCurrency().keySet().stream().sorted().toList();
+    for (String currency : currencies) {
+      metricRow(t, "Cost incurred (" + costs.basis() + ")",
+          fmt(costs.costByCurrency().getOrDefault(currency, 0.0), 4) + " " + currency, true);
+      metricRow(t, "Cost avoided (" + costs.basis() + ")",
+          fmt(costs.costAvoidedByCurrency().getOrDefault(currency, 0.0), 4) + " " + currency,
+          false);
+    }
     doc.add(t);
+    doc.add(note("Pricing: " + costs.pricingNote()));
     if (r.avoidedBasisDiffers()) {
       doc.add(note(GreenReport.AVOIDED_BASIS_NOTE));
     }

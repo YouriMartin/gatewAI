@@ -30,8 +30,8 @@ Emitted by `MicrometerMetricsRecorder` on every served request:
 |---|---|---|---|
 | `gatewai_requests_total` | counter | `model`, `cache_hit` | request count |
 | `gatewai_tokens_total` | counter | `model` | tokens consumed |
-| `gatewai_cost_eur_total` | counter | `model` | actual € cost |
-| `gatewai_cost_avoided_eur_total` | counter | — | € saved |
+| `gatewai_cost_total` | counter | `model`, `currency`, `pricing_basis` | actual cost (v4 B.6; was `gatewai_cost_eur_total`, whatever the currency) |
+| `gatewai_cost_avoided_total` | counter | `currency` | cost saved vs the premium baseline (was `gatewai_cost_avoided_eur_total`) |
 | `gatewai_energy_kwh_total` | counter | `model` | estimated energy |
 | `gatewai_co2_grams_total` | counter | `model` | gCO2 emitted |
 | `gatewai_co2_avoided_grams_total` | counter | — | gCO2 avoided |

@@ -14,6 +14,7 @@ import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
@@ -50,7 +51,7 @@ class GatewayMcpToolsTest {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     GreenReport report = new GreenReport(
-        from, to, 10, 4, 1.5, 0.5, 0.02, 3.0, 1.0, Map.of("haiku", 10L), Map.of(),
+        from, to, 10, 4, CostSummary.of("EUR", 1.5, 0.5), 0.02, 3.0, 1.0, Map.of("haiku", 10L), Map.of(),
         new EmissionsBreakdown(Map.of("US-MIDA-PJM", 3.0), Map.of("anthropic", 3.0),
             List.of("US-MIDA-PJM")));
     when(greenReportUseCase.generate(from, to)).thenReturn(report);
@@ -77,7 +78,7 @@ class GatewayMcpToolsTest {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     when(greenReportUseCase.generate(from, to)).thenReturn(new GreenReport(
-        from, to, 5, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        from, to, 5, 1, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 5L), Map.of("qwen2.5:3b", 4L), EmissionsBreakdown.EMPTY));
 
     GreenReportToolResult result = tools.greenReport(
@@ -93,7 +94,8 @@ class GatewayMcpToolsTest {
   @Test
   void greenReportDefaultsToTrailingThirtyDayWindow() {
     when(greenReportUseCase.generate(any(), any())).thenReturn(new GreenReport(
-        Instant.EPOCH, Instant.EPOCH, 0, 0, 0, 0, 0, 0, 0, Map.of(), Map.of(), EmissionsBreakdown.EMPTY));
+        Instant.EPOCH, Instant.EPOCH, 0, 0, CostSummary.of("EUR", 0, 0), 0, 0, 0, Map.of(), Map.of(),
+            EmissionsBreakdown.EMPTY));
 
     tools.greenReport(null, null);
 

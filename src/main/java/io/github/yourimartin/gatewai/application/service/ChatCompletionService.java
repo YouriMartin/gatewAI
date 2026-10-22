@@ -53,7 +53,8 @@ class ChatCompletionService
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     accounting.record(request, response.model(), new TokenUsage(
-            response.promptTokens(), response.completionTokens(), response.totalTokens()),
+            response.promptTokens(), response.completionTokens(), response.totalTokens(),
+            response.cachedPromptTokens()),
         response.cacheHit(), latencyMs, RequestAccounting.correlationId(),
         RequestAccounting.clientId());
     return response;
@@ -84,7 +85,8 @@ class ChatCompletionService
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     accounting.record(request, last.model(), new TokenUsage(
-            last.promptTokens(), last.completionTokens(), last.totalTokens()),
+            last.promptTokens(), last.completionTokens(), last.totalTokens(),
+            last.cachedPromptTokens()),
         last.cacheHit(), latencyMs, correlationId, clientId);
   }
 

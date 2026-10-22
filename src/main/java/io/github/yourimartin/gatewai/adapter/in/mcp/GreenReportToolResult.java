@@ -15,8 +15,16 @@ import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
  * @param totalRequests        number of requests served in the range
  * @param cacheHits            requests answered from the semantic cache
  * @param cacheHitRate         share of requests served from cache, in [0, 1]
- * @param totalCostEur         total monetary cost actually incurred
- * @param totalCostAvoidedEur  money saved vs a premium-default baseline
+ * @param totalCost            total monetary cost actually incurred, in
+ *                             {@code currency}; null when the period mixes
+ *                             currencies (then see {@code costByCurrency})
+ * @param totalCostAvoided     money saved vs a premium-default baseline, likewise
+ * @param currency             ISO 4217 code of the costs (v4 B.6); null when mixed
+ * @param costByCurrency       cost incurred per currency
+ * @param costAvoidedByCurrency cost avoided per currency
+ * @param pricingBasis         {@code SPLIT}, {@code BLENDED}, {@code NONE} or
+ *                             {@code MIXED}: how the costs were priced
+ * @param pricingNote          one sentence an assistant repeats with the costs
  * @param totalEnergyKwh       total estimated energy consumed
  * @param totalGramsCo2        total estimated emissions actually produced
  * @param totalGramsCo2Avoided total emissions avoided vs a premium baseline
@@ -42,8 +50,13 @@ record GreenReportToolResult(
     long totalRequests,
     long cacheHits,
     double cacheHitRate,
-    double totalCostEur,
-    double totalCostAvoidedEur,
+    Double totalCost,
+    Double totalCostAvoided,
+    String currency,
+    Map<String, Double> costByCurrency,
+    Map<String, Double> costAvoidedByCurrency,
+    String pricingBasis,
+    String pricingNote,
     double totalEnergyKwh,
     double totalGramsCo2,
     double totalGramsCo2Avoided,
@@ -64,8 +77,13 @@ record GreenReportToolResult(
         report.totalRequests(),
         report.cacheHits(),
         report.cacheHitRate(),
-        report.totalCostEur(),
-        report.totalCostAvoidedEur(),
+        report.costs().mixedCurrencies() ? null : report.totalCost(),
+        report.costs().mixedCurrencies() ? null : report.totalCostAvoided(),
+        report.costs().currency(),
+        report.costs().costByCurrency(),
+        report.costs().costAvoidedByCurrency(),
+        report.costs().basis(),
+        report.costs().pricingNote(),
         report.totalEnergyKwh(),
         report.totalGramsCo2(),
         report.totalGramsCo2Avoided(),

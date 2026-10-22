@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.model.report.ReportAggregator;
@@ -34,12 +35,13 @@ class GreenReportService implements GenerateGreenReportUseCase {
   private final ReportAggregator aggregator;
 
   GreenReportService(RequestLogRepository requestLogRepository,
-                     ModelRegistry modelRegistry) {
+                     ModelRegistry modelRegistry,
+                     GreenAccountant greenAccountant) {
     this.requestLogRepository = requestLogRepository;
     this.aggregator = new ReportAggregator(modelId -> modelRegistry
         .findByModelId(modelId)
         .map(ModelDefinition::energySource)
-        .orElse(EnergySource.MODELLED));
+        .orElse(EnergySource.MODELLED), greenAccountant.currency());
   }
 
   private static final long MAX_DAYS = 366;

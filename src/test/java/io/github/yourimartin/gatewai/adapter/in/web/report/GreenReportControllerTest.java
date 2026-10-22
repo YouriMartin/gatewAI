@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.adapter.in.web.report;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -14,6 +15,8 @@ import java.util.Map;
 
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 import io.github.yourimartin.gatewai.domain.port.in.GenerateGreenReportUseCase;
@@ -50,7 +53,7 @@ class GreenReportControllerTest {
   private static GreenReport report() {
     return new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
-        3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
+        3, 1, CostSummary.of("EUR", 0.017, 0.028), 0.003, 1.61, 1.84,
         Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
   }
 
@@ -71,10 +74,52 @@ class GreenReportControllerTest {
   }
 
   @Test
+  void everyJsonCostCarriesItsCurrencyAndPricingBasis() throws Exception {
+    when(useCase.generate(any(), any())).thenReturn(pricedReport(new CostSummary("USD",
+        Map.of("USD", 0.05), Map.of("USD", 0.3), Map.of(PricingBasis.SPLIT, 3L), 0)));
+
+    mockMvc.perform(get("/v1/reports/green")
+            .param("from", FROM).param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.currency").value("USD"))
+        .andExpect(jsonPath("$.total_cost").value(0.05))
+        .andExpect(jsonPath("$.total_cost_avoided").value(0.3))
+        .andExpect(jsonPath("$.pricing_basis").value("SPLIT"))
+        .andExpect(jsonPath("$.requests_by_pricing_basis.SPLIT").value(3))
+        .andExpect(jsonPath("$.pricing_note").isString())
+        // Kept for one release, as copies: their name says EUR, the value is USD.
+        .andExpect(jsonPath("$.total_cost_eur").value(0.05))
+        .andExpect(jsonPath("$.total_cost_avoided_eur").value(0.3));
+  }
+
+  @Test
+  void aPeriodInTwoCurrenciesHasNoGrandTotal() throws Exception {
+    when(useCase.generate(any(), any())).thenReturn(pricedReport(new CostSummary(null,
+        Map.of("EUR", 1.0, "USD", 2.0), Map.of("EUR", 0.0, "USD", 0.0),
+        Map.of(PricingBasis.BLENDED, 1L, PricingBasis.SPLIT, 2L), 0)));
+
+    mockMvc.perform(get("/v1/reports/green")
+            .param("from", FROM).param("to", TO)
+            .with(authentication(auth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.currency").value(nullValue()))
+        .andExpect(jsonPath("$.total_cost").value(nullValue()))
+        .andExpect(jsonPath("$.cost_by_currency.EUR").value(1.0))
+        .andExpect(jsonPath("$.cost_by_currency.USD").value(2.0))
+        .andExpect(jsonPath("$.pricing_basis").value("MIXED"));
+  }
+
+  private static GreenReport pricedReport(CostSummary costs) {
+    return new GreenReport(Instant.parse(FROM), Instant.parse(TO), 3, 0, costs, 0.002, 1.2,
+        2.4, Map.of("gpt-a", 3L), Map.of(), EmissionsBreakdown.EMPTY);
+  }
+
+  @Test
   void jsonReportCarriesTheScopeBoundaryWhenModelsAreExcluded() throws Exception {
     when(useCase.generate(any(), any())).thenReturn(new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
-        3, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        3, 1, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 3L), Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY));
 
     mockMvc.perform(get("/v1/reports/green")
@@ -149,7 +194,7 @@ class GreenReportControllerTest {
   void jsonReportCarriesTheRegionalAttributionAndTheAccountingBasis() throws Exception {
     when(useCase.generate(any(), any())).thenReturn(new GreenReport(
         Instant.parse(FROM), Instant.parse(TO),
-        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        3, 0, CostSummary.of("EUR", 0.03, 0.0), 0.002, 3.5, 0.0,
         Map.of("claude-opus-4-8", 2L), Map.of(),
         new EmissionsBreakdown(
             Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),

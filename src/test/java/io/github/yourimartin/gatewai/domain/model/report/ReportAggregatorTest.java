@@ -13,6 +13,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,7 @@ class ReportAggregatorTest {
 
   /** Everything accounted unless a test says otherwise. */
   private final ReportAggregator aggregator =
-      new ReportAggregator(modelId -> EnergySource.MODELLED);
+      new ReportAggregator(modelId -> EnergySource.MODELLED, "EUR");
 
   private static RequestLog log(String model, double cost, double costAvoided,
                                 double co2, double co2Avoided, boolean cacheHit) {
@@ -37,12 +38,12 @@ class ReportAggregatorTest {
                                           double co2, RegionProvenance regionProvenance) {
     return new RequestLog(
         UUID.randomUUID(), "corr-agg", Instant.now(), model, "hash", 10, 10, 20, 0L,
-        "client", new GreenMetrics(0.0, 0.001, co2, 0.0, 0.0),
+        "client", new GreenMetrics(0.0, 0.001, co2, 0.0, 0.0, PricingBasis.BLENDED, "EUR"),
         new GreenProvenance(provider, zone, 350.0,
             zone == null ? CarbonZoneSource.GATEWAY_DEFAULT
                 : CarbonZoneSource.PROVIDER_REGION,
             null, regionProvenance, EnergySource.MODELLED, null),
-        false);
+        false, null);
   }
 
   private static RequestLog logAt(Instant timestamp, String model, double cost,
@@ -50,7 +51,8 @@ class ReportAggregatorTest {
                                   double co2Avoided, boolean cacheHit) {
     return new RequestLog(
         UUID.randomUUID(), "corr-agg", timestamp, model, "hash", 1, 1, 2, 0L, "client",
-        new GreenMetrics(cost, 0.001, co2, costAvoided, co2Avoided), GreenProvenance.UNKNOWN, cacheHit);
+        new GreenMetrics(cost, 0.001, co2, costAvoided, co2Avoided, PricingBasis.BLENDED, "EUR"),
+            GreenProvenance.UNKNOWN, cacheHit, null);
   }
 
   @Test
@@ -67,8 +69,8 @@ class ReportAggregatorTest {
     assertEquals(3, report.totalRequests());
     assertEquals(1, report.cacheHits());
     assertEquals(1.0 / 3, report.cacheHitRate(), DELTA);
-    assertEquals(0.017, report.totalCostEur(), DELTA);
-    assertEquals(0.028, report.totalCostAvoidedEur(), DELTA);
+    assertEquals(0.017, report.totalCost(), DELTA);
+    assertEquals(0.028, report.totalCostAvoided(), DELTA);
     assertEquals(0.003, report.totalEnergyKwh(), DELTA);
     assertEquals(1.61, report.totalGramsCo2(), DELTA);
     assertEquals(1.84, report.totalGramsCo2Avoided(), DELTA);
@@ -81,7 +83,7 @@ class ReportAggregatorTest {
   void countsRequestsServedByUnaccountedModelsAsOutOfScope() {
     ReportAggregator localAggregator = new ReportAggregator(
         modelId -> modelId.startsWith("qwen")
-            ? EnergySource.NOT_ACCOUNTED : EnergySource.MODELLED);
+            ? EnergySource.NOT_ACCOUNTED : EnergySource.MODELLED, "EUR");
     List<RequestLog> logs = List.of(
         log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false),
         log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false),
@@ -98,7 +100,7 @@ class ReportAggregatorTest {
   @Test
   void cacheHitsAreNotCountedAsExcludedBecauseNoInferenceRan() {
     ReportAggregator localAggregator =
-        new ReportAggregator(modelId -> EnergySource.NOT_ACCOUNTED);
+        new ReportAggregator(modelId -> EnergySource.NOT_ACCOUNTED, "EUR");
     List<RequestLog> logs = List.of(
         log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, true),
         log("qwen2.5:3b", 0.0, 0.0, 0.0, 0.0, false));

@@ -22,8 +22,11 @@ any valid key; the **admin** sections (API keys, routing config) require an
 
 Three headline numbers for the trailing 30 days:
 
-- **€ saved** — money avoided versus a premium-by-default baseline, thanks to cache
-  + routing (`total_cost_avoided_eur`).
+- **`<currency>` saved · `<basis>`** — money avoided versus a premium-by-default
+  baseline, thanks to cache + routing (`total_cost_avoided`), labelled with the
+  report's currency and pricing basis (v4 B.6). When the period mixes currencies the
+  tile says so instead of adding them up. Unless every request is split-priced, the
+  `pricing_note` is shown under the tiles.
 - **gCO₂ avoided** — emissions avoided versus that same baseline
   (`total_grams_co2_avoided`).
 - **Cache hit rate** — share of requests served from the semantic cache.
@@ -35,7 +38,7 @@ These are the "headline savings" figures; treat the carbon value as directional
 
 Two **sparklines** showing the daily evolution over the last 30 days:
 
-- **€ saved / day**
+- **`<currency>` saved / day**
 - **gCO₂ avoided / day**
 
 They are backed by `GET /v1/reports/green/series` (one point per day).

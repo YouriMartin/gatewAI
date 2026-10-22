@@ -1,9 +1,11 @@
 package io.github.yourimartin.gatewai.adapter.in.web.report;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
 import tools.jackson.databind.PropertyNamingStrategies;
@@ -17,6 +19,12 @@ import tools.jackson.databind.annotation.JsonNaming;
  * measured zero when part or all of the period is excluded from scope. The
  * {@code grams_co2_by_region} / {@code by_provider} split and {@code assumed_regions}
  * (v3 lot C.5) come from what each row stored, not from the current registry.
+ *
+ * <p>Since v4 B.6 every cost travels with its {@code currency} and
+ * {@code pricing_basis}, and {@code pricing_note} says in one sentence what that
+ * means. {@code total_cost_eur} and {@code total_cost_avoided_eur} are kept for one
+ * release as copies of {@code total_cost} / {@code total_cost_avoided}: despite
+ * their names they hold the report's currency, which is EUR only by default.
  */
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record GreenReportResponse(
@@ -25,8 +33,16 @@ public record GreenReportResponse(
     long totalRequests,
     long cacheHits,
     double cacheHitRate,
-    double totalCostEur,
-    double totalCostAvoidedEur,
+    Double totalCost,
+    Double totalCostAvoided,
+    String currency,
+    Map<String, Double> costByCurrency,
+    Map<String, Double> costAvoidedByCurrency,
+    String pricingBasis,
+    Map<String, Long> requestsByPricingBasis,
+    String pricingNote,
+    @Deprecated Double totalCostEur,
+    @Deprecated Double totalCostAvoidedEur,
     double totalEnergyKwh,
     double totalGramsCo2,
     double totalGramsCo2Avoided,
@@ -46,6 +62,11 @@ public record GreenReportResponse(
 ) {
 
   public GreenReportResponse {
+    costByCurrency = costByCurrency == null ? Map.of() : Map.copyOf(costByCurrency);
+    costAvoidedByCurrency =
+        costAvoidedByCurrency == null ? Map.of() : Map.copyOf(costAvoidedByCurrency);
+    requestsByPricingBasis =
+        requestsByPricingBasis == null ? Map.of() : Map.copyOf(requestsByPricingBasis);
     modelMix = modelMix == null ? Map.of() : Map.copyOf(modelMix);
     excludedModelMix =
         excludedModelMix == null ? Map.of() : Map.copyOf(excludedModelMix);
@@ -58,14 +79,28 @@ public record GreenReportResponse(
   }
 
   static GreenReportResponse of(GreenReport report) {
+    CostSummary costs = report.costs();
+    // A period that mixes currencies has no grand total: null, never a sum.
+    Double totalCost = costs.mixedCurrencies() ? null : costs.totalCost();
+    Double totalCostAvoided = costs.mixedCurrencies() ? null : costs.totalCostAvoided();
+    Map<String, Long> byBasis = new LinkedHashMap<>();
+    costs.requestsByBasis().forEach((basis, count) -> byBasis.put(basis.name(), count));
     return new GreenReportResponse(
         report.from(),
         report.to(),
         report.totalRequests(),
         report.cacheHits(),
         report.cacheHitRate(),
-        report.totalCostEur(),
-        report.totalCostAvoidedEur(),
+        totalCost,
+        totalCostAvoided,
+        costs.currency(),
+        costs.costByCurrency(),
+        costs.costAvoidedByCurrency(),
+        costs.basis(),
+        byBasis,
+        costs.pricingNote(),
+        totalCost,
+        totalCostAvoided,
         report.totalEnergyKwh(),
         report.totalGramsCo2(),
         report.totalGramsCo2Avoided(),

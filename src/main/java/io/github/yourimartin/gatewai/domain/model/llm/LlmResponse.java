@@ -9,6 +9,9 @@ package io.github.yourimartin.gatewai.domain.model.llm;
  * @param cacheOutcome what the cache did — {@code HIT}, {@code MISS} or
  *     {@code BYPASS} — for the {@code X-GatewAI-Cache} header (ADR 0014); null
  *     when no cache decision reached the response
+ * @param cachedPromptTokens prompt tokens the provider served from its prompt
+ *     cache, counted in {@code promptTokens} (v4 B.6); {@code null} when it did not
+ *     report them
  */
 public record LlmResponse(
     String model,
@@ -18,7 +21,8 @@ public record LlmResponse(
     int completionTokens,
     int totalTokens,
     boolean cacheHit,
-    String cacheOutcome
+    String cacheOutcome,
+    Integer cachedPromptTokens
 ) {
 
   /**
@@ -38,6 +42,14 @@ public record LlmResponse(
    * on a model the registry knows.
    */
   public static final String ROUTED_MODEL_METADATA_KEY = "gatewai.routing.model";
+
+  /** A response whose provider reported no cached prompt tokens. */
+  public LlmResponse(String model, String content, String finishReason, int promptTokens,
+                     int completionTokens, int totalTokens, boolean cacheHit,
+                     String cacheOutcome) {
+    this(model, content, finishReason, promptTokens, completionTokens, totalTokens, cacheHit,
+        cacheOutcome, null);
+  }
 
   /** A response whose cache outcome is only known as hit or not. */
   public LlmResponse(String model, String content, String finishReason, int promptTokens,

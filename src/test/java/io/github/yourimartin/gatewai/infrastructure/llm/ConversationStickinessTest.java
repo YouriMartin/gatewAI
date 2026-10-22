@@ -16,6 +16,7 @@ import java.util.Optional;
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationOpening;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationRouting;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
@@ -112,6 +113,6 @@ class ConversationStickinessTest {
   }
 
   private static ModelDefinition model(String id, ModelTier tier) {
-    return new ModelDefinition(id, "provider", id, 0.0, EnergyProfile.NOT_ACCOUNTED, tier);
+    return new ModelDefinition(id, "provider", id, ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, tier);
   }
 }

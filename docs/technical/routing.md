@@ -10,14 +10,16 @@ Three tiers (`domain/model/routing/ModelTier`): `LOCAL`, `CLOUD_ENTRY`, `CLOUD_P
 
 The **model registry** maps configuration to `ModelDefinition`s
 (`PropertiesModelRegistry` over `ModelRegistryProperties`, prefix
-`gatewai.models.registry`). Each entry has: provider, model id, €/1k tokens, energy
-intensity (kWh/1k tokens), and tier. Default registry:
+`gatewai.models.registry`). Each entry has: provider, model id, a price (split
+per-million rates since v4 B.6, see
+[`green-accounting.md`](green-accounting.md#cost-split-prices-and-an-explicit-currency-v4-b6)),
+an energy profile, and a tier. Default registry:
 
-| Key | Provider | Model id | Tier | €/1k | kWh/1k |
+| Key | Provider | Model id | Tier | Price | Energy |
 |---|---|---|---|---|---|
-| `local-small` | ollama | qwen2.5:0.5b | `LOCAL` | 0.0 | 0.0005 |
-| `local-medium` | ollama | qwen2.5:1.5b | `CLOUD_ENTRY` | 0.0 | 0.001 |
-| `local-large` | ollama | qwen2.5:3b | `CLOUD_PREMIUM` | 0.0 | 0.002 |
+| `local-small` | ollama | qwen2.5:0.5b | `LOCAL` | not priced | not accounted |
+| `local-medium` | ollama | qwen2.5:1.5b | `CLOUD_ENTRY` | not priced | not accounted |
+| `local-large` | ollama | qwen2.5:3b | `CLOUD_PREMIUM` | not priced | not accounted |
 
 The defaults are **local-first since Phase 8**: three Qwen sizes on the bundled
 Ollama, zero API keys. Cloud entries (`claude-opus`, `gpt-…`) ship commented in
@@ -451,7 +453,9 @@ bilingual EN/FR examples are defined in `ClassifierProperties`).
 instance runs, for carbon attribution (see
 [`green-accounting.md`](green-accounting.md#where-a-provider-runs-v3-lot-c2)).
 `gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
-`model-id` (unique), `cost-per-1k-tokens`, `tier`, `priority` (place in the tier's
+`model-id` (unique), `pricing.input-per-1m` / `pricing.output-per-1m` /
+`pricing.cached-input-per-1m` (v4 B.6; the deprecated `cost-per-1k-tokens` still binds
+as a blended rate), `tier`, `priority` (place in the tier's
 failover chain, lowest first; unset entries follow in binding order), and the
 `energy.*` group:
 `prefill-kwh-per-1k-prompt-tokens`, `decode-kwh-per-1k-completion-tokens`,
@@ -462,3 +466,4 @@ every coefficient:
 [`green-accounting.md`](green-accounting.md#the-coefficients-and-where-they-come-from).
 `gatewai.failover.*` (v4 B.5): `pinned` (default false), `failure-threshold` (default
 3), `cooldown` (default `PT30S`).
+`gatewai.billing.currency` (v4 B.6): ISO 4217 code of every price, default `EUR`.

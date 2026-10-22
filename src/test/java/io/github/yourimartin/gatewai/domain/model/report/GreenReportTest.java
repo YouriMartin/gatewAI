@@ -20,7 +20,7 @@ class GreenReportTest {
                                     double gramsCo2, double gramsCo2Avoided,
                                     Map<String, Long> modelMix,
                                     Map<String, Long> excluded) {
-    return new GreenReport(FROM, TO, requests, cacheHits, 0.0, 0.0, 0.0,
+    return new GreenReport(FROM, TO, requests, cacheHits, CostSummary.of("EUR", 0.0, 0.0), 0.0,
         gramsCo2, gramsCo2Avoided, modelMix, excluded, EmissionsBreakdown.EMPTY);
   }
 
@@ -83,7 +83,8 @@ class GreenReportTest {
 
   @Test
   void nullMapsAreTreatedAsEmpty() {
-    GreenReport report = new GreenReport(FROM, TO, 0, 0, 0, 0, 0, 0, 0, null, null, EmissionsBreakdown.EMPTY);
+    GreenReport report = new GreenReport(FROM, TO, 0, 0, CostSummary.of("EUR", 0, 0), 0, 0, 0, null, null,
+        EmissionsBreakdown.EMPTY);
 
     assertTrue(report.modelMix().isEmpty());
     assertTrue(report.excludedModelMix().isEmpty());

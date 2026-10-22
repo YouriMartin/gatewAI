@@ -110,7 +110,7 @@ class PassThroughAcceptanceTest {
 
     @Bean
     GreenAccountant greenAccountant() {
-      return new GreenAccountant(new CarbonCalculator());
+      return new GreenAccountant(new CarbonCalculator(), "EUR");
     }
   }
 

@@ -11,6 +11,7 @@ import java.util.Optional;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -134,7 +135,7 @@ class PropertiesModelRegistryTest {
     Optional<ModelDefinition> result = registry.findByKey("llama3");
 
     assertTrue(result.isPresent());
-    assertEquals(0.0, result.get().costPer1kTokens());
+    assertEquals(ModelPricing.blended(0.0), result.get().pricing());
     assertEquals(0.05, result.get().energy().decodeKwhPer1kCompletionTokens());
     assertEquals(EnergySource.MODELLED, result.get().energySource());
   }
@@ -192,7 +193,7 @@ class PropertiesModelRegistryTest {
 
     try {
       all.add(new ModelDefinition(
-          "test", "test", "test", 0, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL));
+          "test", "test", "test", ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL));
       // If add succeeds, test fails
       assertTrue(false, "List should be immutable");
     } catch (UnsupportedOperationException expected) {

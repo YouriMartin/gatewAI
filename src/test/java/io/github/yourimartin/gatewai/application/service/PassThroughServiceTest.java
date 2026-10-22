@@ -30,6 +30,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedExceptio
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughResponse;
@@ -66,11 +67,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PassThroughServiceTest {
 
   private static final ModelDefinition LOCAL =
-      new ModelDefinition("local", "ollama", "qwen2.5:0.5b", 0.0, null, ModelTier.LOCAL);
+      new ModelDefinition("local", "ollama", "qwen2.5:0.5b", ModelPricing.NONE, null, ModelTier.LOCAL);
   private static final ModelDefinition PREMIUM =
-      new ModelDefinition("premium", "openai", "gpt-5", 0.01, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("premium", "openai", "gpt-5", ModelPricing.blended(0.01), null, ModelTier.CLOUD_PREMIUM);
   private static final ModelDefinition PREMIUM_2 =
-      new ModelDefinition("premium2", "openai", "gpt-5-mini", 0.002, null, ModelTier.CLOUD_PREMIUM);
+      new ModelDefinition("premium2", "openai", "gpt-5-mini", ModelPricing.blended(0.002), null,
+          ModelTier.CLOUD_PREMIUM);
   private static final String BODY = "{\"model\":\"auto\"}";
 
   @Mock
@@ -381,7 +383,7 @@ class PassThroughServiceTest {
 
   private PassThroughService service(String defaultModel) {
     return new PassThroughService(client, modelRegistry, decisionRecorder, decisionMetrics,
-        requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator()),
+        requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator(), "EUR"),
         metricsRecorder, providerRegions, cloudRegionZones, health, defaultModel, false);
   }
 

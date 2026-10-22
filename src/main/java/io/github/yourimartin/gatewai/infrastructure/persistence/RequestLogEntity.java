@@ -7,6 +7,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.CarbonZoneSource;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
@@ -52,8 +53,9 @@ class RequestLogEntity {
   @Column(name = "client_id", updatable = false)
   private String clientId;
 
-  @Column(name = "cost_eur", updatable = false)
-  private double costEur;
+  /** In {@link #currency}; the column was {@code cost_eur} until v4 B.6. */
+  @Column(name = "cost", updatable = false)
+  private double cost;
 
   @Column(name = "energy_kwh", updatable = false)
   private double energyKwh;
@@ -61,14 +63,27 @@ class RequestLogEntity {
   @Column(name = "grams_co2", updatable = false)
   private double gramsCo2;
 
-  @Column(name = "cost_avoided_eur", updatable = false)
-  private double costAvoidedEur;
+  @Column(name = "cost_avoided", updatable = false)
+  private double costAvoided;
 
   @Column(name = "grams_co2_avoided", updatable = false)
   private double gramsCo2Avoided;
 
   @Column(name = "cache_hit", updatable = false)
   private boolean cacheHit;
+
+  // --- Pricing (v4 B.6): what the two costs are in and how they were priced.
+  // Rows written before B.6 read BLENDED, EUR, and no cached-token count.
+
+  @Column(name = "cached_prompt_tokens", updatable = false)
+  private Integer cachedPromptTokens;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "pricing_basis", updatable = false, nullable = false, length = 16)
+  private PricingBasis pricingBasis;
+
+  @Column(name = "currency", updatable = false, nullable = false, length = 3)
+  private String currency;
 
   // --- Green provenance (v3 lot C.5): what the figures above were derived from,
   // so a row explains itself without consulting today's configuration. Nullable
@@ -118,12 +133,18 @@ class RequestLogEntity {
     this.clientId = log.clientId();
     this.cacheHit = log.cacheHit();
 
-    GreenMetrics green = log.green() != null ? log.green() : GreenMetrics.ZERO;
-    this.costEur = green.costEur();
+    this.cachedPromptTokens = log.cachedPromptTokens();
+
+    // Production always logs an accounting, if only to say nothing was priced; a row
+    // without one has no currency, which the NOT NULL column then refuses.
+    GreenMetrics green = log.green() != null ? log.green() : GreenMetrics.none(null);
+    this.cost = green.cost();
     this.energyKwh = green.energyKwh();
     this.gramsCo2 = green.gramsCo2();
-    this.costAvoidedEur = green.costAvoidedEur();
+    this.costAvoided = green.costAvoided();
     this.gramsCo2Avoided = green.gramsCo2Avoided();
+    this.pricingBasis = green.pricingBasis();
+    this.currency = green.currency();
 
     GreenProvenance provenance = log.provenance();
     this.provider = provenance.provider();
@@ -141,10 +162,11 @@ class RequestLogEntity {
         id, correlationId, timestamp, model, promptHash,
         promptTokens, completionTokens, totalTokens, latencyMs,
         clientId,
-        new GreenMetrics(costEur, energyKwh, gramsCo2,
-            costAvoidedEur, gramsCo2Avoided),
+        new GreenMetrics(cost, energyKwh, gramsCo2,
+            costAvoided, gramsCo2Avoided, pricingBasis, currency),
         provenance(),
-        cacheHit
+        cacheHit,
+        cachedPromptTokens
     );
   }
 

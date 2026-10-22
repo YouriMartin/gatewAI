@@ -333,8 +333,12 @@ async function revoke(id: string) {
     </p>
     <section class="cards">
       <div class="card">
-        <span class="label">€ saved</span>
-        <strong>{report.total_cost_avoided_eur.toFixed(4)}</strong>
+        <span class="label">{report.currency ?? 'Cost'} saved · {report.pricing_basis}</span>
+        {#if report.total_cost_avoided === null}
+          <strong class="excluded">mixed currencies — see export</strong>
+        {:else}
+          <strong>{report.total_cost_avoided.toFixed(4)}</strong>
+        {/if}
       </div>
       <div class="card">
         <span class="label">gCO₂ avoided</span>
@@ -350,6 +354,10 @@ async function revoke(id: string) {
       </div>
     </section>
 
+    {#if report.pricing_basis !== 'SPLIT' && report.total_requests > 0}
+      <p class="scope-note"><strong>Pricing:</strong> {report.pricing_note}</p>
+    {/if}
+
     {#if report.emissions_scope !== 'ALL_ACCOUNTED' && report.emissions_scope !== 'NO_ACTIVITY'}
       <p class="scope-note">
         <strong>Emissions scope:</strong> {report.emissions_scope_note}
@@ -364,8 +372,10 @@ async function revoke(id: string) {
         <h2>Trends (30 days)</h2>
         <div class="cards">
           <div class="card">
-            <span class="label">€ saved / day</span>
-            <Sparkline values={series.map((p) => p.total_cost_avoided_eur)} />
+            <span class="label">
+              {report.currency ?? 'Cost'} saved / day · {report.pricing_basis}
+            </span>
+            <Sparkline values={series.map((p) => p.total_cost_avoided ?? 0)} />
           </div>
           <div class="card">
             <span class="label">gCO₂ avoided / day</span>

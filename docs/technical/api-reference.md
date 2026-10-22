@@ -265,6 +265,10 @@ stored in clear text until the job is deleted.
 {
   "from": "2026-01-01T00:00:00Z", "to": "2026-02-01T00:00:00Z",
   "total_requests": 1280, "cache_hits": 410, "cache_hit_rate": 0.32,
+  "total_cost": 3.91, "total_cost_avoided": 5.12, "currency": "USD",
+  "cost_by_currency": {"USD": 3.91}, "cost_avoided_by_currency": {"USD": 5.12},
+  "pricing_basis": "MIXED", "requests_by_pricing_basis": {"SPLIT": 870, "NONE": 410},
+  "pricing_note": "Pricing basis is mixed: 870 split, 0 blended, 410 not priced (cost zero because no price is declared).",
   "total_cost_eur": 3.91, "total_cost_avoided_eur": 5.12,
   "total_energy_kwh": 0.84, "total_grams_co2": 193.2,
   "total_grams_co2_avoided": 256.7,
@@ -282,6 +286,19 @@ stored in clear text until the job is deleted.
   "assumed_region_note": "Region assumed, not known, for: US-MIDA-PJM. …"
 }
 ```
+
+The cost block (v4 B.6) never travels without what it is in. `currency` is the
+ISO 4217 code of `total_cost` and `total_cost_avoided`. When the period spans a change
+of `gatewai.billing.currency`, `currency`, `total_cost` and `total_cost_avoided` are
+`null`, and `cost_by_currency` / `cost_avoided_by_currency` hold one figure per
+currency, because no conversion is done. `pricing_basis` is `SPLIT`, `BLENDED`
+(the deprecated `cost-per-1k-tokens`), `NONE` (no price declared: a zero cost means
+*not priced*) or `MIXED`, with the counts in `requests_by_pricing_basis`.
+`pricing_note` says the same in one sentence, including how many split-priced requests
+did not report cached prompt tokens. **Deprecated:** `total_cost_eur` and
+`total_cost_avoided_eur` are copies of `total_cost` / `total_cost_avoided` kept for
+one release. Despite their names they hold the report's currency. See
+[`green-accounting.md`](green-accounting.md#cost-split-prices-and-an-explicit-currency-v4-b6).
 
 The `emissions_scope` block (v3 lot C.1) says what the CO2 totals cover, so a zero
 is never read as a measured zero: `NO_ACTIVITY` | `ALL_ACCOUNTED` |

@@ -13,6 +13,7 @@ import java.util.Properties;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
 import io.github.yourimartin.gatewai.infrastructure.llm.EvalClassifierFactory;
@@ -147,10 +148,26 @@ final class EvalConfig {
         key,
         entry.getOrDefault("provider", ""),
         entry.getOrDefault("model-id", ""),
-        Double.parseDouble(entry.getOrDefault("cost-per-1k-tokens", "0")),
+        pricing(entry),
         energyProfile(entry),
         tier(entry.get("tier")))));
     return List.copyOf(models);
+  }
+
+  /**
+   * Reads the price (v4 B.6) as the registry binds it: {@code pricing.*} as split
+   * rates, else the deprecated {@code cost-per-1k-tokens} as a blended one, else none.
+   */
+  private static ModelPricing pricing(Map<String, String> entry) {
+    if (entry.containsKey("pricing.input-per-1m") || entry.containsKey("pricing.output-per-1m")) {
+      String cached = entry.get("pricing.cached-input-per-1m");
+      return ModelPricing.split(
+          Double.parseDouble(entry.getOrDefault("pricing.input-per-1m", "0")),
+          Double.parseDouble(entry.getOrDefault("pricing.output-per-1m", "0")),
+          cached == null ? null : Double.parseDouble(cached));
+    }
+    String blended = entry.get("cost-per-1k-tokens");
+    return blended == null ? ModelPricing.NONE : ModelPricing.blended(Double.parseDouble(blended));
   }
 
   /**

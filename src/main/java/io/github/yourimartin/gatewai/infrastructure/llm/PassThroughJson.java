@@ -32,7 +32,9 @@ final class PassThroughJson {
   /**
    * The {@code usage} of a Chat Completions answer, or {@code null} when the
    * upstream reported none or the body is not JSON. A missing total is the sum of
-   * the two phases.
+   * the two phases. {@code prompt_tokens_details.cached_tokens} is the part of the
+   * prompt served from the provider's cache (v4 B.6): OpenAI reports it, and so do
+   * servers that copy the field; anything else leaves it unreported, not zero.
    */
   static TokenUsage usage(String body) {
     try {
@@ -49,9 +51,10 @@ final class PassThroughJson {
     int prompt = usage.path("prompt_tokens").asInt(0);
     int completion = usage.path("completion_tokens").asInt(0);
     JsonNode total = usage.get("total_tokens");
-    return total == null || !total.isNumber()
-        ? TokenUsage.of(prompt, completion)
-        : new TokenUsage(prompt, completion, total.asInt());
+    JsonNode cached = usage.path("prompt_tokens_details").get("cached_tokens");
+    return new TokenUsage(prompt, completion,
+        total == null || !total.isNumber() ? prompt + completion : total.asInt(),
+        cached == null || !cached.isNumber() ? null : cached.asInt());
   }
 
   /**

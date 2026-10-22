@@ -13,6 +13,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ class JpaRequestLogAdapterTest {
     RequestLog log = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.now(), "claude-3",
         "a".repeat(64), 10, 5, 15, 200L, "client-1",
-        new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5), GreenProvenance.UNKNOWN, false
+        new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5, PricingBasis.BLENDED, "EUR"), GreenProvenance.UNKNOWN, false, null
     );
 
     when(jpaRepository.save(any(RequestLogEntity.class)))
@@ -57,12 +58,29 @@ class JpaRequestLogAdapterTest {
   }
 
   @Test
+  void theCachedCountThePricingBasisAndTheCurrencySurviveTheRoundTrip() {
+    RequestLog original = new RequestLog(
+        UUID.randomUUID(), "corr-2", Instant.parse("2026-10-22T12:00:00Z"),
+        "gpt-a", "c".repeat(64), 10_000, 50, 10_050, 900L, "tenant-7",
+        new GreenMetrics(0.0153, 0.0, 0.0, 0.0371, 0.0, PricingBasis.SPLIT, "USD"),
+        GreenProvenance.UNKNOWN, false, 8_000);
+
+    RequestLog restored = new RequestLogEntity(original).toDomain();
+
+    assertEquals(original, restored);
+    assertEquals(8_000, restored.cachedPromptTokens());
+    assertEquals(PricingBasis.SPLIT, restored.green().pricingBasis());
+    assertEquals("USD", restored.green().currency());
+  }
+
+  @Test
   void roundTripDomainToEntityToDomain() {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), "corr-1", Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3-opus", "b".repeat(64),
         100, 50, 150, 1234L, "tenant-42",
-        new GreenMetrics(2.25, 0.75, 172.5, 22.5, 60.0), GreenProvenance.UNKNOWN, true
+        new GreenMetrics(2.25, 0.75, 172.5, 22.5, 60.0, PricingBasis.BLENDED, "EUR"), GreenProvenance.UNKNOWN,
+            true, null
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);
@@ -76,7 +94,7 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), null, Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3", "c".repeat(64),
-        10, 5, 15, 100L, null, GreenMetrics.ZERO, GreenProvenance.UNKNOWN, false
+        10, 5, 15, 100L, null, GreenMetrics.none("EUR"), GreenProvenance.UNKNOWN, false, null
     );
 
     RequestLogEntity entity = new RequestLogEntity(original);
@@ -93,8 +111,8 @@ class JpaRequestLogAdapterTest {
     RequestLog original = new RequestLog(
         UUID.randomUUID(), "corr-9", Instant.parse("2026-09-01T09:00:00Z"),
         "claude-opus-4-8", "d".repeat(64), 320, 322, 642, 900L, "tenant-1",
-        new GreenMetrics(0.00963, 0.0059471552, 2.08150432, 0.0, 0.0),
-        provenance, false);
+        new GreenMetrics(0.00963, 0.0059471552, 2.08150432, 0.0, 0.0, PricingBasis.BLENDED, "EUR"),
+        provenance, false, null);
 
     RequestLog restored = new RequestLogEntity(original).toDomain();
 
@@ -114,7 +132,7 @@ class JpaRequestLogAdapterTest {
     RequestLog preC5 = new RequestLog(
         UUID.randomUUID(), "corr-old", Instant.parse("2026-06-01T12:00:00Z"),
         "claude-3", "e".repeat(64), 10, 5, 15, 100L, "tenant-1",
-        new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5), null, false);
+        new GreenMetrics(0.3, 0.01, 2.3, 0.6, 1.5, PricingBasis.BLENDED, "EUR"), null, false, null);
 
     // Null provenance is what a pre-V9 row deserialises to: the columns are NULL.
     RequestLog restored = new RequestLogEntity(preC5).toDomain();

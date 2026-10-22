@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsBreakdown;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
@@ -20,7 +22,7 @@ class GreenReportCsvWriterTest {
     return new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        3, 1, 0.017, 0.028, 0.003, 1.61, 1.84,
+        3, 1, CostSummary.of("EUR", 0.017, 0.028), 0.003, 1.61, 1.84,
         Map.of("haiku", 1L, "sonnet", 2L), Map.of(), EmissionsBreakdown.EMPTY);
   }
 
@@ -29,7 +31,7 @@ class GreenReportCsvWriterTest {
     return new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        4, 1, 0.0, 0.0, 0.0, 0.0, 0.0,
+        4, 1, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 4L), Map.of("qwen2.5:3b", 3L), EmissionsBreakdown.EMPTY);
   }
 
@@ -88,7 +90,7 @@ class GreenReportCsvWriterTest {
     GreenReport mixed = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        4, 0, 0.03, 0.05, 0.002, 1.2, 2.4,
+        4, 0, CostSummary.of("EUR", 0.03, 0.05), 0.002, 1.2, 2.4,
         Map.of("claude-opus-4-8", 2L, "qwen2.5:3b", 2L),
         Map.of("qwen2.5:3b", 2L), EmissionsBreakdown.EMPTY);
 
@@ -116,7 +118,7 @@ class GreenReportCsvWriterTest {
     GreenReport attributed = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        3, 0, 0.03, 0.0, 0.002, 3.5, 0.0,
+        3, 0, CostSummary.of("EUR", 0.03, 0.0), 0.002, 3.5, 0.0,
         Map.of("claude-opus-4-8", 2L, "mistral-large", 1L), Map.of(),
         new EmissionsBreakdown(
             Map.of("US-MIDA-PJM", 3.0, "FR", 0.5),
@@ -142,7 +144,7 @@ class GreenReportCsvWriterTest {
     GreenReport known = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        1, 0, 0.01, 0.0, 0.001, 0.5, 0.0,
+        1, 0, CostSummary.of("EUR", 0.01, 0.0), 0.001, 0.5, 0.0,
         Map.of("mistral-large", 1L), Map.of(),
         new EmissionsBreakdown(Map.of("FR", 0.5), Map.of("vllm", 0.5), List.of()));
 
@@ -157,7 +159,7 @@ class GreenReportCsvWriterTest {
     GreenReport local = new GreenReport(
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-30T00:00:00Z"),
-        1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        1, 0, CostSummary.of("EUR", 0.0, 0.0), 0.0, 0.0, 0.0,
         Map.of("qwen2.5:3b", 1L), Map.of("qwen2.5:3b", 1L),
         new EmissionsBreakdown(Map.of(GreenProvenance.UNATTRIBUTED_ZONE, 0.0),
             Map.of("ollama", 0.0), List.of()));
@@ -177,5 +179,37 @@ class GreenReportCsvWriterTest {
         .filter(row -> row.contains(",kg CO2e,") || row.contains(",t CO2e,")
             || row.contains(",g CO2e/request,"))
         .toList();
+  }
+
+  @Test
+  void everyCostRowNamesItsCurrencyAndPricingBasis() {
+    String csv = GreenReportCsvWriter.toCsv(pricedReport(new CostSummary("USD",
+        Map.of("USD", 0.05), Map.of("USD", 0.3), Map.of(PricingBasis.SPLIT, 4L), 0)));
+
+    assertTrue(csv.contains(
+        "Resource efficiency,Cost incurred,0.050000,USD,pricing basis: SPLIT\n"), csv);
+    assertTrue(csv.contains(
+        "Resource efficiency,Cost avoided (non-inventory),0.300000,USD,pricing basis: SPLIT\n"),
+        csv);
+    assertTrue(csv.contains("Resource efficiency,Pricing basis,SPLIT,,"
+        + "Every request is priced at split input/output/cached-input rates.\n"), csv);
+    assertFalse(csv.contains(",EUR,"), csv);
+  }
+
+  @Test
+  void aPeriodInTwoCurrenciesGetsOneRowPerCurrencyAndNoSum() {
+    String csv = GreenReportCsvWriter.toCsv(pricedReport(new CostSummary(null,
+        Map.of("EUR", 1.0, "USD", 2.0), Map.of("EUR", 0.0, "USD", 0.0),
+        Map.of(PricingBasis.BLENDED, 1L, PricingBasis.SPLIT, 1L), 0)));
+
+    assertTrue(csv.contains("Resource efficiency,Cost incurred,1.000000,EUR,"), csv);
+    assertTrue(csv.contains("Resource efficiency,Cost incurred,2.000000,USD,"), csv);
+    assertFalse(csv.contains("3.000000"), csv);
+  }
+
+  private static GreenReport pricedReport(CostSummary costs) {
+    return new GreenReport(Instant.parse("2026-06-01T00:00:00Z"),
+        Instant.parse("2026-06-30T00:00:00Z"), 4, 0, costs, 0.002, 1.2, 2.4,
+        Map.of("gpt-a", 4L), Map.of(), EmissionsBreakdown.EMPTY);
   }
 }

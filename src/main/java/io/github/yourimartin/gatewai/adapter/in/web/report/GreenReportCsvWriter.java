@@ -3,11 +3,13 @@ package io.github.yourimartin.gatewai.adapter.in.web.report;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergySource;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.report.CostSummary;
 import io.github.yourimartin.gatewai.domain.model.report.EmissionsScope;
 import io.github.yourimartin.gatewai.domain.model.report.GreenReport;
 
@@ -82,10 +84,18 @@ final class GreenReportCsvWriter {
     row(csv, "Resource efficiency",
         "Avoided emissions (non-inventory)" + avoidedScopeSuffix(report),
         num(report.totalGramsCo2Avoided() / 1000.0, 6), "kg CO2e", "");
-    row(csv, "Resource efficiency", "Cost incurred",
-        num(report.totalCostEur(), 6), "EUR", "");
-    row(csv, "Resource efficiency", "Cost avoided (non-inventory)",
-        num(report.totalCostAvoidedEur(), 6), "EUR", "");
+    // One pair of rows per currency, never a sum across currencies (v4 B.6); the
+    // unit column carries the ISO 4217 code and the note the pricing basis.
+    CostSummary costs = report.costs();
+    String basis = "pricing basis: " + costs.basis();
+    for (String currency : currencies(costs)) {
+      row(csv, "Resource efficiency", "Cost incurred",
+          num(costs.costByCurrency().getOrDefault(currency, 0.0), 6), currency, basis);
+      row(csv, "Resource efficiency", "Cost avoided (non-inventory)",
+          num(costs.costAvoidedByCurrency().getOrDefault(currency, 0.0), 6), currency, basis);
+    }
+    row(csv, "Resource efficiency", "Pricing basis", costs.basis(), "",
+        costs.pricingNote());
     if (report.avoidedBasisDiffers()) {
       row(csv, "Resource efficiency", "Avoided emissions basis",
           GreenReport.AVOIDED_BASIS_NOTE, "", "");
@@ -119,6 +129,14 @@ final class GreenReportCsvWriter {
     }
 
     return csv.toString();
+  }
+
+  /** The report's currencies, sorted; its own currency alone when it has no rows. */
+  private static List<String> currencies(CostSummary costs) {
+    if (costs.costByCurrency().isEmpty()) {
+      return costs.currency() == null ? List.of() : List.of(costs.currency());
+    }
+    return costs.costByCurrency().keySet().stream().sorted().toList();
   }
 
   /**

@@ -19,13 +19,13 @@ class ModelDefinitionTest {
   void carriesRegistryCostAndEnergyData() {
     ModelDefinition def = new ModelDefinition(
         "claude-sonnet", "anthropic", "claude-sonnet-4-20250514",
-        0.015, modelled(0.6), ModelTier.CLOUD_PREMIUM
+        ModelPricing.blended(0.015), modelled(0.6), ModelTier.CLOUD_PREMIUM
     );
 
     assertEquals("claude-sonnet", def.key());
     assertEquals("anthropic", def.provider());
     assertEquals("claude-sonnet-4-20250514", def.modelId());
-    assertEquals(0.015, def.costPer1kTokens());
+    assertEquals(ModelPricing.blended(0.015), def.pricing());
     assertEquals(0.6, def.energy().decodeKwhPer1kCompletionTokens());
     assertEquals(EnergySource.MODELLED, def.energySource());
     assertEquals(ModelTier.CLOUD_PREMIUM, def.tier());
@@ -35,7 +35,7 @@ class ModelDefinitionTest {
   void aModelWithNoEnergyProfileIsExcludedFromScope() {
     // Not "measured as zero": excluded, and rendered as excluded (v3 lot C.1).
     ModelDefinition def = new ModelDefinition(
-        "local", "ollama", "qwen2.5:3b", 0.0, null, ModelTier.LOCAL);
+        "local", "ollama", "qwen2.5:3b", ModelPricing.NONE, null, ModelTier.LOCAL);
 
     assertEquals(EnergyProfile.NOT_ACCOUNTED, def.energy());
     assertEquals(EnergySource.NOT_ACCOUNTED, def.energySource());
@@ -45,9 +45,9 @@ class ModelDefinitionTest {
   @Test
   void structuralEquality() {
     ModelDefinition a = new ModelDefinition(
-        "llama3", "ollama", "llama3", 0.0, modelled(0.05), ModelTier.LOCAL);
+        "llama3", "ollama", "llama3", ModelPricing.NONE, modelled(0.05), ModelTier.LOCAL);
     ModelDefinition b = new ModelDefinition(
-        "llama3", "ollama", "llama3", 0.0, modelled(0.05), ModelTier.LOCAL);
+        "llama3", "ollama", "llama3", ModelPricing.NONE, modelled(0.05), ModelTier.LOCAL);
 
     assertEquals(a, b);
     assertEquals(a.hashCode(), b.hashCode());
@@ -56,19 +56,19 @@ class ModelDefinitionTest {
   @Test
   void differentFieldsProduceDifferentEquality() {
     ModelDefinition a = new ModelDefinition("claude-sonnet", "anthropic",
-        "claude-sonnet-4", 0.015, modelled(0.6), ModelTier.CLOUD_PREMIUM);
+        "claude-sonnet-4", ModelPricing.blended(0.015), modelled(0.6), ModelTier.CLOUD_PREMIUM);
     ModelDefinition b = new ModelDefinition("claude-haiku", "anthropic",
-        "claude-haiku-4", 0.002, modelled(0.15), ModelTier.CLOUD_ENTRY);
+        "claude-haiku-4", ModelPricing.blended(0.002), modelled(0.15), ModelTier.CLOUD_ENTRY);
 
     assertNotEquals(a, b);
   }
 
   @Test
   void twoModelsDifferingOnlyInEnergyProvenanceAreNotEqual() {
-    ModelDefinition modelledEntry = new ModelDefinition("m", "anthropic", "m", 0.0,
+    ModelDefinition modelledEntry = new ModelDefinition("m", "anthropic", "m", ModelPricing.NONE,
         new EnergyProfile(0.0, 0.01, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_ENTRY);
-    ModelDefinition vendorEntry = new ModelDefinition("m", "anthropic", "m", 0.0,
+    ModelDefinition vendorEntry = new ModelDefinition("m", "anthropic", "m", ModelPricing.NONE,
         new EnergyProfile(0.0, 0.01, 0.0, EnergySource.VENDOR_PUBLISHED, false),
         ModelTier.CLOUD_ENTRY);
 

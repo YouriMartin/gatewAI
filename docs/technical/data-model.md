@@ -23,13 +23,16 @@ Persisted once per served request by `ChatCompletionService`
 | `timestamp` | instant | when served |
 | `model` | text | model that actually served it |
 | `prompt_hash` | char(64) | **SHA-256 of the prompt** — the prompt text is not stored |
-| `prompt_tokens`, `completion_tokens`, `total_tokens` | int | usage |
+| `prompt_tokens`, `completion_tokens`, `total_tokens` | int | usage; `prompt_tokens` includes cached prompt tokens |
+| `cached_prompt_tokens` | int | prompt tokens the provider served from its prompt cache (v4 B.6); **NULL = not reported**, not zero |
 | `latency_ms` | bigint | wall-clock latency |
 | `client_id` | text | owning client (from the request context), nullable |
-| `cost_eur` | double | actual cost |
+| `cost` | double | actual cost, in `currency` (`cost_eur` until v4 B.6, which held whatever currency the prices were in) |
 | `energy_kwh` | double | estimated energy |
 | `grams_co2` | double | estimated emissions |
-| `cost_avoided_eur` | double | saved vs premium baseline |
+| `cost_avoided` | double | saved vs premium baseline, in `currency` (`cost_avoided_eur` until v4 B.6) |
+| `pricing_basis` | varchar(16) | `SPLIT` / `BLENDED` / `NONE` — how `cost` was priced (v4 B.6); pre-v4 rows `BLENDED` |
+| `currency` | varchar(3) | ISO 4217 code of both costs (v4 B.6); pre-v4 rows `EUR` |
 | `grams_co2_avoided` | double | saved vs premium baseline |
 | `cache_hit` | boolean | served from cache |
 | `provider` | text | provider instance that served it (v3 lot C.5), indexed, nullable |
@@ -385,6 +388,7 @@ startup instead of silently altering a table.
 | `V10__cache_scope.sql` | `cache_decision.reason` and `cache_scope` (v4 A.2) |
 | `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
 | `V12__failover_event.sql` | `failover_event` and its indexes (v4 B.5) |
+| `V13__split_pricing.sql` | `request_log.cost_eur`/`cost_avoided_eur` renamed `cost`/`cost_avoided`, plus `cached_prompt_tokens`, `pricing_basis`, `currency` (v4 B.6) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

@@ -34,6 +34,31 @@ Full discussion:
 For audited CSRD claims you would need measured energy factors, marginal
 intensity, real multi-region execution and a documented methodology.
 
+## Cost figures are your declared prices, not an invoice
+
+- **The prices are the operator's.** gatewAI multiplies the tokens a provider reports
+  by the rates you declare under `pricing.*`. It never fetches a tariff, so a stale
+  price makes a stale cost. The commented examples carry their source and read-date
+  for that reason.
+- **No currency conversion.** Every price is in `gatewai.billing.currency`. Provider
+  list prices are usually USD: set `USD`, or convert them yourself. A period that
+  spans a change of currency has one total per currency and no grand total.
+- **Self-hosted models are not priced** by default, so their cost reads `0`,
+  labelled `NONE` (not priced), not free. Hardware, power and staff are not modelled
+  per token.
+- **Cached input is only as good as the provider's report.** OpenAI and Anthropic
+  report the prompt tokens served from their cache. Ollama, most self-hosted servers
+  and Anthropic's OpenAI-compatibility layer do not, and then every prompt token is
+  priced at the input rate. The report counts those requests
+  (`pricing_note`).
+- **Not modelled:** prompt-cache *writes* (priced at the input rate; Anthropic bills
+  them higher, but the gateway sends no `cache_control`), cache storage fees (Gemini
+  bills per hour), long-context surcharges, batch discounts and reasoning-token
+  details beyond what `completion_tokens` already counts.
+- **Rows written before v4 B.6 stay `BLENDED` and `EUR`.** They are not re-priced.
+  `cost-per-1k-tokens` still works for one release, priced as `BLENDED`, with a
+  startup warning.
+
 ## Egress providers: local-first by default; any mix by configuration
 
 - Out of the box the egress is **100% local**: the three routing tiers map to

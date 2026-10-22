@@ -43,10 +43,15 @@ class MicrometerMetricsRecorder implements MetricsRecorder {
 
     GreenMetrics green = log.green();
     if (green != null) {
-      registry.counter("gatewai.cost.eur", modelTag)
-          .increment(green.costEur());
-      registry.counter("gatewai.cost.avoided.eur")
-          .increment(green.costAvoidedEur());
+      // Named for the currency until v4 B.6 (gatewai.cost.eur), whatever the
+      // prices were in. A series per currency and basis now, never summed across.
+      String currency = green.currency() == null ? "unknown" : green.currency();
+      registry.counter("gatewai.cost", modelTag
+              .and("currency", currency)
+              .and("pricing_basis", green.pricingBasis().name().toLowerCase(Locale.ROOT)))
+          .increment(green.cost());
+      registry.counter("gatewai.cost.avoided", "currency", currency)
+          .increment(green.costAvoided());
       registry.counter("gatewai.energy.kwh", modelTag)
           .increment(green.energyKwh());
       registry.counter("gatewai.co2.grams", modelTag)

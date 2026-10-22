@@ -230,7 +230,7 @@ details.
 ## 7. Open the dashboard
 
 Browse to <http://localhost:8080/>. Paste your API key, click **Test connection**,
-and you get the KPIs (€ saved, gCO2 avoided, cache hit rate), trends, model mix,
+and you get the KPIs (cost saved in your billing currency, gCO2 avoided, cache hit rate), trends, model mix,
 CSRD report downloads, and — with an **admin** key — key administration and live
 routing configuration. A full tour is in
 [`dashboard-guide.md`](dashboard-guide.md).

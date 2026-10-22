@@ -1,10 +1,10 @@
 package io.github.yourimartin.gatewai.domain.model.carbon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
@@ -22,18 +22,18 @@ class GreenAccountantTest {
 
   @BeforeEach
   void setUp() {
-    accountant = new GreenAccountant(new CarbonCalculator());
+    accountant = new GreenAccountant(new CarbonCalculator(), "EUR");
   }
 
   /** Decode-only coefficients keep the arithmetic below one multiplication deep. */
   private static ModelDefinition premium() {
-    return new ModelDefinition("sonnet", "anthropic", "claude-sonnet", 0.015,
+    return new ModelDefinition("sonnet", "anthropic", "claude-sonnet", ModelPricing.blended(0.015),
         new EnergyProfile(0.0, 0.005, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_PREMIUM);
   }
 
   private static ModelDefinition entry() {
-    return new ModelDefinition("haiku", "anthropic", "claude-haiku", 0.002,
+    return new ModelDefinition("haiku", "anthropic", "claude-haiku", ModelPricing.blended(0.002),
         new EnergyProfile(0.0, 0.002, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_ENTRY);
   }
@@ -59,14 +59,14 @@ class GreenAccountantTest {
     GreenMetrics metrics = accountant.account(
         site(entry()), site(premium()), decoding(2000), false);
 
-    assertEquals(0.004, metrics.costEur(), DELTA);
+    assertEquals(0.004, metrics.cost(), DELTA);
     assertEquals(0.004, metrics.energyKwh(), DELTA);
     assertEquals(0.92, metrics.gramsCo2(), DELTA);
   }
 
   @Test
   void promptTokensAreChargedAtThePrefillRateAndBilledInTheTotal() {
-    ModelDefinition split = new ModelDefinition("split", "anthropic", "split", 0.01,
+    ModelDefinition split = new ModelDefinition("split", "anthropic", "split", ModelPricing.blended(0.01),
         new EnergyProfile(0.0005, 0.01, 0.0, EnergySource.MODELLED, false),
         ModelTier.CLOUD_PREMIUM);
 
@@ -75,7 +75,7 @@ class GreenAccountantTest {
 
     // energy = 4 x 0.0005 + 0.2 x 0.01 = 0.004 kWh; cost bills all 4200 tokens.
     assertEquals(0.004, metrics.energyKwh(), DELTA);
-    assertEquals(4.2 * 0.01, metrics.costEur(), DELTA);
+    assertEquals(4.2 * 0.01, metrics.cost(), DELTA);
   }
 
   @Test
@@ -87,7 +87,7 @@ class GreenAccountantTest {
 
     assertEquals(0.69, metrics.gramsCo2Avoided(), DELTA);
     // premium cost 0.015 - entry cost 0.002 = 0.013 EUR avoided
-    assertEquals(0.013, metrics.costAvoidedEur(), DELTA);
+    assertEquals(0.013, metrics.costAvoided(), DELTA);
   }
 
   @Test
@@ -100,7 +100,7 @@ class GreenAccountantTest {
 
   @Test
   void avoidanceNeverNegativeWhenActualDirtierThanBaseline() {
-    ModelDefinition dirty = new ModelDefinition("dirty", "x", "dirty", 0.0,
+    ModelDefinition dirty = new ModelDefinition("dirty", "x", "dirty", ModelPricing.NONE,
         new EnergyProfile(0.0, 0.01, 0.0, EnergySource.MODELLED, false),
         ModelTier.LOCAL);
 
@@ -122,24 +122,24 @@ class GreenAccountantTest {
 
   @Test
   void unknownUsedModelReturnsZeroOnMiss() {
-    assertSame(GreenMetrics.ZERO,
+    assertEquals(GreenMetrics.none("EUR"),
         accountant.account(null, site(premium()), decoding(1000), false));
-    assertSame(GreenMetrics.ZERO,
+    assertEquals(GreenMetrics.none("EUR"),
         accountant.account(site(null), site(premium()), decoding(1000), false));
   }
 
   @Test
   void zeroTokensReturnsZero() {
-    assertSame(GreenMetrics.ZERO,
+    assertEquals(GreenMetrics.none("EUR"),
         accountant.account(site(entry()), site(premium()), TokenUsage.NONE, false));
-    assertSame(GreenMetrics.ZERO,
+    assertEquals(GreenMetrics.none("EUR"),
         accountant.account(site(entry()), site(premium()), null, false));
   }
 
   @Test
   void anUnaccountedModelCostsMoneyButBooksNoEmissions() {
     // Local egress is out of scope (lot C.1) — zero, and labelled, never measured.
-    ModelDefinition local = new ModelDefinition("local", "ollama", "qwen2.5:3b", 0.0,
+    ModelDefinition local = new ModelDefinition("local", "ollama", "qwen2.5:3b", ModelPricing.NONE,
         EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
 
     GreenMetrics metrics = accountant.account(
@@ -158,7 +158,7 @@ class GreenAccountantTest {
     GreenMetrics metrics = accountant.account(
         site(entry()), site(premium()), decoding(1000), true);
 
-    assertEquals(0.0, metrics.costEur(), DELTA);
+    assertEquals(0.0, metrics.cost(), DELTA);
     assertEquals(0.0, metrics.energyKwh(), DELTA);
     assertEquals(0.0, metrics.gramsCo2(), DELTA);
   }
@@ -169,7 +169,7 @@ class GreenAccountantTest {
         site(entry()), site(premium()), decoding(1000), true);
 
     assertEquals(1.15, metrics.gramsCo2Avoided(), DELTA);
-    assertEquals(0.015, metrics.costAvoidedEur(), DELTA);
+    assertEquals(0.015, metrics.costAvoided(), DELTA);
   }
 
   @Test

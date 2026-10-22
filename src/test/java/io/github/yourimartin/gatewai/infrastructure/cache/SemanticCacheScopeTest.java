@@ -21,6 +21,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
@@ -343,7 +344,7 @@ class SemanticCacheScopeTest {
   /** Knows one model, {@code model-a}: requesting it is a pin. */
   static final ModelRegistry REGISTRY = new ModelRegistry() {
     private final ModelDefinition modelA = new ModelDefinition("a", "provider", "model-a",
-        0.0, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
+        ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, ModelTier.LOCAL);
 
     @Override
     public List<ModelDefinition> allModels() {

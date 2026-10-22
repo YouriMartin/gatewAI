@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import com.anthropic.models.messages.MessageDeltaUsage;
+
 import io.github.yourimartin.gatewai.domain.model.llm.FinishReason;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -109,20 +111,61 @@ class SpringAiLlmClient implements LlmClient {
     int promptTokens = 0;
     int completionTokens = 0;
     int totalTokens = 0;
+    Integer cachedPromptTokens = null;
     if (responseMeta != null && responseMeta.getUsage() != null) {
       Usage usage = responseMeta.getUsage();
-      promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
+      promptTokens = promptTokens(usage);
       completionTokens =
           usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-      totalTokens = usage.getTotalTokens() != null
-          ? usage.getTotalTokens() : promptTokens + completionTokens;
+      totalTokens = totalTokens(usage, promptTokens, completionTokens);
+      cachedPromptTokens = cachedPromptTokens(usage);
     }
 
     boolean cacheHit = responseMeta != null
         && Boolean.TRUE.equals(responseMeta.get(LlmResponse.CACHE_HIT_METADATA_KEY));
 
     return new LlmStreamChunk(model, delta, finishReason, cacheHit,
-        promptTokens, completionTokens, totalTokens, last);
+        promptTokens, completionTokens, totalTokens, last, cachedPromptTokens);
+  }
+
+  /**
+   * The prompt tokens, cached ones included (v4 B.6). OpenAI counts the tokens it
+   * served from its prompt cache inside {@code prompt_tokens}; Anthropic counts
+   * cache reads and cache writes apart from {@code input_tokens}, and Spring AI
+   * passes its {@code input_tokens} on as is. Adding them back gives both
+   * providers the same meaning, which split pricing and the energy model rely on.
+   */
+  static int promptTokens(Usage usage) {
+    int prompt = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
+    if (countsCacheApart(usage)) {
+      prompt += Math.toIntExact(orZero(usage.getCacheReadInputTokens())
+          + orZero(usage.getCacheWriteInputTokens()));
+    }
+    return prompt;
+  }
+
+  /** The provider's total, unless the prompt had cached tokens added back to it. */
+  private static int totalTokens(Usage usage, int promptTokens, int completionTokens) {
+    if (countsCacheApart(usage) || usage.getTotalTokens() == null) {
+      return promptTokens + completionTokens;
+    }
+    return usage.getTotalTokens();
+  }
+
+  /** Cache reads, which split pricing bills at the cached-input rate; null if unreported. */
+  static Integer cachedPromptTokens(Usage usage) {
+    Long cacheRead = usage.getCacheReadInputTokens();
+    return cacheRead == null ? null : Math.toIntExact(cacheRead);
+  }
+
+  private static boolean countsCacheApart(Usage usage) {
+    Object nativeUsage = usage.getNativeUsage();
+    return nativeUsage instanceof com.anthropic.models.messages.Usage
+        || nativeUsage instanceof MessageDeltaUsage;
+  }
+
+  private static long orZero(Long value) {
+    return value == null ? 0L : value;
   }
 
   /**
@@ -150,12 +193,11 @@ class SpringAiLlmClient implements LlmClient {
         ? FinishReason.toOpenAi(resultMeta.getFinishReason()) : null;
 
     Usage usage = Objects.requireNonNull(chatResponse.getMetadata().getUsage());
-    int promptTokens = usage.getPromptTokens() != null
-        ? usage.getPromptTokens() : 0;
+    int promptTokens = promptTokens(usage);
     int completionTokens = usage.getCompletionTokens() != null
         ? usage.getCompletionTokens() : 0;
-    int totalTokens = usage.getTotalTokens() != null
-        ? usage.getTotalTokens() : 0;
+    int totalTokens = countsCacheApart(usage) || usage.getTotalTokens() != null
+        ? totalTokens(usage, promptTokens, completionTokens) : 0;
 
     Boolean cacheHitFlag =
         chatResponse.getMetadata().get(LlmResponse.CACHE_HIT_METADATA_KEY);
@@ -166,6 +208,6 @@ class SpringAiLlmClient implements LlmClient {
     return new LlmResponse(
         model, content, finishReason,
         promptTokens, completionTokens, totalTokens, cacheHit,
-        cacheOutcome instanceof String outcome ? outcome : null);
+        cacheOutcome instanceof String outcome ? outcome : null, cachedPromptTokens(usage));
   }
 }

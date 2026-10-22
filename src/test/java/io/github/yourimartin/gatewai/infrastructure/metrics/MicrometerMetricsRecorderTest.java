@@ -8,6 +8,7 @@ import java.util.UUID;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
+import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -31,20 +32,22 @@ class MicrometerMetricsRecorderTest {
   private static RequestLog log(String model, int tokens, boolean cacheHit,
                                 GreenMetrics green) {
     return new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(), model,
-        "hash", 1, 1, tokens, 42L, "client", green, GreenProvenance.UNKNOWN, cacheHit);
+        "hash", 1, 1, tokens, 42L, "client", green, GreenProvenance.UNKNOWN, cacheHit, null);
   }
 
   @Test
   void recordsCountersAndTimerForAMiss() {
     recorder.record(log("sonnet", 20, false,
-        new GreenMetrics(0.015, 0.004, 1.15, 0.0, 0.69)));
+        new GreenMetrics(0.015, 0.004, 1.15, 0.0, 0.69, PricingBasis.BLENDED, "EUR")));
 
     assertEquals(1.0, registry.get("gatewai.requests")
         .tags("model", "sonnet", "cache_hit", "false").counter().count(), DELTA);
     assertEquals(20.0, registry.get("gatewai.tokens")
         .tags("model", "sonnet").counter().count(), DELTA);
-    assertEquals(0.015, registry.get("gatewai.cost.eur")
-        .tags("model", "sonnet").counter().count(), DELTA);
+    // Tagged with what the cost is in and how it was priced (v4 B.6).
+    assertEquals(0.015, registry.get("gatewai.cost")
+        .tags("model", "sonnet", "currency", "EUR", "pricing_basis", "blended")
+        .counter().count(), DELTA);
     assertEquals(0.69, registry.get("gatewai.co2.avoided.grams")
         .counter().count(), DELTA);
     assertEquals(1.0, registry.get("gatewai.cache.misses")
@@ -55,7 +58,7 @@ class MicrometerMetricsRecorderTest {
 
   @Test
   void countsCacheHits() {
-    recorder.record(log("haiku", 10, true, GreenMetrics.ZERO));
+    recorder.record(log("haiku", 10, true, GreenMetrics.none("EUR")));
 
     assertEquals(1.0, registry.get("gatewai.cache.hits").counter().count(), DELTA);
   }
@@ -63,7 +66,7 @@ class MicrometerMetricsRecorderTest {
   @Test
   void handlesNullModelAndMissingGreenMetrics() {
     recorder.record(new RequestLog(UUID.randomUUID(), "corr-1", Instant.now(),
-        null, "hash", 0, 0, 0, 0L, "client", null, GreenProvenance.UNKNOWN, false));
+        null, "hash", 0, 0, 0, 0L, "client", null, GreenProvenance.UNKNOWN, false, null));
 
     assertEquals(1.0, registry.get("gatewai.requests")
         .tags("model", "unknown", "cache_hit", "false").counter().count(), DELTA);

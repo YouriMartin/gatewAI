@@ -20,6 +20,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationAffinity;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationOpening;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationRouting;
@@ -293,7 +294,7 @@ class RoutingAdvisorConversationTest {
   }
 
   private static ModelDefinition model(String id, ModelTier tier) {
-    return new ModelDefinition(id, "provider", id, 0.0, EnergyProfile.NOT_ACCOUNTED, tier);
+    return new ModelDefinition(id, "provider", id, ModelPricing.NONE, EnergyProfile.NOT_ACCOUNTED, tier);
   }
 
   private static DecisionRecorder recording(List<RoutingDecision> into) {

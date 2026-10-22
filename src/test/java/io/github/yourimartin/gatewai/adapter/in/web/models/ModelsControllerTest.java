@@ -12,6 +12,7 @@ import java.util.Optional;
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
+import io.github.yourimartin.gatewai.domain.model.llm.ModelPricing;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.in.ListModelsUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
@@ -29,11 +30,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ModelsControllerTest {
 
   private static final ModelDefinition LOCAL =
-      new ModelDefinition("local", "ollama", "qwen2.5:3b", 0.0, null, ModelTier.LOCAL);
+      new ModelDefinition("local", "ollama", "qwen2.5:3b", ModelPricing.NONE, null, ModelTier.LOCAL);
   private static final ModelDefinition PREMIUM = new ModelDefinition(
-      "premium", "anthropic-eu", "claude-sonnet-4-5", 0.015, null, ModelTier.CLOUD_PREMIUM);
+      "premium", "anthropic-eu", "claude-sonnet-4-5", ModelPricing.blended(0.015), null, ModelTier.CLOUD_PREMIUM);
   private static final ModelDefinition SLASHED = new ModelDefinition(
-      "vllm", "vllm", "Qwen/Qwen2.5-7B-Instruct", 0.0, null, ModelTier.CLOUD_ENTRY);
+      "vllm", "vllm", "Qwen/Qwen2.5-7B-Instruct", ModelPricing.NONE, null, ModelTier.CLOUD_ENTRY);
 
   @Autowired
   private MockMvc mockMvc;
