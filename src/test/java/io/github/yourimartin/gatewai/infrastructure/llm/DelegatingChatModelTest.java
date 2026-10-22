@@ -16,6 +16,8 @@ import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +48,8 @@ class DelegatingChatModelTest {
               ProviderProperties.ProviderType.OLLAMA, ollama),
           "openai", new ProviderChatModels.ProviderInstance(
               ProviderProperties.ProviderType.OPENAI, openAi))),
-      registry);
+      registry, new InMemoryEgressHealth(new FailoverProperties()),
+      mock(DecisionRecorder.class), mock(DecisionMetricsRecorder.class));
 
   /** Each provider model exposes its own options type, as the real ones do. */
   @BeforeEach

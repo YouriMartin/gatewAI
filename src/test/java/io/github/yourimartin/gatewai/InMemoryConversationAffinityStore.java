@@ -35,6 +35,13 @@ public final class InMemoryConversationAffinityStore implements ConversationAffi
   }
 
   @Override
+  public void reassign(String fingerprint, String modelId, ModelTier tier) {
+    records.computeIfPresent(fingerprint, (key, existing) -> existing.tier() == tier
+        ? new ConversationAffinity(key, modelId, tier, existing.createdAt(), Instant.now())
+        : existing);
+  }
+
+  @Override
   public int purgeLastSeenBefore(Instant cutoff) {
     int before = records.size();
     records.values().removeIf(record -> record.lastSeenAt().isBefore(cutoff));

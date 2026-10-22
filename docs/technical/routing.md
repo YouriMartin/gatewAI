@@ -242,7 +242,8 @@ Two questions, both answered on demand and never while routing — see
    `gatewai.classifier.client-pinning` is on (default): honour it, leave the
    prompt untouched, record `CLIENT_PINNED` and stop (v2 batch 4). An
    **unregistered** id is not honoured — the egress has no fallback provider,
-   so honouring it would turn a routed request into a 400.
+   so honouring it would turn a routed request into a 400. A pinned request does
+   not fail over unless `gatewai.failover.pinned=true` (v4 B.5).
 3. `tier = classifier.classify(userText)` — the last user turn alone.
 4. `ConversationStickiness` places the request in its conversation (v4 A.3, see
    [below](#conversations-keep-their-model-v4-a3)): on a first turn the tier stands;
@@ -250,11 +251,15 @@ Two questions, both answered on demand and never while routing — see
 5. If the registry has no model for the resulting tier, log and pass through
    (use the default model).
 6. Otherwise **rewrite the prompt** with that model id (`reroutePrompt` preserves
-   temperature/maxTokens/topP/stop), then `chain.nextCall(routedRequest)`.
-7. On a first turn, record the conversation it opens, with its answer. Stamp the
-   **registry** model id on the response (`gatewai.routing.model` metadata), so
+   temperature/maxTokens/topP/stop), flag it as allowed to **fail over** inside its
+   tier (v4 B.5, [below](#failover-inside-a-tier-v4-b5)), then
+   `chain.nextCall(routedRequest)`.
+7. On a first turn, record the conversation it opens, with its answer, on the model
+   that **answered**: after a failover, that is not the one the prompt named. Stamp
+   that **registry** model id on the response (`gatewai.routing.model` metadata), so
    the cache stores the model the registry knows rather than the provider's name
-   for it.
+   for it. On a later turn that failed over, the conversation's record moves to the
+   answering model (same tier).
 
 So the **requested `model` is a hint unless it is registered**: an unknown id is
 overridden by the tier's configured model, a known one is honoured as sent. `adviseStream(...)` mirrors this (Phase 7.5) — it reroutes the
@@ -292,6 +297,49 @@ one node at a time ([`clustering.md`](clustering.md#conversation-records-v4-a3))
 
 What it costs and where it is wrong:
 [`limitations.md`](../functional/limitations.md#conversation-sticky-routing).
+
+## Failover inside a tier (v4 B.5)
+
+[ADR 0017](adr/0017-ordered-failover-inside-a-tier.md). The entries of one tier are
+its **failover chain**. `findByTier` returns them in failover order: entries with
+`gatewai.models.registry.<key>.priority` first (lowest first), then the others in
+binding order. Binding order is file order within one file; entries from environment
+variables or a profile file bind **before** those of `application.properties`, which
+is what `priority` is for. The startup log prints every tier's chain.
+
+| | |
+|---|---|
+| **Triggers** | connection failure, timeout (`connect-timeout`, `read-timeout` of the instance), HTTP 429, HTTP 5xx (Anthropic's 529 included) |
+| **Never** | any other 4xx; any failure after the first chunk reached the client; across tiers |
+| **Who fails over** | routed chain requests; pass-through requests sent to the default model. Pinned requests only with `gatewai.failover.pinned=true` |
+| **Pass-through** | candidates whose endpoint would ignore a marked feature (ADR 0016) are skipped. A stream fails over only while it is being opened (before the upstream answered 2xx) |
+| **Retries** | none below the gateway: no Spring AI retry for Ollama, `maxRetries(0)` for the OpenAI and Anthropic SDKs |
+| **Exhausted** | the client gets the last failure (429, 502 or 504, as ADR 0016 maps them) |
+
+**Cooldown.** Each registry entry has a per-node, in-memory health record
+(`InMemoryEgressHealth` behind the `EgressHealth` port). After
+`gatewai.failover.failure-threshold` consecutive transient failures (default 3) the
+entry is skipped for `gatewai.failover.cooldown` (default 30 s). Then one request
+probes it, and the others keep skipping it until the probe ends. Any request's
+transient failure counts, a pinned one's included, and a success resets the count.
+When every entry of a chain is cooling down, they are tried anyway, in order: the
+cooldown reorders, it never refuses.
+
+**Where it runs.** On the chain, `DelegatingChatModel` runs the attempts. It is the
+only component that sees the providers' exceptions, which `UpstreamFailures` reads
+(SDK status, Spring AI's `"<status> - …"` messages, `WebClient` exceptions, timeouts,
+I/O failures) into the same `UpstreamFailureException` the pass-through path raises.
+An answer from another model carries `gatewai.egress.answered-model`, which the
+router uses for the stamp and the conversation record. On the pass-through path,
+`PassThroughService` runs the attempts. Both share `FailoverSequence`, which holds the
+candidates in order and skips cooling entries lazily, so that a candidate the request
+never reaches does not take a probe.
+
+**Trace.** One `failover_event` row per failed attempt of a request allowed to fail
+over (from, to or null, cause, upstream status, path), and
+`gatewai_failover_total{tier,from,to,cause}`
+([`observability.md`](observability.md#failover-v4-b5)). `routing_decision` still names
+the first target. `request_log` and `X-GatewAI-Model` name the model that answered.
 
 ## Traced decisions (v2 batch 2)
 
@@ -367,7 +415,14 @@ There is **no fallback provider**: a model id absent from the registry (or
 mapping to an unbuilt instance) raises `UnknownModelException`, returned to the
 client as an OpenAI-style 400 (`unknown_model`). Clients may pin any registered
 model id directly (v2 batch 4): the router honours it and skips classification
-altogether.
+altogether. What does exist since v4 B.5 is **failover inside a tier**, to another
+entry the operator declared in that tier ([above](#failover-inside-a-tier-v4-b5)).
+
+Every instance has a `connect-timeout` (default 10 s) and a `read-timeout` (default
+5 min: how long it may take to start answering, and for the SDK-based types also the
+longest silence between two reads). Neither bounds a whole stream. Until v4 B.5,
+`openai`/`openai-compatible` instances had one 60 s timeout that the SDK applied to
+the **whole** call, so any answer longer than that failed.
 
 Implementation note: `OllamaChatModel` hard-casts the prompt options to
 `OllamaChatOptions`, so the delegating model rebuilds the prompt with native
@@ -390,15 +445,20 @@ embedding model's scale, not a universal constant),
 `routes[n].name` / `routes[n].tier` / `routes[n].examples[m]` (defaults with
 bilingual EN/FR examples are defined in `ClassifierProperties`).
 `gatewai.providers.<name>.*`: `type` (`anthropic`|`openai`|`openai-compatible`|`ollama`),
-`api-key`, `base-url`, `pull-model-strategy` (ollama only), `region`,
+`api-key`, `base-url`, `pull-model-strategy` (ollama only), `connect-timeout`
+(default `PT10S`), `read-timeout` (default `PT5M`), `region`,
 `region-provenance` (`known`|`assumed`, default `assumed`) and `pue` — where the
 instance runs, for carbon attribution (see
 [`green-accounting.md`](green-accounting.md#where-a-provider-runs-v3-lot-c2)).
 `gatewai.models.registry.<key>.*`: `provider` (a `gatewai.providers` instance name),
-`model-id` (unique), `cost-per-1k-tokens`, `tier`, and the `energy.*` group:
+`model-id` (unique), `cost-per-1k-tokens`, `tier`, `priority` (place in the tier's
+failover chain, lowest first; unset entries follow in binding order), and the
+`energy.*` group:
 `prefill-kwh-per-1k-prompt-tokens`, `decode-kwh-per-1k-completion-tokens`,
 `fixed-kwh-per-request`, `includes-datacenter-overhead`, and `source`
 (`not-accounted`|`vendor-published`|`modelled`; omitted → derived from the
 coefficients, and `not-accounted` on the local defaults). Sources and read-dates for
 every coefficient:
 [`green-accounting.md`](green-accounting.md#the-coefficients-and-where-they-come-from).
+`gatewai.failover.*` (v4 B.5): `pinned` (default false), `failure-threshold` (default
+3), `cooldown` (default `PT30S`).

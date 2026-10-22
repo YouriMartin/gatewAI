@@ -44,6 +44,11 @@ Non-negotiable:
   registry references them by name; **no fallback provider** (unknown model id → 400);
   no API key required by default. An `anthropic` instance takes Console API keys only:
   subscription OAuth tokens (`sk-ant-oat…`, `sk-ant-ort…`) fail startup.
+- **Failover only inside a tier** (ADR 0017): the registry entries of one tier, in
+  failover order (`priority`, then binding order), on a connection failure, timeout, 429
+  or 5xx before the first byte. Never across tiers, never to an undeclared model, never
+  silently (`failover_event`, `gatewai_failover_total`). The gateway is the only retry
+  layer: provider clients are built with their retries off.
 - The cache implements `CallAdvisor`/`StreamAdvisor`, low `getOrder()`, and short-circuits by
   **not calling** `chain.nextCall()`.
 - All persistence goes into the **same PostgreSQL**.
@@ -108,4 +113,4 @@ io.github.yourimartin.gatewai
 - End every implementation with a proposed commit message: short, English, imperative mood.
 
 ## Status
-v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open); next: B.4 manual check, then B.5 (docs/developpment/roadmap-v4.md)
+v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5 done; next: B.4 manual check, then B.6 (docs/developpment/roadmap-v4.md)

@@ -61,6 +61,28 @@ class JdbcConversationAffinityStoreTest {
   }
 
   @Test
+  void aFailoverMovesTheConversationToAnotherModelOfItsTier() {
+    store.record(fingerprint, "premium-1", ModelTier.CLOUD_PREMIUM);
+
+    store.reassign(fingerprint, "premium-2", ModelTier.CLOUD_PREMIUM);
+
+    ConversationAffinity recorded = store.find(fingerprint).orElseThrow();
+    assertEquals("premium-2", recorded.modelId());
+    assertEquals(ModelTier.CLOUD_PREMIUM, recorded.tier());
+  }
+
+  @Test
+  void aReassignmentNeverTouchesAnotherTierNorCreatesARecord() {
+    store.reassign(fingerprint, "local-2", ModelTier.LOCAL);
+    assertTrue(store.find(fingerprint).isEmpty(), "a reassignment created a record");
+
+    store.record(fingerprint, "premium-1", ModelTier.CLOUD_PREMIUM);
+    store.reassign(fingerprint, "local-2", ModelTier.LOCAL);
+
+    assertEquals("premium-1", store.find(fingerprint).orElseThrow().modelId());
+  }
+
+  @Test
   void everyWriteMovesLastSeenButNotCreatedAt() {
     store.record(fingerprint, "premium-1", ModelTier.CLOUD_PREMIUM);
     ConversationAffinity first = store.find(fingerprint).orElseThrow();

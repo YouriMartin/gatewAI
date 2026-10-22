@@ -199,4 +199,31 @@ class PropertiesModelRegistryTest {
       // Expected: toList() produces an unmodifiable list
     }
   }
+
+  @Test
+  void aTierIsListedInFailoverOrderPriorityFirstThenBindingOrder() {
+    Map<String, ModelRegistryProperties.ModelEntry> entries = new LinkedHashMap<>();
+    entries.put("declared-first", local("a", null));
+    entries.put("declared-second", local("b", 5));
+    entries.put("declared-third", local("c", null));
+    entries.put("declared-fourth", local("d", 1));
+    ModelRegistryProperties properties = new ModelRegistryProperties();
+    properties.setRegistry(entries);
+
+    PropertiesModelRegistry ordered = new PropertiesModelRegistry(properties);
+
+    assertEquals(List.of("d", "b", "a", "c"), ordered.findByTier(ModelTier.LOCAL).stream()
+        .map(ModelDefinition::modelId).toList());
+    assertEquals(List.of("a", "b", "c", "d"), ordered.allModels().stream()
+        .map(ModelDefinition::modelId).toList(), "allModels keeps the declared order");
+  }
+
+  private static ModelRegistryProperties.ModelEntry local(String modelId, Integer priority) {
+    ModelRegistryProperties.ModelEntry entry = new ModelRegistryProperties.ModelEntry();
+    entry.setProvider("ollama");
+    entry.setModelId(modelId);
+    entry.setTier(ModelTier.LOCAL);
+    entry.setPriority(priority);
+    return entry;
+  }
 }

@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,9 +15,20 @@ import org.springframework.stereotype.Component;
 class PropertiesModelRegistry implements ModelRegistry {
 
   private final List<ModelDefinition> models;
+  /** Every entry in failover order (ADR 0017): {@code priority} first, then binding order. */
+  private final List<ModelDefinition> failoverOrder;
 
   PropertiesModelRegistry(ModelRegistryProperties properties) {
-    this.models = properties.getRegistry().entrySet().stream()
+    List<Map.Entry<String, ModelRegistryProperties.ModelEntry>> entries =
+        List.copyOf(properties.getRegistry().entrySet());
+    this.models = entries.stream()
+        .map(PropertiesModelRegistry::toModelDefinition)
+        .toList();
+    // A stable sort: entries with equal (or no) priority keep binding order.
+    this.failoverOrder = entries.stream()
+        .sorted(Comparator.comparing(
+            (Map.Entry<String, ModelRegistryProperties.ModelEntry> e) -> e.getValue().getPriority(),
+            Comparator.nullsLast(Comparator.naturalOrder())))
         .map(PropertiesModelRegistry::toModelDefinition)
         .toList();
   }
@@ -42,7 +54,7 @@ class PropertiesModelRegistry implements ModelRegistry {
 
   @Override
   public List<ModelDefinition> findByTier(ModelTier tier) {
-    return models.stream()
+    return failoverOrder.stream()
         .filter(m -> m.tier() == tier)
         .toList();
   }

@@ -79,6 +79,7 @@ measurement of it.
 | `gatewai_cache_similarity` | summary (p50/p95) | — | best candidate's similarity |
 | `gatewai_routing_config_changes_total` | counter | — | edits to the live routing rules |
 | `gatewai_decisions_metric_failures_total` | counter | `kind` | decisions that could not be counted |
+| `gatewai_failover_total` | counter | `tier`, `from`, `to`, `cause` | a request left a registry entry for the next one of its tier (v4 B.5, [below](#failover-v4-b5)) |
 
 Three rules this table follows, and one deviation from the plan:
 
@@ -88,7 +89,10 @@ Three rules this table follows, and one deviation from the plan:
   is a product of small numbers and stays constant over a process's life. The
   prompt, the model id and the correlation id are never tags — the first two
   would leak content and cardinality, the third is what the decision tables are
-  for. Metrics answer "how often", rows answer "why this one".
+  for. Metrics answer "how often", rows answer "why this one". The one exception
+  is `gatewai_failover_total`, whose `from`/`to` are **registry** model ids: the
+  operator's configuration lists them, unlike the `model` a client sends, so they
+  are bounded too.
 - **Continuous quantities are summaries, never tags.** A similarity of 0.9431 as
   a label would mint one series per request.
 - **`gatewai_conformal_set_size` is routing-only** (D27). The cache's set is over
@@ -128,6 +132,30 @@ pass-through, however it ends.
 cannot see. The provider billed those tokens, but their count only arrives in the
 last chunk, so no `request_log` row exists for them (ADR 0016). Read it as a ratio
 over all three outcomes.
+
+## Failover (v4 B.5)
+
+Emitted by `MicrometerDecisionMetricsRecorder` from the same `FailoverEvent` that is
+written to `failover_event` ([ADR 0017](adr/0017-ordered-failover-inside-a-tier.md)),
+on both paths.
+
+| Metric | Type | Tags | Meaning |
+|---|---|---|---|
+| `gatewai_failover_total` | counter | `tier`, `from`, `to`, `cause` (`connection_failed`/`timeout`/`rate_limited`/`server_error`) | one count per failed attempt that a request was allowed to fail over from |
+
+`to="none"` counts the chains that ran out: the client received that failure. A
+request that may not fail over (a pin, by default) is counted nowhere here, although
+its failure still feeds the model's cooldown. The **Failover inside a tier** row of the
+committed dashboard shows the rate by tier and cause, and where the traffic moved.
+
+```promql
+# Share of routed traffic that needed a second model, per tier
+sum by (tier) (rate(gatewai_failover_total{to!="none"}[5m]))
+  / sum by (tier) (rate(gatewai_routing_decisions_total[5m]))
+```
+
+The cooldowns are per node, so with several replicas each one learns an outage on its
+own ([`clustering.md`](clustering.md)).
 
 ### Deprecated: `gatewai_cache_hits_total` / `gatewai_cache_misses_total`
 

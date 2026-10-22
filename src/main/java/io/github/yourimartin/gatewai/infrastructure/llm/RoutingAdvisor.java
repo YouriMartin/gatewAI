@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
@@ -59,6 +60,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
   private final CalibrationUseCase calibrations;
   private final ClassifierProperties properties;
   private final ConversationStickiness stickiness;
+  private final FailoverProperties failover;
 
   RoutingAdvisor(ComplexityClassifier classifier,
                  ModelRegistry modelRegistry,
@@ -67,7 +69,8 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
                  RoutingConfigVersionTracker configVersion,
                  CalibrationUseCase calibrations,
                  ClassifierProperties properties,
-                 ConversationStickiness stickiness) {
+                 ConversationStickiness stickiness,
+                 FailoverProperties failover) {
     this.classifier = classifier;
     this.modelRegistry = modelRegistry;
     this.decisionRecorder = decisionRecorder;
@@ -76,6 +79,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     this.calibrations = calibrations;
     this.properties = properties;
     this.stickiness = stickiness;
+    this.failover = failover;
   }
 
   @Override
@@ -87,21 +91,25 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     if (honourPin(request, userText)) {
-      return chain.nextCall(request);
+      return chain.nextCall(pinned(request));
     }
 
     List<ConversationOpening.Turn> turns =
         ConversationStickiness.turns(request.prompt());
-    ModelDefinition target = route(userText, turns);
+    ConversationStickiness.Placement placement = route(userText, turns);
+    ModelDefinition target = placement.model();
     if (target == null) {
       return chain.nextCall(request);
     }
 
     ChatClientResponse response = chain.nextCall(reroute(request, target));
+    ModelDefinition answered = answeredModel(response, target);
     if (!ConversationOpening.hasHistory(turns)) {
-      stickiness.recordFirstTurn(turns, answerText(response), target);
+      stickiness.recordFirstTurn(turns, answerText(response), answered);
+    } else {
+      stickiness.recordFailover(placement, answered);
     }
-    return stampRoutedModel(response, target.modelId());
+    return stampRoutedModel(response, answered.modelId());
   }
 
   @Override
@@ -113,35 +121,78 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     if (honourPin(request, userText)) {
-      return chain.nextStream(request);
+      return chain.nextStream(pinned(request));
     }
 
     List<ConversationOpening.Turn> turns =
         ConversationStickiness.turns(request.prompt());
-    ModelDefinition target = route(userText, turns);
+    ConversationStickiness.Placement placement = route(userText, turns);
+    ModelDefinition target = placement.model();
     if (target == null) {
       return chain.nextStream(request);
     }
 
-    Flux<ChatClientResponse> stream = chain.nextStream(reroute(request, target));
+    // The model that answered is known from the first chunk (v4 B.5).
+    AtomicReference<ModelDefinition> answered = new AtomicReference<>();
+    Flux<ChatClientResponse> stream = chain.nextStream(reroute(request, target))
+        .doOnNext(response -> {
+          if (answered.get() == null) {
+            ModelDefinition model = answeredModel(response, target);
+            answered.set(model);
+            if (ConversationOpening.hasHistory(turns)) {
+              stickiness.recordFailover(placement, model);
+            }
+          }
+        });
     if (!ConversationOpening.hasHistory(turns)) {
       // A first turn is recorded on completion, with the answer as the client
       // received it: the concatenated deltas it will send back next turn.
       StringBuilder answer = new StringBuilder();
       stream = stream
           .doOnNext(response -> appendDelta(answer, response))
-          .doOnComplete(() ->
-              stickiness.recordFirstTurn(turns, answer.toString(), target));
+          .doOnComplete(() -> stickiness.recordFirstTurn(turns, answer.toString(),
+              answered.get() == null ? target : answered.get()));
     }
-    return stream.map(response -> stampRoutedModel(response, target.modelId()));
+    return stream.map(response -> stampRoutedModel(response,
+        (answered.get() == null ? target : answered.get()).modelId()));
   }
 
+  /** The request re-targeted at {@code target}, allowed to fail over (ADR 0017). */
   private static ChatClientRequest reroute(ChatClientRequest request,
                                            ModelDefinition target) {
     return ChatClientRequest.builder()
-        .prompt(reroutePrompt(request.prompt(), target.modelId()))
+        .prompt(reroutePrompt(request.prompt(), target.modelId(), true))
         .context(request.context())
         .build();
+  }
+
+  /**
+   * A pinned request, as sent: it fails over only when
+   * {@code gatewai.failover.pinned} says so — the client asked for that model.
+   */
+  private ChatClientRequest pinned(ChatClientRequest request) {
+    ChatOptions options = request.prompt().getOptions();
+    if (!failover.isPinned() || options == null) {
+      return request;
+    }
+    return ChatClientRequest.builder()
+        .prompt(reroutePrompt(request.prompt(), options.getModel(), true))
+        .context(request.context())
+        .build();
+  }
+
+  /**
+   * The registry model that answered: the one the egress names when a failover
+   * moved the request (v4 B.5), otherwise the one it was sent to.
+   */
+  private ModelDefinition answeredModel(ChatClientResponse response, ModelDefinition target) {
+    ChatResponse chatResponse = response == null ? null : response.chatResponse();
+    Object answered = chatResponse == null || chatResponse.getMetadata() == null
+        ? null : chatResponse.getMetadata().get(DelegatingChatModel.ANSWERED_MODEL_METADATA_KEY);
+    if (!(answered instanceof String modelId) || modelId.equals(target.modelId())) {
+      return target;
+    }
+    return modelRegistry.findByModelId(modelId).orElse(target);
   }
 
   /**
@@ -221,10 +272,11 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
    * Classifies, places the request in its conversation and records the
    * decision.
    *
-   * @return the model to rewrite to, or null when the request must pass through
-   *         because no model is registered for the tier
+   * @return where the request goes; its model is null when the request must
+   *         pass through because no model is registered for the tier
    */
-  private ModelDefinition route(String userText, List<ConversationOpening.Turn> turns) {
+  private ConversationStickiness.Placement route(String userText,
+                                                 List<ConversationOpening.Turn> turns) {
     long startNanos = System.nanoTime();
 
     ClassificationOutcome outcome = classifier.classify(userText);
@@ -241,7 +293,7 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
 
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     recordDecision(userText, outcome, placement, latencyMs);
-    return target;
+    return placement;
   }
 
   /**
@@ -428,14 +480,21 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
    * The prompt re-targeted at {@code targetModelId}, every other option kept.
    * Until v4 B.1 this rebuilt the options from four of them, which dropped the
    * penalties and the seed of every routed request; mutating keeps whatever the
-   * request carried — including the seed of {@link GatewaiChatOptions}.
+   * request carried — including the seed of {@link GatewaiChatOptions} — and
+   * since v4 B.5 sets the flag that lets the egress fail over. The chain's
+   * options are always of that type ({@code SpringAiLlmClient} builds them);
+   * any other type carries no flag, and so never fails over.
    */
   private static Prompt reroutePrompt(Prompt original,
-                                      String targetModelId) {
+                                      String targetModelId,
+                                      boolean failover) {
     ChatOptions originalOptions = original.getOptions();
     ChatOptions.Builder<?> builder = originalOptions == null
-        ? ChatOptions.builder() : originalOptions.mutate();
+        ? GatewaiChatOptions.builder() : originalOptions.mutate();
     builder.model(targetModelId);
+    if (builder instanceof GatewaiChatOptions.Builder gatewai) {
+      gatewai.failover(failover);
+    }
     return new Prompt(original.getInstructions(), builder.build());
   }
 }

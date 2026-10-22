@@ -171,6 +171,32 @@ only moves `last_seen_at`; a row past the TTL is replaced as if absent. Lookups
 ignore rows older than `gatewai.routing.conversation-ttl` (24 h); an hourly
 purge under `LeaderLock` deletes them.
 
+The one write that changes the model at an unchanged tier is the failover's
+(v4 B.5): an `UPDATE` that moves a live row to the model that actually answered,
+only while the row is still on that tier, and never creates one.
+
+## `failover_event` (v4 B.5)
+
+One row per failed attempt of a request that was allowed to fail over inside its
+tier ([ADR 0017](adr/0017-ordered-failover-inside-a-tier.md)), on either path (`V12`):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `correlation_id` | `varchar(64)` | joins the request's `routing_decision`, `cache_decision` and `request_log` (indexed) |
+| `created_at` | `timestamptz` | when the attempt failed; the retention clock (indexed) |
+| `path` | `varchar(16)` | `CHAIN` \| `PASS_THROUGH` |
+| `tier` | `varchar(32)` | the tier of the whole chain |
+| `from_model_id` | `varchar(255)` | the registry model id that failed |
+| `to_model_id` | `varchar(255)` | the next one tried; **null** when nothing was left and the client received this failure |
+| `cause` | `varchar(32)` | `CONNECTION_FAILED` \| `TIMEOUT` \| `RATE_LIMITED` \| `SERVER_ERROR` |
+| `upstream_status` | `integer` | the provider's HTTP status; null when it never answered |
+
+Written off the request path by `AsyncDecisionRecorder` like the other decision
+tables, and purged with them (`gatewai.decisions.retention-days`). A request that failed
+over leaves three rows that tell its story together: `routing_decision` names where it
+was sent first, these rows each move, and `request_log` the model that answered.
+
 ## `conformal_calibration` (v2 batch 3)
 
 One row per target (`CACHE`, `ROUTING`) — the primary key is the target, because
@@ -358,6 +384,7 @@ startup instead of silently altering a table.
 | `V9__green_provenance.sql` | eight provenance columns on `request_log` + indexes on `grid_zone` and `provider` |
 | `V10__cache_scope.sql` | `cache_decision.reason` and `cache_scope` (v4 A.2) |
 | `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
+| `V12__failover_event.sql` | `failover_event` and its indexes (v4 B.5) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

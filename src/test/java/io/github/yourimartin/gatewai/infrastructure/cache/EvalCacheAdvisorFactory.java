@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
@@ -39,6 +40,11 @@ public final class EvalCacheAdvisorFactory {
     @Override
     public void record(RoutingDecision decision) {
       // Metrics are not what the harness measures.
+    }
+
+    @Override
+    public void record(FailoverEvent event) {
+      // No failover happens here.
     }
 
     @Override

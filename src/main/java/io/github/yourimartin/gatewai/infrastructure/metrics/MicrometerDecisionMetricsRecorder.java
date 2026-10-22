@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Locale;
 
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
@@ -35,7 +36,8 @@ import org.springframework.stereotype.Component;
  * <p>The prompt, the model id and the correlation id are deliberately
  * <b>never</b> tags: the first two would leak content and cardinality, the third
  * is what the decision tables are for. Metrics answer "how often", the rows
- * answer "why this one".
+ * answer "why this one". The failover counter (v4 B.5) is the one exception
+ * for model ids, and a bounded one: it tags registry ids only.
  */
 @Component
 class MicrometerDecisionMetricsRecorder implements DecisionMetricsRecorder {
@@ -84,6 +86,28 @@ class MicrometerDecisionMetricsRecorder implements DecisionMetricsRecorder {
       }
     } catch (RuntimeException e) {
       failed("cache", e);
+    }
+  }
+
+  /**
+   * A request that moved to the next entry of its tier (ADR 0017, v4 B.5),
+   * scraped as {@code gatewai_failover_total}; {@code to="none"} counts the
+   * chains that ran out.
+   *
+   * <p>The one place model ids are tags, and the exception is bounded: these
+   * are <b>registry</b> ids, which the operator's configuration lists, never the
+   * {@code model} a client sends.
+   */
+  @Override
+  public void record(FailoverEvent event) {
+    try {
+      registry.counter("gatewai.failover",
+          "tier", lower(event.tier()),
+          "from", event.fromModelId(),
+          "to", event.toModelId() == null ? NONE : event.toModelId(),
+          "cause", lower(event.cause())).increment();
+    } catch (RuntimeException e) {
+      failed("failover", e);
     }
   }
 

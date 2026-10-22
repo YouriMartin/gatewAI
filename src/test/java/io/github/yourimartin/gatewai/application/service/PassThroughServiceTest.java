@@ -47,6 +47,7 @@ import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EgressHealth;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
@@ -90,9 +91,12 @@ class PassThroughServiceTest {
   private ProviderRegions providerRegions;
   @Mock
   private CloudRegionZones cloudRegionZones;
+  @Mock
+  private EgressHealth health;
 
   @BeforeEach
   void registry() {
+    lenient().when(health.admit(any())).thenReturn(true);
     lenient().when(modelRegistry.findByTier(ModelTier.CLOUD_PREMIUM))
         .thenReturn(List.of(PREMIUM, PREMIUM_2));
     lenient().when(modelRegistry.findByModelId(anyString())).thenReturn(Optional.empty());
@@ -378,7 +382,7 @@ class PassThroughServiceTest {
   private PassThroughService service(String defaultModel) {
     return new PassThroughService(client, modelRegistry, decisionRecorder, decisionMetrics,
         requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator()),
-        metricsRecorder, providerRegions, cloudRegionZones, defaultModel);
+        metricsRecorder, providerRegions, cloudRegionZones, health, defaultModel, false);
   }
 
   private static PassThroughRequest request(String model, PassThroughFeature... features) {

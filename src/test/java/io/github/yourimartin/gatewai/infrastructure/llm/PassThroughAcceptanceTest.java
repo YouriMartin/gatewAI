@@ -102,8 +102,10 @@ class PassThroughAcceptanceTest {
       useDefaultFilters = false,
       includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
           pattern = ".*\\.PassThroughService"))
-  @Import({OpenAiFormatPassThroughClient.class, PropertiesModelRegistry.class})
-  @EnableConfigurationProperties({ProviderProperties.class, ModelRegistryProperties.class})
+  @Import({OpenAiFormatPassThroughClient.class, PropertiesModelRegistry.class,
+      InMemoryEgressHealth.class})
+  @EnableConfigurationProperties({ProviderProperties.class, ModelRegistryProperties.class,
+      FailoverProperties.class})
   static class Wiring {
 
     @Bean

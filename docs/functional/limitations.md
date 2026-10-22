@@ -46,6 +46,8 @@ intensity, real multi-region execution and a documented methodology.
   LM Studio, llama.cpp, OpenRouter, DeepSeek… — or more `ollama` servers) and
   point registry entries at them. Only instances referenced by the registry are
   built, and startup fails fast on missing keys/endpoints.
+- **Several entries in one tier fail over in order** (v4 B.5); see
+  [Failover inside a tier](#failover-inside-a-tier).
 - The default local models are small (chosen for speed and pull size); swap in
   larger local models or a cloud tier for frontier quality — see the commented
   examples in `application.properties`.
@@ -91,7 +93,11 @@ What that costs:
 - **Only `data` is relayed on a stream.** SSE comments and `event:`/`id:` fields
   from the upstream are dropped. OpenAI-format servers do not use them.
 - **The deferred endpoint and MCP still refuse marked requests.**
-- **No retry, no failover.** One upstream call. Failover inside a tier is B.5.
+- **Failover only for the default model, and only before the stream opens.** A
+  request sent to `gatewai.passthrough.default-model` fails over inside that model's
+  tier (v4 B.5); a pinned one does not, unless `gatewai.failover.pinned=true`. A
+  stream fails over only until the upstream has answered 2xx. See
+  [Failover inside a tier](#failover-inside-a-tier).
 - **Anthropic goes through its OpenAI SDK compatibility layer.** Anthropic presents it
   as a way to test and compare models, "not considered a long-term or
   production-ready solution for most use cases", and it **does not support prompt
@@ -112,6 +118,41 @@ What that costs:
   logged with zero tokens and the same warning.
 - **The response's `model` is the provider's name**, often a dated variant. The
   registry id is in `X-GatewAI-Model` and in `request_log`.
+
+## Failover inside a tier
+
+A tier with several registry entries fails over from one to the next on a connection
+failure, a timeout, a 429 or a 5xx ([ADR 0017](../technical/adr/0017-ordered-failover-inside-a-tier.md)).
+What it does not do:
+
+- **A tier with one entry has no failover, and no retry either.** Since v4 B.5 the
+  provider clients' own retries are off: the gateway's failover is the only retry
+  layer. A single 503 from the only model of a tier reaches the client (as a 502).
+  The official OpenAI SDKs retry 429 and 5xx by themselves; a second entry in the
+  tier is the way to ask the gateway for resilience.
+- **A timeout can cost twice.** A request that times out fails over, and the first
+  provider may still bill what it generated. That is why `read-timeout` defaults to
+  5 minutes: a long blocking answer is slow, not broken. Shorten it per instance only
+  where a provider is known to answer fast.
+- **Nothing fails over after the first byte.** A stream that breaks halfway ends
+  for the client as it did before. The partial answer is not resent from another
+  model.
+- **Never across tiers.** A local tier whose only model is down does not go to the
+  cloud. Declare a cloud entry *in* the local tier to get that, and accept that
+  its traffic is then billed.
+- **Cooldowns are per node.** Each replica learns an outage on its own, in up to
+  `gatewai.failover.failure-threshold` failed calls (default 3), and probes on its
+  own ([`clustering.md`](../technical/clustering.md#failover-health-v4-b5)). When
+  every model of a tier is cooling down, they are all tried anyway, so a cooldown
+  never refuses a request.
+- **The order of a tier is behaviour.** Entries bound from environment variables or
+  a profile file come before those of `application.properties`; set `priority` when
+  entries come from several sources. The startup log prints each tier's chain.
+- **`routing_decision` names the first target, not the answering model.** After a
+  failover, `request_log`, `X-GatewAI-Model` and the green accounting name the model
+  that answered, and `failover_event` holds each move. Join on the correlation id.
+- **A pinned request does not fail over** unless `gatewai.failover.pinned=true`. Its
+  failures still count towards the model's cooldown.
 
 ## Semantic cache trade-offs
 

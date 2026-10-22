@@ -5,6 +5,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
@@ -39,6 +40,7 @@ class AsyncDecisionRecorder implements DecisionRecorder {
 
   private final SpringDataRoutingDecisionRepository routingRepository;
   private final SpringDataCacheDecisionRepository cacheRepository;
+  private final SpringDataFailoverEventRepository failoverRepository;
   private final Executor executor;
   private final MeterRegistry meterRegistry;
   private final DecisionRecordingProperties properties;
@@ -46,11 +48,13 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   AsyncDecisionRecorder(
       SpringDataRoutingDecisionRepository routingRepository,
       SpringDataCacheDecisionRepository cacheRepository,
+      SpringDataFailoverEventRepository failoverRepository,
       @Qualifier("applicationTaskExecutor") TaskExecutor executor,
       MeterRegistry meterRegistry,
       DecisionRecordingProperties properties) {
     this.routingRepository = routingRepository;
     this.cacheRepository = cacheRepository;
+    this.failoverRepository = failoverRepository;
     this.executor = executor;
     this.meterRegistry = meterRegistry;
     this.properties = properties;
@@ -69,10 +73,16 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   }
 
   @Override
+  public void record(FailoverEvent event) {
+    submit("failover", () -> failoverRepository.save(new FailoverEventEntity(event)));
+  }
+
+  @Override
   @Transactional
   public int purgeOlderThan(Instant cutoff) {
     return routingRepository.deleteByCreatedAtBefore(cutoff)
-        + cacheRepository.deleteByCreatedAtBefore(cutoff);
+        + cacheRepository.deleteByCreatedAtBefore(cutoff)
+        + failoverRepository.deleteByCreatedAtBefore(cutoff);
   }
 
   /**

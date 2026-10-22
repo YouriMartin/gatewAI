@@ -1,7 +1,10 @@
 # ADR 0016 — Pass through what the advisor chain cannot honour
 
 **Status:** Accepted (v4 batch B.3). Amends [ADR 0002](0002-thin-gateway-advisor-chain.md)
-and the "one processing chain" rule of `AGENTS.md`.
+and the "one processing chain" rule of `AGENTS.md`. Amended by
+[ADR 0017](0017-ordered-failover-inside-a-tier.md) (v4 B.5): a request sent to the
+default model fails over inside its tier, and the target instance's `read-timeout`
+replaces `gatewai.passthrough.timeout`.
 
 ## Context
 

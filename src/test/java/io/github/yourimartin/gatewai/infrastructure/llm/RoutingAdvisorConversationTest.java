@@ -16,6 +16,7 @@ import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
@@ -94,7 +95,8 @@ class RoutingAdvisorConversationTest {
     return new RoutingAdvisor(classifier, REGISTRY, recording(decisions),
         mock(DecisionMetricsRecorder.class), mock(RoutingConfigVersionTracker.class),
         CalibrationFixtures.none(0.60), new ClassifierProperties(),
-        new ConversationStickiness(conversations, REGISTRY, classifier));
+        new ConversationStickiness(conversations, REGISTRY, classifier),
+        new FailoverProperties());
   }
 
   @Test
@@ -237,6 +239,11 @@ class RoutingAdvisorConversationTest {
       }
 
       @Override
+      public void reassign(String fingerprint, String modelId, ModelTier tier) {
+        throw new IllegalStateException("database down");
+      }
+
+      @Override
       public int purgeLastSeenBefore(Instant cutoff) {
         return 0;
       }
@@ -294,6 +301,11 @@ class RoutingAdvisorConversationTest {
       @Override
       public void record(RoutingDecision decision) {
         into.add(decision);
+      }
+
+      @Override
+      public void record(FailoverEvent event) {
+        // No failover happens here.
       }
 
       @Override

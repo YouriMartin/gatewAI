@@ -85,6 +85,16 @@ class JdbcConversationAffinityStore implements ConversationAffinityStore {
   }
 
   @Override
+  public void reassign(String fingerprint, String modelId, ModelTier tier) {
+    jdbc.update("""
+        UPDATE conversation_affinity
+           SET model_id = ?, last_seen_at = ?
+         WHERE fingerprint = ? AND tier = ? AND last_seen_at >= ?
+        """, modelId, Timestamp.from(Instant.now()), fingerprint, tier.name(),
+        Timestamp.from(cutoff()));
+  }
+
+  @Override
   public int purgeLastSeenBefore(Instant cutoff) {
     return jdbc.update("DELETE FROM conversation_affinity WHERE last_seen_at < ?",
         Timestamp.from(cutoff));

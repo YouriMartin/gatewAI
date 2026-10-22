@@ -13,6 +13,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.PromptHash;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.ClientDisconnectedException;
@@ -26,7 +27,10 @@ import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
+import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
+import io.github.yourimartin.gatewai.domain.model.routing.FailoverSequence;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.in.PassThroughStream;
 import io.github.yourimartin.gatewai.domain.port.in.PassThroughUseCase;
@@ -34,6 +38,7 @@ import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EgressHealth;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
@@ -53,6 +58,12 @@ import org.springframework.stereotype.Service;
  * cached, and the trace says so: a {@code BYPASS} cache decision and a
  * {@code PASSTHROUGH_*} routing decision, recorded before the call. The served
  * request is then accounted by the same code as the chain.
+ *
+ * <p>Since v4 B.5 (ADR 0017) a request sent to the default model fails over, on a
+ * transient failure before the first byte, to the next entry of that model's tier
+ * that can honour it; a pinned one only when {@code gatewai.failover.pinned} says
+ * so. The routing decision names the first target, the failover rows each move,
+ * and the request log the model that answered.
  */
 @Service
 final class PassThroughService implements PassThroughUseCase {
@@ -65,7 +76,9 @@ final class PassThroughService implements PassThroughUseCase {
   private final DecisionMetricsRecorder decisionMetrics;
   private final RequestAccounting accounting;
   private final MetricsRecorder metricsRecorder;
+  private final EgressHealth health;
   private final ModelDefinition defaultTarget;
+  private final boolean failoverPinned;
 
   PassThroughService(PassThroughClient client,
                      ModelRegistry modelRegistry,
@@ -77,7 +90,9 @@ final class PassThroughService implements PassThroughUseCase {
                      MetricsRecorder metricsRecorder,
                      ProviderRegions providerRegions,
                      CloudRegionZones cloudRegionZones,
-                     @Value("${gatewai.passthrough.default-model:}") String defaultModel) {
+                     EgressHealth health,
+                     @Value("${gatewai.passthrough.default-model:}") String defaultModel,
+                     @Value("${gatewai.failover.pinned:false}") boolean failoverPinned) {
     this.client = client;
     this.modelRegistry = modelRegistry;
     this.decisionRecorder = decisionRecorder;
@@ -86,7 +101,9 @@ final class PassThroughService implements PassThroughUseCase {
         carbonIntensityProvider, greenAccountant, metricsRecorder, providerRegions,
         cloudRegionZones);
     this.metricsRecorder = metricsRecorder;
+    this.health = health;
     this.defaultTarget = resolveDefault(modelRegistry, defaultModel);
+    this.failoverPinned = failoverPinned;
   }
 
   /**
@@ -108,16 +125,83 @@ final class PassThroughService implements PassThroughUseCase {
   @Override
   public PassThroughResponse forward(PassThroughRequest passThrough) {
     Prepared prepared = prepare(passThrough.request());
-    PassThroughResponse response = client.forward(prepared.target(), passThrough.body());
-    account(prepared, response.usage());
-    return response;
+    FailoverSequence sequence = sequence(prepared);
+    ModelDefinition model = sequence.next().orElse(prepared.target());
+    while (true) {
+      try {
+        PassThroughResponse response = client.forward(model, passThrough.body());
+        health.succeeded(model);
+        account(prepared, model, response.usage());
+        return response;
+      } catch (UpstreamFailureException e) {
+        model = afterFailure(e, model, sequence, prepared);
+      }
+    }
   }
 
+  /**
+   * Opens the stream, failing over while no upstream has answered 2xx: once one
+   * has, the relay has begun, and nothing fails over any more (ADR 0017).
+   */
   @Override
   public PassThroughStream openStream(PassThroughRequest passThrough) {
     Prepared prepared = prepare(passThrough.request());
-    UpstreamEventStream upstream = client.openStream(prepared.target(), passThrough.body());
-    return new RelayedStream(prepared, upstream);
+    FailoverSequence sequence = sequence(prepared);
+    ModelDefinition model = sequence.next().orElse(prepared.target());
+    while (true) {
+      try {
+        UpstreamEventStream upstream = client.openStream(model, passThrough.body());
+        health.succeeded(model);
+        return new RelayedStream(prepared, model, upstream);
+      } catch (UpstreamFailureException e) {
+        model = afterFailure(e, model, sequence, prepared);
+      }
+    }
+  }
+
+  /**
+   * The request's candidates: its target, then — when it may fail over — the
+   * rest of the target's tier in failover order, without the entries whose
+   * endpoint would ignore one of its marked features (ADR 0016). Failover never
+   * turns a refusal into a different model's answer.
+   */
+  private FailoverSequence sequence(Prepared prepared) {
+    if (!prepared.failover()) {
+      return FailoverSequence.single(prepared.target());
+    }
+    List<ModelDefinition> honouring = modelRegistry.findByTier(prepared.target().tier()).stream()
+        .filter(model -> model.equals(prepared.target())
+            || ignored(prepared.request(), model).isEmpty())
+        .toList();
+    return FailoverSequence.of(prepared.target(), honouring, health::admit);
+  }
+
+  /**
+   * What a failed attempt leads to: the next model, or the failure the client
+   * receives. Only a transient failure counts against the model's health, and
+   * only a request allowed to fail over moves on.
+   */
+  private ModelDefinition afterFailure(UpstreamFailureException failure, ModelDefinition failed,
+                                       FailoverSequence sequence, Prepared prepared) {
+    Optional<FailoverCause> cause = FailoverCause.of(failure);
+    if (cause.isEmpty()) {
+      throw failure;
+    }
+    health.failed(failed);
+    if (!prepared.failover()) {
+      throw failure;
+    }
+    ModelDefinition next = sequence.next().orElse(null);
+    recordFailover(FailoverEvent.of(prepared.correlationId(), FailoverEvent.Path.PASS_THROUGH,
+        failed, next, cause.get(), failure));
+    if (next == null) {
+      LOG.warn("Pass-through to model '{}' failed ({}) and its tier {} has nothing left to try",
+          failed.modelId(), cause.get(), failed.tier());
+      throw failure;
+    }
+    LOG.warn("Pass-through to model '{}' failed ({}): failing over to '{}' in tier {}",
+        failed.modelId(), cause.get(), next.modelId(), failed.tier());
+    return next;
   }
 
   /**
@@ -144,29 +228,32 @@ final class PassThroughService implements PassThroughUseCase {
     recordRouting(userText, target,
         pinned.isPresent() ? DecisionReason.PASSTHROUGH_PINNED : DecisionReason.PASSTHROUGH_DEFAULT,
         decisionMs, correlationId);
-    return new Prepared(request, target, startNanos, correlationId,
-        RequestAccounting.clientId());
+    return new Prepared(request, target, pinned.isEmpty() || failoverPinned, startNanos,
+        correlationId, RequestAccounting.clientId());
   }
 
   /**
    * A request on its way, with the context captured on the request thread: a
    * stream is relayed from another one, where the Scoped Value is unbound.
+   *
+   * @param target   where it is sent first
+   * @param failover whether it may fail over inside {@code target}'s tier
    */
-  private record Prepared(LlmRequest request, ModelDefinition target, long startNanos,
-                          String correlationId, String clientId) {
+  private record Prepared(LlmRequest request, ModelDefinition target, boolean failover,
+                          long startNanos, String correlationId, String clientId) {
   }
 
-  /** Accounts a served request through the chain's code (ADR 0016). */
-  private void account(Prepared prepared, TokenUsage reported) {
+  /** Accounts a request {@code model} served, through the chain's code (ADR 0016). */
+  private void account(Prepared prepared, ModelDefinition model, TokenUsage reported) {
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - prepared.startNanos());
     TokenUsage usage = reported;
     if (usage == null) {
       LOG.warn("Upstream of model '{}' reported no usage: request {} is logged with zero"
           + " tokens, which means not accounted, not measured zero",
-          prepared.target().modelId(), prepared.correlationId());
+          model.modelId(), prepared.correlationId());
       usage = TokenUsage.NONE;
     }
-    accounting.record(prepared.request(), prepared.target().modelId(), usage, false, latencyMs,
+    accounting.record(prepared.request(), model.modelId(), usage, false, latencyMs,
         prepared.correlationId(), prepared.clientId());
   }
 
@@ -180,16 +267,18 @@ final class PassThroughService implements PassThroughUseCase {
   private final class RelayedStream implements PassThroughStream {
 
     private final Prepared prepared;
+    private final ModelDefinition answering;
     private final UpstreamEventStream upstream;
 
-    RelayedStream(Prepared prepared, UpstreamEventStream upstream) {
+    RelayedStream(Prepared prepared, ModelDefinition answering, UpstreamEventStream upstream) {
       this.prepared = prepared;
+      this.answering = answering;
       this.upstream = upstream;
     }
 
     @Override
     public String model() {
-      return prepared.target().modelId();
+      return answering.modelId();
     }
 
     @Override
@@ -200,7 +289,7 @@ final class PassThroughService implements PassThroughUseCase {
       try {
         TokenUsage usage = upstream.relay(onEvent);
         outcome = PassThroughStreamOutcome.COMPLETED;
-        account(prepared, usage);
+        account(prepared, answering, usage);
       } catch (ClientDisconnectedException e) {
         outcome = PassThroughStreamOutcome.CLIENT_DISCONNECTED;
         LOG.warn("Client of request {} went away mid-stream: the call to model '{}' was"
@@ -219,12 +308,28 @@ final class PassThroughService implements PassThroughUseCase {
 
   /** Refuses, before anything is sent or traced, what the target would silently drop. */
   private void refuseIgnoredFeatures(LlmRequest request, ModelDefinition target) {
-    Set<PassThroughFeature> ignored = EnumSet.noneOf(PassThroughFeature.class);
-    ignored.addAll(request.passThrough());
-    ignored.retainAll(client.ignoredFeatures(target));
+    Set<PassThroughFeature> ignored = ignored(request, target);
     if (!ignored.isEmpty()) {
       throw UnsupportedFeatureException.notHonouredBy(ignored, target.modelId(),
           client.describeEndpoint(target));
+    }
+  }
+
+  /** The request's marked features that {@code target}'s endpoint would ignore. */
+  private Set<PassThroughFeature> ignored(LlmRequest request, ModelDefinition target) {
+    Set<PassThroughFeature> ignored = EnumSet.noneOf(PassThroughFeature.class);
+    ignored.addAll(request.passThrough());
+    ignored.retainAll(client.ignoredFeatures(target));
+    return ignored;
+  }
+
+  /** Never throws: the trace explains a request, it must not fail one. */
+  private void recordFailover(FailoverEvent event) {
+    try {
+      decisionRecorder.record(event);
+      decisionMetrics.record(event);
+    } catch (RuntimeException e) {
+      LOG.warn("Could not record a pass-through failover: {}", e.toString());
     }
   }
 

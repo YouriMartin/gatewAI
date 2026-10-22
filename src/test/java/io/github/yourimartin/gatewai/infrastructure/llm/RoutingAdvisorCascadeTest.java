@@ -83,7 +83,8 @@ class RoutingAdvisorCascadeTest {
     advisor = new RoutingAdvisor(classifier, modelRegistry,
         decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
         properties, new ConversationStickiness(
-            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier),
+        new FailoverProperties());
   }
 
   // ---- Cascade tracing (v2 batch 4) ----
@@ -132,7 +133,8 @@ class RoutingAdvisorCascadeTest {
         CalibrationFixtures.applied(CalibrationFixtures.calibration(
             CalibrationTarget.ROUTING, 0.60), 0.60),
         properties, new ConversationStickiness(
-            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier),
+        new FailoverProperties());
     when(classifier.classify(any())).thenReturn(new ClassificationOutcome(
         ModelTier.CLOUD_PREMIUM,
         new ClassificationJustification.Cascade(CascadeLevel.LLM, 0.02,

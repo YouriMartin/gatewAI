@@ -25,6 +25,16 @@ public interface ConversationAffinityStore {
    */
   void record(String fingerprint, String modelId, ModelTier tier);
 
+  /**
+   * Moves the conversation to another model of the <b>same</b> tier, because a
+   * failover made that model answer (v4 B.5, ADR 0017), and marks it seen.
+   *
+   * <p>Changes nothing unless the live record is on {@code tier}: a record that
+   * another node has meanwhile moved up keeps its higher tier, and a missing or
+   * expired one is not created here.
+   */
+  void reassign(String fingerprint, String modelId, ModelTier tier);
+
   /** Drops records last seen before {@code cutoff}; returns how many. */
   int purgeLastSeenBefore(Instant cutoff);
 }

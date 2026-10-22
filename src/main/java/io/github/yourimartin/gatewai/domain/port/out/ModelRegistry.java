@@ -14,5 +14,9 @@ public interface ModelRegistry {
 
   Optional<ModelDefinition> findByModelId(String modelId);
 
+  /**
+   * The entries of {@code tier} in failover order (ADR 0017): the first is where
+   * the tier's new traffic goes, the others where it fails over to.
+   */
   List<ModelDefinition> findByTier(ModelTier tier);
 }

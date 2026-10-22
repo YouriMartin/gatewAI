@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -18,6 +19,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Since v3 lot C.2 an instance also carries <b>where it runs</b> — {@code region},
  * {@code region-provenance} and {@code pue}. That belongs here rather than on a
  * model because every model behind one instance runs in the same datacenter.
+ *
+ * <p>Since v4 B.5 it also carries its <b>timeouts</b> ({@code connect-timeout},
+ * {@code read-timeout}), which both paths apply and which are failover triggers
+ * (ADR 0017).
  */
 @ConfigurationProperties(prefix = "gatewai")
 class ProviderProperties {
@@ -60,6 +65,13 @@ class ProviderProperties {
     private Double pue;
     /** Ollama only: whether to pull the registry's models at startup. */
     private PullModelStrategy pullModelStrategy = PullModelStrategy.WHEN_MISSING;
+    /** How long establishing a connection may take (ADR 0017). */
+    private Duration connectTimeout = Duration.ofSeconds(10);
+    /**
+     * How long the instance may take to start answering (ADR 0017). Long by
+     * default: a blocking call answers nothing until the whole answer exists.
+     */
+    private Duration readTimeout = Duration.ofMinutes(5);
 
     ProviderType getType() {
       return type;
@@ -115,6 +127,22 @@ class ProviderProperties {
 
     void setPullModelStrategy(PullModelStrategy pullModelStrategy) {
       this.pullModelStrategy = pullModelStrategy;
+    }
+
+    Duration getConnectTimeout() {
+      return connectTimeout;
+    }
+
+    void setConnectTimeout(Duration connectTimeout) {
+      this.connectTimeout = connectTimeout;
+    }
+
+    Duration getReadTimeout() {
+      return readTimeout;
+    }
+
+    void setReadTimeout(Duration readTimeout) {
+      this.readTimeout = readTimeout;
     }
   }
 }

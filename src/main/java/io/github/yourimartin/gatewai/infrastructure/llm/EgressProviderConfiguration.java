@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -8,6 +9,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.AnthropicClientAsync;
+import com.openai.client.OpenAIClient;
+import com.openai.client.OpenAIClientAsync;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
@@ -19,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
+import org.springframework.ai.anthropic.AnthropicSetup;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.ollama.OllamaChatModel;
@@ -32,6 +39,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.retry.RetryPolicy;
+import org.springframework.core.retry.RetryTemplate;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.reactive.JdkClientHttpConnector;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Builds the egress {@link ProviderChatModels} from configuration and fails fast
@@ -62,6 +75,13 @@ import org.springframework.context.annotation.Profile;
  * that declares no {@code region} (v3 lot C.2). It would be booked at the gateway's
  * own grid zone, which is the defect lot C exists to fix — but refusing to boot over
  * a carbon-accounting detail would break the zero-config promise.
+ *
+ * <p>Since v4 B.5 (ADR 0017) every instance gets its own {@code connect-timeout}
+ * and {@code read-timeout}, and <b>no client-side retry</b>: the gateway's
+ * failover inside a tier is the only retry layer. Left alone, Spring AI's Ollama
+ * model retried a blocking call ten times with backoff of up to three minutes, and
+ * the OpenAI and Anthropic SDKs retried on their own, each attempt delaying the
+ * failover and hiding failures from the cooldown.
  */
 @Configuration
 @Profile("!mock")
@@ -70,8 +90,8 @@ class EgressProviderConfiguration {
   private static final Logger LOG = LoggerFactory.getLogger(EgressProviderConfiguration.class);
 
   private static final String DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
-  private static final Duration OPENAI_TIMEOUT = Duration.ofSeconds(60);
-  private static final int OPENAI_MAX_RETRIES = 3;
+  /** Spring AI's Ollama model retries unless told otherwise (ADR 0017). */
+  private static final RetryTemplate NO_RETRY = new RetryTemplate(RetryPolicy.withMaxRetries(0));
   /** Anthropic requires max_tokens; used when the client sends none. */
   private static final int ANTHROPIC_DEFAULT_MAX_TOKENS = 4096;
 
@@ -90,6 +110,7 @@ class EgressProviderConfiguration {
                             ToolCallingManager tools,
                             ObservationRegistry observations) {
     validateRegistry(modelRegistry);
+    logFailoverChains(modelRegistry);
 
     Map<String, ProviderProperties.ProviderEntry> declared = lowercaseKeys(providerProperties);
     declared.forEach(EgressProviderConfiguration::refuseSubscriptionToken);
@@ -154,6 +175,22 @@ class EgressProviderConfiguration {
     return entry.getRegion() + " (" + provenance.label() + ", " + pue + ")";
   }
 
+  /**
+   * The order of a tier is behaviour since ADR 0017 — where its traffic goes, and
+   * where it fails over to — so it is printed where an operator will look first.
+   */
+  private static void logFailoverChains(ModelRegistry modelRegistry) {
+    for (ModelTier tier : ModelTier.values()) {
+      List<String> chain = modelRegistry.findByTier(tier).stream()
+          .map(ModelDefinition::modelId).toList();
+      if (chain.size() > 1) {
+        LOG.info("Tier {} fails over in order: {}", tier, String.join(" → ", chain));
+      } else {
+        LOG.info("Tier {} has one model ({}): no failover", tier, chain);
+      }
+    }
+  }
+
   private static void validateRegistry(ModelRegistry modelRegistry) {
     for (ModelTier tier : ModelTier.values()) {
       if (modelRegistry.findByTier(tier).isEmpty()) {
@@ -195,14 +232,30 @@ class EgressProviderConfiguration {
                                    ToolCallingManager tools,
                                    ObservationRegistry observations) {
     requireApiKey(name, entry, "an Anthropic");
+    String baseUrl = hasText(entry.getBaseUrl()) ? entry.getBaseUrl() : null;
     AnthropicChatOptions.Builder options = AnthropicChatOptions.builder()
         .model(models.getFirst().modelId())
         .maxTokens(ANTHROPIC_DEFAULT_MAX_TOKENS)
         .apiKey(entry.getApiKey());
-    if (hasText(entry.getBaseUrl())) {
-      options.baseUrl(entry.getBaseUrl());
+    if (baseUrl != null) {
+      options.baseUrl(baseUrl);
     }
+    // Built here rather than by the model, which only passes one timeout through.
+    com.anthropic.core.Timeout timeout = com.anthropic.core.Timeout.builder()
+        .connect(entry.getConnectTimeout())
+        .read(entry.getReadTimeout())
+        .write(entry.getReadTimeout())
+        .request(Duration.ZERO)
+        .build();
+    AnthropicClient client = AnthropicSetup.setupSyncClient(baseUrl, entry.getApiKey(),
+            entry.getReadTimeout(), 0, null, null, observations, null)
+        .withOptions(o -> o.timeout(timeout).maxRetries(0));
+    AnthropicClientAsync clientAsync = AnthropicSetup.setupAsyncClient(baseUrl,
+            entry.getApiKey(), entry.getReadTimeout(), 0, null, null, observations, null)
+        .withOptions(o -> o.timeout(timeout).maxRetries(0));
     return AnthropicChatModel.builder()
+        .anthropicClient(client)
+        .anthropicClientAsync(clientAsync)
         .options(options.build())
         .toolCallingManager(tools)
         .observationRegistry(observations)
@@ -224,13 +277,25 @@ class EgressProviderConfiguration {
     // Empty key => the SDK's no-auth mode, common for self-hosted OpenAI-compatible servers.
     String apiKey = entry.getApiKey() == null ? "" : entry.getApiKey();
     String baseUrl = hasText(entry.getBaseUrl()) ? entry.getBaseUrl() : null;
+    // OpenAiSetup takes one Duration and applies it to the whole call, which cut
+    // every answer longer than it; the instance's timeouts replace it (ADR 0017).
+    com.openai.core.Timeout timeout = com.openai.core.Timeout.builder()
+        .connect(entry.getConnectTimeout())
+        .read(entry.getReadTimeout())
+        .write(entry.getReadTimeout())
+        .request(Duration.ZERO)
+        .build();
+    OpenAIClient client = OpenAiSetup.setupSyncClient(baseUrl, apiKey, null, null, null, null,
+            false, false, null, entry.getReadTimeout(), 0, null, Map.of(),
+            observations, null, List.of())
+        .withOptions(o -> o.timeout(timeout).maxRetries(0));
+    OpenAIClientAsync clientAsync = OpenAiSetup.setupAsyncClient(baseUrl, apiKey, null, null,
+            null, null, false, false, null, entry.getReadTimeout(), 0, null, Map.of(),
+            observations, null, List.of())
+        .withOptions(o -> o.timeout(timeout).maxRetries(0));
     return OpenAiChatModel.builder()
-        .openAiClient(OpenAiSetup.setupSyncClient(baseUrl, apiKey, null, null, null, null,
-            false, false, null, OPENAI_TIMEOUT, OPENAI_MAX_RETRIES, null, Map.of(),
-            observations, null, List.of()))
-        .openAiClientAsync(OpenAiSetup.setupAsyncClient(baseUrl, apiKey, null, null, null, null,
-            false, false, null, OPENAI_TIMEOUT, OPENAI_MAX_RETRIES, null, Map.of(),
-            observations, null, List.of()))
+        .openAiClient(client)
+        .openAiClientAsync(clientAsync)
         .options(OpenAiChatOptions.builder().model(models.getFirst().modelId()).build())
         .toolCallingManager(tools)
         .observationRegistry(observations)
@@ -243,8 +308,23 @@ class EgressProviderConfiguration {
                                 ObservationRegistry observations) {
     String baseUrl = hasText(entry.getBaseUrl()) ? entry.getBaseUrl() : DEFAULT_OLLAMA_BASE_URL;
     List<String> modelIds = models.stream().map(ModelDefinition::modelId).toList();
+    // One JDK client for both of the API's clients: RestClient for blocking calls,
+    // WebClient for streams. The read timeout bounds the wait for the headers.
+    HttpClient http = HttpClient.newBuilder()
+        .version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(entry.getConnectTimeout())
+        .build();
+    JdkClientHttpRequestFactory blocking = new JdkClientHttpRequestFactory(http);
+    blocking.setReadTimeout(entry.getReadTimeout());
+    JdkClientHttpConnector streaming = new JdkClientHttpConnector(http);
+    streaming.setReadTimeout(entry.getReadTimeout());
     return OllamaChatModel.builder()
-        .ollamaApi(OllamaApi.builder().baseUrl(baseUrl).build())
+        .ollamaApi(OllamaApi.builder()
+            .baseUrl(baseUrl)
+            .restClientBuilder(RestClient.builder().requestFactory(blocking))
+            .webClientBuilder(WebClient.builder().clientConnector(streaming))
+            .build())
+        .retryTemplate(NO_RETRY)
         .options(OllamaChatOptions.builder().model(modelIds.getFirst()).build())
         // Pulls this instance's registry models per the configured strategy.
         .modelManagementOptions(ModelManagementOptions.builder()

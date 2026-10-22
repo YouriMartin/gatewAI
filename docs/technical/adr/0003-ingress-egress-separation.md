@@ -1,6 +1,8 @@
 # ADR 0003 — Separate ingress from egress
 
-**Status:** Accepted
+**Status:** Accepted. Amended by [ADR 0017](0017-ordered-failover-inside-a-tier.md):
+a request may fail over to another registry entry **of its tier**. There is still no
+fallback provider outside the registry.
 
 ## Context
 

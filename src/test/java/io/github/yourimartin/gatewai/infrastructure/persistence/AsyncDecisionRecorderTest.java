@@ -13,11 +13,13 @@ import java.util.UUID;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.HeuristicRule;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,6 +42,9 @@ class AsyncDecisionRecorderTest {
   @Mock
   private SpringDataCacheDecisionRepository cacheRepository;
 
+  @Mock
+  private SpringDataFailoverEventRepository failoverRepository;
+
   private MeterRegistry meterRegistry;
   private DecisionRecordingProperties properties;
   private AsyncDecisionRecorder recorder;
@@ -51,7 +56,7 @@ class AsyncDecisionRecorderTest {
     // Runs the submitted task inline, so the assertions see the effect.
     TaskExecutor executor = new SyncTaskExecutor();
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        executor, meterRegistry, properties);
+        failoverRepository, executor, meterRegistry, properties);
   }
 
   @Test
@@ -95,7 +100,7 @@ class AsyncDecisionRecorderTest {
       throw new IllegalStateException("executor shut down");
     };
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        rejecting, meterRegistry, properties);
+        failoverRepository, rejecting, meterRegistry, properties);
 
     assertDoesNotThrow(() -> recorder.record(routingDecision()));
     assertEquals(1.0, recorder.failureCount("routing"));
@@ -114,12 +119,22 @@ class AsyncDecisionRecorderTest {
   }
 
   @Test
-  void purgeCountsBothTables() {
+  void purgeCountsEveryDecisionTable() {
     Instant cutoff = Instant.now();
     when(routingRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(3);
     when(cacheRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(4);
+    when(failoverRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(2);
 
-    assertEquals(7, recorder.purgeOlderThan(cutoff));
+    assertEquals(9, recorder.purgeOlderThan(cutoff));
+  }
+
+  @Test
+  void writesAFailoverEvent() {
+    recorder.record(new FailoverEvent(UUID.randomUUID(), "corr-1", Instant.now(),
+        FailoverEvent.Path.CHAIN, ModelTier.LOCAL, "qwen2.5:0.5b", "qwen2.5:1.5b",
+        FailoverCause.SERVER_ERROR, 503));
+
+    verify(failoverRepository).save(any(FailoverEventEntity.class));
   }
 
   private static RoutingDecision routingDecision() {

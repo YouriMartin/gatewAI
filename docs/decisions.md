@@ -7,6 +7,56 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot B — B.5 (ordered failover inside a tier)
+
+- **The order is binding order plus an optional `priority`.** The roadmap left the
+  choice open. Binding order alone is not enough: Spring Boot binds a map from every
+  property source in precedence order, so entries from environment variables or a
+  profile file land **before** those of `application.properties`. `priority` (lowest
+  first; entries without one follow in binding order) states the order where that
+  matters, and the startup log prints every tier's chain.
+- **Client-side retries are off, not capped.** ADR 0017 explains the choice. It costs
+  single-entry tiers their in-gateway retry on a transient 5xx/429. Finding it also
+  showed what the retries were doing: Spring AI's Ollama model retried a blocking call
+  10 times with a backoff of up to 3 min per attempt.
+- **A real bug fixed on the way: `openai`/`openai-compatible` calls failed at 60 s.**
+  The hard-coded `OPENAI_TIMEOUT` went into the SDK as the bound on the **whole** call
+  (`Timeout.request`, which `read` defaults to), so any blocking or streamed answer
+  longer than 60 s failed. The instance's `connect-timeout`/`read-timeout` replace it,
+  with no whole-call bound.
+- **`gatewai.passthrough.timeout` is removed** rather than kept beside the new
+  per-instance `read-timeout`, which now bounds the same wait on the pass-through path.
+  Two timeouts for one provider would disagree. B.3 introduced the property and no
+  release has shipped it.
+- **Health is per registry entry, not per provider instance.** The roadmap says "an
+  instance is skipped". A 429 is often per model, and one model's rate limit should not
+  cool down every model of its provider. A provider that is down trips each of its
+  models within a few requests anyway.
+- **When every entry of a chain is cooling down, the chain is tried as declared.** The
+  roadmap only says "skipped for a cooldown, then probed". Skipping everything would
+  turn three failures on a single-entry tier into 30 s of certain errors, even after the
+  provider recovered. The cooldown reorders; it never refuses.
+- **The chain's provider errors are now `UpstreamFailureException`.** Failover needed
+  one vocabulary for "transient" on both paths. As a consequence, an SDK error on the
+  chain reaches the client as 429/502/504 with ADR 0016's codes instead of a generic 500,
+  and Ollama's as a 502 instead of a 503. The 503 row is gone from `api-reference.md`.
+- **The conversation store gained `reassign`.** "The conversation follows the model
+  that actually answered" could not go through `record`, whose never-downgrade rule
+  keeps the recorded model at an equal tier (A.3). `reassign` moves a live record to
+  another model of the **same** tier only, so a concurrent upgrade by another node
+  still wins.
+- **The failover counter tags model ids.** The metrics rule says model ids are never
+  tags. The roadmap names `from` and `to`, and they are **registry** ids, which the
+  configuration bounds. The exception is written down in `observability.md` and in the
+  recorder.
+- **Failovers are not in the explain API.** The roadmap asks for a trace and a metric,
+  both done (`failover_event`, `gatewai_failover_total`). Adding them to
+  `GET /v1/admin/decisions/{correlationId}` is left for when someone asks.
+- **`JdbcConversationAffinityStore.reassign` is covered by an integration test that
+  was not run here.** The `-Pit` suite needs Postgres on port 5432, which another
+  project's container held at the time. The unit suite covers `reassign` through the
+  in-memory store.
+
 ## v4 lot B — B.4 (pass-through, streaming)
 
 - **A disconnect is recorded as a counter and a log line, not as a `request_log` row.**

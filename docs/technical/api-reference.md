@@ -58,7 +58,10 @@ How a marked request is served:
   provider untouched. It is POSTed to the provider instance's OpenAI-format endpoint:
   `{base-url}/chat/completions` for `openai` (default `https://api.openai.com/v1`) and
   `openai-compatible`, `{base-url}/v1/chat/completions` for `ollama` and for
-  `anthropic` (Anthropic's OpenAI SDK compatibility layer). No retry.
+  `anthropic` (Anthropic's OpenAI SDK compatibility layer). No retry. A request to
+  the default model fails over inside its tier on a connection failure, a timeout, a
+  429 or a 5xx (v4 B.5, [ADR 0017](adr/0017-ordered-failover-inside-a-tier.md)); a
+  pinned one does not unless `gatewai.failover.pinned=true`.
 - **Answer.** The upstream status and body, as sent. The model in the body is the
   provider's own name. `X-GatewAI-Model` carries the registry id.
 - **Streaming (v4 B.4).** With `"stream": true` the upstream's events are relayed one
@@ -171,14 +174,19 @@ client SDKs parse them like any other OpenAI error:
 |---|---|---|
 | `400` | `invalid_request_error` | Malformed JSON, a body that is not the Chat Completions shape, or missing/empty `messages` |
 | `400` | `invalid_request_error`, code `unsupported_feature` | A marked request on a path or a target that cannot honour it (above) |
-| `400` | `invalid_request_error`, code `upstream_rejected` | Pass-through: the upstream answered 400, 413 or 422. The message names the status |
+| `400` | `invalid_request_error`, code `upstream_rejected` | The upstream answered 400, 413 or 422 (pass-through, and the chain since v4 B.5). The message names the status |
 | `401` | — | Missing/invalid API key (Spring Security entry point, no body) |
 | `429` | — | Rate limit exceeded (`Retry-After` header) |
-| `429` | `api_error`, code `upstream_rate_limited` | Pass-through: the upstream answered 429 |
-| `502` | `api_error` | Upstream provider rejected the request (auth, unknown model) or is unreachable. On pass-through: any other upstream 4xx, a 5xx, or no connection |
-| `503` | `api_error` | Upstream provider temporarily unavailable / rate-limited after retries (chain only) |
-| `504` | `api_error` | Pass-through: no answer within `gatewai.passthrough.timeout` (default 5 min). For a stream, that is the wait for the first byte |
+| `429` | `api_error`, code `upstream_rate_limited` | The upstream answered 429, and failover had nothing left to try |
+| `502` | `api_error` | The upstream rejected the gateway's credentials or model id (401, 403, 404, any other 4xx), answered 5xx, or could not be reached, and failover had nothing left to try |
+| `504` | `api_error` | The upstream did not start answering within its instance's `read-timeout` (default 5 min), and failover had nothing left to try. For a stream, that is the wait for the first byte |
 | `500` | `api_error` | Unexpected internal error |
+
+Since v4 B.5 the chain reports provider failures with the same statuses and codes as
+the pass-through path (until then an SDK error reached the client as a generic 500,
+and Ollama's as a 503 after its own retries). When a tier has several models, those
+statuses only appear once failover inside the tier has run out
+([ADR 0017](adr/0017-ordered-failover-inside-a-tier.md)).
 
 Upstream provider details are logged server-side but **not echoed** to the caller.
 Streaming (`"stream": true`) reports failures inline on the SSE stream rather than

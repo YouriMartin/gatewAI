@@ -40,4 +40,21 @@ class GatewaiChatOptionsTest {
     assertThat(GatewaiChatOptions.seedOf(ChatOptions.builder().model("m").build())).isNull();
     assertThat(GatewaiChatOptions.seedOf(null)).isNull();
   }
+
+  @Test
+  void theFailoverFlagSurvivesMutatingAndMerging() {
+    GatewaiChatOptions flagged = GatewaiChatOptions.builder().model("m").failover(true).build();
+
+    assertThat(flagged.mutate().build().isFailover()).isTrue();
+    assertThat(GatewaiChatOptions.builder().combineWith(flagged.mutate()).build().isFailover())
+        .isTrue();
+    assertThat(flagged).isNotEqualTo(flagged.mutate().failover(false).build());
+  }
+
+  @Test
+  void onlyTheGatewaysOptionsCanAskForFailover() {
+    assertThat(GatewaiChatOptions.failoverOf(ChatOptions.builder().model("m").build())).isFalse();
+    assertThat(GatewaiChatOptions.failoverOf(null)).isFalse();
+    assertThat(GatewaiChatOptions.failoverOf(GatewaiChatOptions.builder().build())).isFalse();
+  }
 }

@@ -29,6 +29,12 @@ class ModelRegistryProperties {
     private double costPer1kTokens;
     private Energy energy = new Energy();
     private ModelTier tier;
+    /**
+     * Place in the tier's failover chain (ADR 0017): lowest first, before the
+     * entries that set none. Null keeps binding order, which is file order
+     * inside one file but not across property sources.
+     */
+    private Integer priority;
 
     String getProvider() {
       return provider;
@@ -68,6 +74,14 @@ class ModelRegistryProperties {
 
     void setTier(ModelTier tier) {
       this.tier = tier;
+    }
+
+    Integer getPriority() {
+      return priority;
+    }
+
+    void setPriority(Integer priority) {
+      this.priority = priority;
     }
   }
 

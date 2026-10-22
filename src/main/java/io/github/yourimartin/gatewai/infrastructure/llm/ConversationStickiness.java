@@ -123,6 +123,23 @@ class ConversationStickiness {
   }
 
   /**
+   * Moves a placed conversation to the model that actually answered, when a
+   * failover made it another one (v4 B.5, ADR 0017): the next turn then starts
+   * where the answer came from, and does not pay the failed attempt again. The
+   * tier is unchanged — failover never leaves it.
+   */
+  void recordFailover(Placement placement, ModelDefinition answered) {
+    if (placement.fingerprint() == null || answered.equals(placement.model())) {
+      return;
+    }
+    try {
+      store.reassign(placement.fingerprint(), answered.modelId(), placement.tier());
+    } catch (RuntimeException e) {
+      LOG.warn("Could not move the conversation to the model that answered: {}", e.toString());
+    }
+  }
+
+  /**
    * The first user message's tier. Classified only when it differs from the
    * last turn, so a conversation whose only user message is the last one (an
    * assistant greeting first) costs no second classification.

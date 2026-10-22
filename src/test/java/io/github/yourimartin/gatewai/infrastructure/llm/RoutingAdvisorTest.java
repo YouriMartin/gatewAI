@@ -87,7 +87,8 @@ class RoutingAdvisorTest {
     advisor = new RoutingAdvisor(classifier, modelRegistry,
         decisionRecorder, decisionMetrics, configVersion, CalibrationFixtures.none(0.60),
         properties, new ConversationStickiness(
-            new InMemoryConversationAffinityStore(), modelRegistry, classifier));
+            new InMemoryConversationAffinityStore(), modelRegistry, classifier),
+        new FailoverProperties());
   }
 
   // ---- Routing tests ----

@@ -9,6 +9,7 @@ import java.util.Map;
 import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
@@ -148,6 +149,11 @@ final class ConversationCacheEvaluator {
       @Override
       public void record(RoutingDecision decision) {
         // The cache records no routing decision.
+      }
+
+      @Override
+      public void record(FailoverEvent event) {
+        // No failover happens here.
       }
 
       @Override

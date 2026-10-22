@@ -162,9 +162,10 @@ class OpenAiFormatPassThroughClientTest {
       exchange.close();
     });
     server.start();
-    OpenAiFormatPassThroughClient client = new OpenAiFormatPassThroughClient(
-        providers(entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, base(), null)),
-        Duration.ofMillis(200));
+    ProviderProperties.ProviderEntry slow =
+        entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, base(), null);
+    slow.setReadTimeout(Duration.ofMillis(200));
+    OpenAiFormatPassThroughClient client = new OpenAiFormatPassThroughClient(providers(slow));
 
     assertThatThrownBy(() -> client.forward(TARGET, "{}"))
         .isInstanceOfSatisfying(UpstreamFailureException.class,
@@ -282,8 +283,7 @@ class OpenAiFormatPassThroughClientTest {
 
   private static OpenAiFormatPassThroughClient client(ProviderProperties.ProviderType type,
                                                       String baseUrl, String key) {
-    return new OpenAiFormatPassThroughClient(providers(entry(type, baseUrl, key)),
-        Duration.ofSeconds(5));
+    return new OpenAiFormatPassThroughClient(providers(entry(type, baseUrl, key)));
   }
 
   private static ProviderProperties providers(ProviderProperties.ProviderEntry entry) {
@@ -298,6 +298,7 @@ class OpenAiFormatPassThroughClientTest {
     entry.setType(type);
     entry.setBaseUrl(baseUrl);
     entry.setApiKey(key);
+    entry.setReadTimeout(Duration.ofSeconds(5));
     return entry;
   }
 }

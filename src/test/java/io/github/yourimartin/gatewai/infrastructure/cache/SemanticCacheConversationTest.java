@@ -12,6 +12,7 @@ import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationAffinity;
@@ -156,6 +157,11 @@ class SemanticCacheConversationTest {
     }
 
     @Override
+    public void record(FailoverEvent event) {
+      // No failover happens here.
+    }
+
+    @Override
     public void record(CacheDecision decision) {
     }
 
@@ -168,6 +174,11 @@ class SemanticCacheConversationTest {
   private static final DecisionMetricsRecorder NO_METRICS = new DecisionMetricsRecorder() {
     @Override
     public void record(RoutingDecision decision) {
+    }
+
+    @Override
+    public void record(FailoverEvent event) {
+      // No failover happens here.
     }
 
     @Override

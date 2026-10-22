@@ -1,9 +1,10 @@
 package io.github.yourimartin.gatewai.domain.model.llm;
 
 /**
- * The upstream of a pass-through request answered with an error, or did not
- * answer (ADR 0016, v4 B.3). Carries what the client is told, never what the
- * upstream said: its body may name the gateway's configuration.
+ * A provider answered with an error, or did not answer (ADR 0016, v4 B.3). Since
+ * B.5 both paths raise it, the advisor chain included (ADR 0017), and its kind is
+ * what decides whether a request fails over. Carries what the client is told,
+ * never what the upstream said: its body may name the gateway's configuration.
  */
 public class UpstreamFailureException extends RuntimeException {
 
@@ -19,7 +20,7 @@ public class UpstreamFailureException extends RuntimeException {
     MISCONFIGURED,
     /** 5xx, or no connection at all. */
     UNAVAILABLE,
-    /** No answer within {@code gatewai.passthrough.timeout}. */
+    /** The instance's {@code connect-timeout} or {@code read-timeout} elapsed. */
     TIMEOUT
   }
 
@@ -27,7 +28,12 @@ public class UpstreamFailureException extends RuntimeException {
   private final int upstreamStatus;
 
   public UpstreamFailureException(Kind kind, int upstreamStatus, String message) {
-    super(message);
+    this(kind, upstreamStatus, message, null);
+  }
+
+  public UpstreamFailureException(Kind kind, int upstreamStatus, String message,
+                                  Throwable cause) {
+    super(message, cause);
     this.kind = kind;
     this.upstreamStatus = upstreamStatus;
   }

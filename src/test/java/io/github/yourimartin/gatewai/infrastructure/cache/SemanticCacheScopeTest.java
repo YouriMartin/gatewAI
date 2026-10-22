@@ -14,6 +14,7 @@ import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
@@ -467,6 +468,10 @@ class SemanticCacheScopeTest {
       }
 
       @Override
+      public void record(FailoverEvent event) {
+      }
+
+      @Override
       public void record(CacheDecision decision) {
         decisions.add(decision);
       }
@@ -481,12 +486,14 @@ class SemanticCacheScopeTest {
   static final DecisionMetricsRecorder NO_METRICS = new DecisionMetricsRecorder() {
     @Override
     public void record(RoutingDecision decision) {
-      // Not under test.
+    }
+
+    @Override
+    public void record(FailoverEvent event) {
     }
 
     @Override
     public void record(CacheDecision decision) {
-      // Not under test.
     }
   };
 }

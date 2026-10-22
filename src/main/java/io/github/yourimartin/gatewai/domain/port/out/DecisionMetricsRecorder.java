@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.domain.port.out;
 
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 
 /**
@@ -27,4 +28,7 @@ public interface DecisionMetricsRecorder {
   void record(RoutingDecision decision);
 
   void record(CacheDecision decision);
+
+  /** A request moved to the next entry of its tier (ADR 0017, v4 B.5). */
+  void record(FailoverEvent event);
 }

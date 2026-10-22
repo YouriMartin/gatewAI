@@ -19,7 +19,9 @@ this format, so switching providers never breaks clients.
 local Ollama models, so it works with zero API keys — and any mix of provider
 instances (several Ollama/vLLM servers, Anthropic, OpenAI, any OpenAI-compatible
 endpoint) is plain configuration. No vendor is required or privileged, and there
-is no fallback provider: every routable model is an explicit registry entry.
+is no fallback provider: every routable model is an explicit registry entry. A tier
+with several entries fails over from one to the next, in order (v4 B.5, ADR 0017),
+but never outside the tier.
 
 **Why:** the product promise is *on-premise sovereignty*: a gateway that demands
 a cloud API key before it starts undermines it. Local-first makes `docker

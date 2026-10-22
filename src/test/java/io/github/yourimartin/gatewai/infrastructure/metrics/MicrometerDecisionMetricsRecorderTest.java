@@ -16,12 +16,14 @@ import java.util.UUID;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
+import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.HeuristicRule;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
+import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -53,6 +55,24 @@ class MicrometerDecisionMetricsRecorderTest {
         .tag("reason", "match")
         .tag("strategy", "embedding")
         .counter().count());
+  }
+
+  @Test
+  @DisplayName("a failover is counted by tier, both registry models and cause")
+  void failoversAreCountedByTheirShape() {
+    recorder.record(new FailoverEvent(UUID.randomUUID(), "corr", Instant.now(),
+        FailoverEvent.Path.CHAIN, ModelTier.CLOUD_PREMIUM, "gpt-a", "claude-b",
+        FailoverCause.RATE_LIMITED, 429));
+    recorder.record(new FailoverEvent(UUID.randomUUID(), "corr", Instant.now(),
+        FailoverEvent.Path.PASS_THROUGH, ModelTier.CLOUD_PREMIUM, "claude-b", null,
+        FailoverCause.CONNECTION_FAILED, null));
+
+    assertEquals(1.0, registry.get("gatewai.failover")
+        .tag("tier", "cloud_premium").tag("from", "gpt-a").tag("to", "claude-b")
+        .tag("cause", "rate_limited").counter().count());
+    assertEquals(1.0, registry.get("gatewai.failover")
+        .tag("from", "claude-b").tag("to", "none").tag("cause", "connection_failed")
+        .counter().count(), "an exhausted chain is counted with to=none");
   }
 
   @Test

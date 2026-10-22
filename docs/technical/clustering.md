@@ -42,6 +42,7 @@ and says why.
 | Metric series | tagged `instance` per node | **fine** — the same string as `claimed_by`, so a graph and a job row name a node alike (B.5) ✅ |
 | Conversation records (v4 A.3) | `conversation_affinity` table | **fine** — shared, so a conversation started on one node is sticky on the others; the write never downgrades, atomically ✅ |
 | `ConversationAffinityPurgeWorker` | runs on every node, gated on an advisory lock | **fine** — one purge per interval; the lookup already ignores expired rows, so the purge only bounds the table ✅ |
+| Failover health records (v4 B.5) | heap, per node (`InMemoryEgressHealth`) | **fine, and per node on purpose** — a cooldown only reorders a tier's candidates, it never refuses a request; each node relearns an outage in `failure-threshold` failed calls. See [below](#failover-health-v4-b5) |
 
 ## Routing configuration (B.1)
 
@@ -322,6 +323,27 @@ the failure: it means node 2 saw no record. First run (2026-10-08, `mock` egress
 It moved up rather than stayed because check 1 had just replaced the routing
 config with a single `cloud_entry` route. Turn 1 fell to the heuristic (`LOCAL`)
 and the follow-up matched the route.
+
+## Failover health (v4 B.5)
+
+[ADR 0017](adr/0017-ordered-failover-inside-a-tier.md) adds state that is
+deliberately **not** shared: each registry entry's consecutive-failure count and
+cooldown, in the heap of each node.
+
+- **Why not shared.** Sharing it would put a database write on every failed
+  upstream call, during an outage, for state that a node relearns in three failed
+  requests (`gatewai.failover.failure-threshold`, default 3). A cooldown is an
+  optimisation: it moves a failing entry to the back of its chain, and when every
+  entry is cooling down they are all tried anyway. Two nodes disagreeing about a
+  cooldown cannot serve a wrong answer, only spend a few more failed attempts.
+- **What it costs.** With N replicas, an outage costs up to N × threshold failed
+  attempts before every node skips the entry, and each node sends its own probe
+  once the cooldown ends. Both are visible: `gatewai_failover_total` is tagged per
+  `instance` like every series, and every failed attempt that failed over is a
+  `failover_event` row with its correlation id.
+- **What stays shared.** The conversation record still follows the model that
+  answered (`ConversationAffinityStore.reassign`), so after a failover the next turn
+  starts on the answering model whichever node receives it.
 
 ## The scenario (B.5)
 

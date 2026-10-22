@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.infrastructure.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +17,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.micrometer.observation.ObservationRegistry;
 
@@ -219,7 +222,9 @@ class DelegatingChatModelWireTest {
     ModelRegistry registry = registry(modelId);
     ProviderChatModels models = new EgressProviderConfiguration().create(providers, registry,
         ToolCallingManager.builder().build(), ObservationRegistry.NOOP);
-    return new DelegatingChatModel(models, registry);
+    return new DelegatingChatModel(models, registry,
+        new InMemoryEgressHealth(new FailoverProperties()),
+        mock(DecisionRecorder.class), mock(DecisionMetricsRecorder.class));
   }
 
   /** Every tier needs an entry; only the local one is called. */

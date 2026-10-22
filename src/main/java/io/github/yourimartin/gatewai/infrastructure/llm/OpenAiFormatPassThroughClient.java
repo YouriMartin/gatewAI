@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughFeature;
@@ -25,7 +26,6 @@ import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +36,8 @@ import org.springframework.stereotype.Component;
  * <p>Plain JDK {@link HttpClient}, not the Spring AI clients: those take a
  * {@code Prompt}, and the point of this path is that the body is never
  * translated — only {@code model} is rewritten. No retry: failover inside a tier
- * is B.5, and it will apply to both paths at once.
+ * is the service's (ADR 0017), and each instance's {@code connect-timeout} and
+ * {@code read-timeout} bound a call here as they do on the chain.
  */
 @Component
 @Profile("!mock")
@@ -58,28 +59,26 @@ class OpenAiFormatPassThroughClient implements PassThroughClient {
       PassThroughFeature.LOGIT_BIAS, PassThroughFeature.AUDIO_INPUT,
       PassThroughFeature.FILE_INPUT, PassThroughFeature.MULTIPLE_CHOICES);
 
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
   private static final int LOGGED_ERROR_CHARS = 512;
 
   private final Map<String, ProviderProperties.ProviderEntry> providers;
-  private final Duration timeout;
-  private final HttpClient http;
+  /** One client per instance: the JDK sets the connect timeout per client. */
+  private final Map<String, HttpClient> clients = new LinkedHashMap<>();
 
   @Autowired
-  OpenAiFormatPassThroughClient(ProviderProperties providerProperties,
-                                @Value("${gatewai.passthrough.timeout:PT5M}") Duration timeout) {
-    this(providerProperties, timeout,
-        HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+  OpenAiFormatPassThroughClient(ProviderProperties providerProperties) {
+    this(providerProperties, entry -> HttpClient.newBuilder()
+        .connectTimeout(entry.getConnectTimeout()).build());
   }
 
-  OpenAiFormatPassThroughClient(ProviderProperties providerProperties, Duration timeout,
-                                HttpClient http) {
+  OpenAiFormatPassThroughClient(ProviderProperties providerProperties,
+                                Function<ProviderProperties.ProviderEntry, HttpClient> http) {
     Map<String, ProviderProperties.ProviderEntry> byName = new LinkedHashMap<>();
-    providerProperties.getProviders()
-        .forEach((name, entry) -> byName.put(name.toLowerCase(Locale.ROOT), entry));
+    providerProperties.getProviders().forEach((name, entry) -> {
+      byName.put(name.toLowerCase(Locale.ROOT), entry);
+      clients.put(name.toLowerCase(Locale.ROOT), http.apply(entry));
+    });
     this.providers = byName;
-    this.timeout = timeout;
-    this.http = http;
   }
 
   @Override
@@ -109,7 +108,7 @@ class OpenAiFormatPassThroughClient implements PassThroughClient {
   }
 
   /**
-   * Streams (v4 B.4). {@code gatewai.passthrough.timeout} bounds the wait for the
+   * Streams (v4 B.4). The instance's {@code read-timeout} bounds the wait for the
    * upstream's first byte, not the stream: a long answer is not cut, the SSE
    * timeout of the ingress bounds it.
    */
@@ -135,7 +134,7 @@ class OpenAiFormatPassThroughClient implements PassThroughClient {
   private HttpRequest request(ModelDefinition target, String body, String accept) {
     ProviderProperties.ProviderEntry entry = entry(target);
     HttpRequest.Builder request = HttpRequest.newBuilder(endpoint(entry))
-        .timeout(timeout)
+        .timeout(entry.getReadTimeout())
         .header("Content-Type", "application/json")
         .header("Accept", accept)
         .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
@@ -155,10 +154,10 @@ class OpenAiFormatPassThroughClient implements PassThroughClient {
   private <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> handler,
                                    ModelDefinition target) {
     try {
-      return http.send(request, handler);
+      return clients.get(target.provider().toLowerCase(Locale.ROOT)).send(request, handler);
     } catch (HttpTimeoutException e) {
       LOG.warn("Pass-through upstream of model '{}' did not answer within {}",
-          target.modelId(), timeout);
+          target.modelId(), request.timeout().map(Duration::toString).orElse("its timeout"));
       throw new UpstreamFailureException(UpstreamFailureException.Kind.TIMEOUT, 0,
           "Upstream of model '" + target.modelId() + "' timed out");
     } catch (IOException e) {
