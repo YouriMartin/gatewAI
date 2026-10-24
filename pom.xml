@@ -19,13 +19,13 @@
 	<properties>
 		<revision>0.0.1-SNAPSHOT</revision>
 		<java.version>25</java.version>
-		<spring-ai.version>2.0.0</spring-ai.version>
+		<spring-ai.version>2.0.1</spring-ai.version>
 		<checkstyle.version>14.3.0</checkstyle.version>
-		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
+		<spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 		<!-- Hugging Face commit of Xenova/paraphrase-multilingual-MiniLM-L12-v2
 		     (2025-07-22), checked on 2026-10-24 to serve both pinned SHA-256s. -->
 		<embedding-model.revision>2c4055b12046f11709e9df2c122e59ffbdc2f900</embedding-model.revision>
-		<archunit.version>1.4.2</archunit.version>
+		<archunit.version>1.5.1</archunit.version>
 		<!--
 			Security overrides, on top of what spring-boot-starter-parent manages.
 			Each one exists only because the parent's managed version is still
@@ -61,7 +61,7 @@
 		<dependency>
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-core</artifactId>
-			<version>8.14.0</version>
+			<version>8.21.0</version>
 		</dependency>
 		<!--
 			Postgres-backed token buckets (v3 lot B.3): the rate limit becomes the
@@ -71,7 +71,7 @@
 		<dependency>
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-postgresql</artifactId>
-			<version>8.14.0</version>
+			<version>8.21.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -255,7 +255,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.14.0</version>
+				<version>3.16.0</version>
 				<configuration>
 					<release>25</release>
 				</configuration>
@@ -263,7 +263,7 @@
 					<dependency>
 						<groupId>org.ow2.asm</groupId>
 						<artifactId>asm</artifactId>
-						<version>9.9.1</version>
+						<version>9.11.1</version>
 					</dependency>
 				</dependencies>
 			</plugin>
