@@ -1,0 +1,76 @@
+name: Bug report
+description: Something gatewAI does differs from what its docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A security problem? Do not file it here — report it privately (see SECURITY.md).
+        Never paste an API key, a provider key or a prompt you cannot share.
+  - type: input
+    id: version
+    attributes:
+      label: gatewAI version
+      description: The image tag you run, or `build.version` from `GET /actuator/info`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client and its version
+      description: What sends the requests — an SDK, an IDE plugin, an agent, curl.
+      placeholder: openai-python 2.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider type of the model involved
+      description: The `type` of the `gatewai.providers.<name>` instance the request went to.
+      options:
+        - ollama
+        - openai
+        - openai-compatible
+        - anthropic
+        - mock profile
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: Include the request shape (stream or not, tools, response_format…) if it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. curl -s http://localhost:8080/v1/chat/completions -H 'Authorization: Bearer <redacted>' -d '…'
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: request-id
+    attributes:
+      label: X-Request-Id
+      description: |
+        The `X-Request-Id` response header of a failing request. It finds that request
+        in the logs and in `GET /v1/admin/decisions/{id}`.
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration excerpt (no secrets)
+      description: |
+        The `gatewai.providers.*` and registry entries involved, as environment variables or
+        properties. Replace every key and token with `<redacted>`.
+      render: properties
+  - type: textarea
+    id: logs
+    attributes:
+      label: Gateway log around the failure
+      description: Lines with the same request id, if you have them.
+      render: text

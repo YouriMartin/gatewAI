@@ -51,6 +51,7 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 ## Development ([`developpment/`](developpment/))
 
 - [`contributing.md`](developpment/contributing.md) — build, test, conventions, how to make common changes
+- [`releasing.md`](developpment/releasing.md) — cutting a release: tag, image, attestation, what each step checks
 - [`roadmap-v2.md`](developpment/roadmap-v2.md) — v2 action plan: explainable, calibrated decisions (done)
 - [`roadmap-v3.md`](developpment/roadmap-v3.md) — v3 action plan: in-process ONNX embedding, multi-instance readiness, cloud carbon (done)
 - [`roadmap-v4.md`](developpment/roadmap-v4.md) — v4 action plan: from portfolio to a tool people use (in progress)

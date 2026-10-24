@@ -38,8 +38,13 @@ Two reasons it is not a committed blob, and one it is not Git LFS:
 Cached under `~/.m2/repository/.cache/download-maven-plugin` (130 MB), which is
 inside the directory CI already caches — so the download happens once per cache
 generation, and `./mvnw -o` works offline afterwards. Swapping the model means
-changing two URLs, two checksums and the two
-`spring.ai.embedding.transformer.*` properties.
+changing the pinned revision (`embedding-model.revision`), two URLs, two checksums
+and the two `spring.ai.embedding.transformer.*` properties.
+
+The URLs name a Hugging Face **commit**, not `resolve/main` (v4 C.1). The SHA-256
+check already made a moved file fail the build; pinning makes the build not fail at
+all when upstream pushes. Revision `2c4055b1…` (2025-07-22) was checked on
+2026-10-24 to serve both pinned checksums.
 
 `InProcessEmbeddingModelTest` asserts the resources exist and are megabytes, so a
 failed or truncated fetch fails a test rather than the application at startup.
@@ -69,14 +74,30 @@ via `frontend-maven-plugin` (profile `frontend`, active unless `-DskipFrontend`)
 - Bound to the `prepare-package` phase, so `./mvnw test` stays Node-free.
 - Dev: `npm run dev` (Vite on `:5173`, proxies `/v1 → :8080`).
 
+## Version
+
+The project version is CI-friendly: `<version>${revision}</version>`, with
+`revision=0.0.1-SNAPSHOT` as the default for every local build. A release passes
+`-Drevision=<tag without the v>`, through the Dockerfile's `GATEWAI_VERSION` build
+argument, so a released jar, image label and `/actuator/info` never say `SNAPSHOT`.
+`spring-boot-maven-plugin`'s `build-info` goal writes `META-INF/build-info.properties`,
+which is where `build.version` on the public `GET /actuator/info` comes from.
+
 ## Docker image (multi-stage)
 
 `Dockerfile`:
 
-- **Build stage** (`eclipse-temurin:25-jdk`): copies `.mvn`, `mvnw`, `pom.xml`,
-  `checkstyle.xml`, `spotbugs-exclude.xml`, `src`, then `./mvnw -DskipTests clean
-  package` (frontend included). A BuildKit cache mount keeps `~/.m2` warm.
-- **Runtime stage** (`eclipse-temurin:25-jre`): adds `curl` (for the health
+- Base images (`eclipse-temurin:25-jdk`, `25-jre`) and the Dockerfile frontend are
+  pinned by **index digest**, tag kept beside it; Dependabot moves both.
+- **Build stage** (`eclipse-temurin:25-jdk`, on `$BUILDPLATFORM`): copies `.mvn`,
+  `mvnw`, `pom.xml`, `checkstyle.xml`, `spotbugs-exclude.xml`, `src`, then `./mvnw
+  -DskipTests -Drevision=$GATEWAI_VERSION clean package` (frontend included). A
+  BuildKit cache mount keeps `~/.m2` warm. It always runs on the builder's own
+  architecture: the jar is architecture-independent (ONNX Runtime and the DJL
+  tokenizer carry their `linux-x64` and `linux-aarch64` natives inside it), so a
+  multi-arch build compiles once, natively, and never runs Maven under emulation.
+- **Runtime stage** (`eclipse-temurin:25-jre`, per target architecture): OCI labels
+  (title, source, licence, version), adds `curl` (for the health
   check), runs as a **non-root** user, copies the fat jar, sets
   `SPRING_DOCKER_COMPOSE_ENABLED=false`, exposes `8080`, and defines a
   `HEALTHCHECK` hitting `/actuator/health`.
@@ -84,6 +105,17 @@ via `frontend-maven-plugin` (profile `frontend`, active unless `-DskipFrontend`)
 > Lesson encoded in the Dockerfile: `checkstyle.xml`/`spotbugs-exclude.xml` must be
 > in the build context because Checkstyle runs at the `validate` phase during
 > `package`.
+
+## Releases (v4 C.1)
+
+A `v<semver>` tag runs `.github/workflows/release.yml`: a `linux/amd64` +
+`linux/arm64` image pushed to `ghcr.io/yourimartin/gatewai` by digest, with a
+BuildKit SBOM and provenance and a GitHub build-provenance attestation; then
+`scripts/image-smoke.sh` boots it with the `mock` profile and sends one request on
+each architecture, on native runners; only then is it tagged `:<version>` (and
+`:latest` unless it is a pre-release) and the GitHub release published with its
+`CHANGELOG.md` section. Procedure, checks and one-time setup:
+[`../developpment/releasing.md`](../developpment/releasing.md).
 
 ## Compose: four files, on purpose
 

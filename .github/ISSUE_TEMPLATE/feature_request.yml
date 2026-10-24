@@ -1,0 +1,20 @@
+name: Feature request
+description: Something gatewAI should do for your setup.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+      description: The setup (clients, providers, scale) and where gatewAI gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: A shape you have in mind, if any — or how another gateway does it.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do today instead

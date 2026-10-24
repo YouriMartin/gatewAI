@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/YouriMartin/gatewAI/security/advisories/new
+    about: Privately, so it can be fixed before it is public.
+  - name: Troubleshooting and configuration
+    url: https://github.com/YouriMartin/gatewAI/tree/main/docs
+    about: The documentation, including known limitations.

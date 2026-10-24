@@ -36,7 +36,9 @@ jobs:
     name: Dependency CVEs (Maven + npm)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Pinned by version *and* checksum: this binary reads the dependency graph
       # and fails the build, so an unpinned download would be a supply-chain hole

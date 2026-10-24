@@ -1,0 +1,54 @@
+# Dependency update PRs (v4 C.1). Weekly and grouped, so one maintainer reviews
+# a handful of PRs a week rather than one per artifact.
+#
+# `cooldown` holds a release back for a week after it is published. A hijacked
+# release is usually caught and pulled within days (litellm 1.82.7 and 1.82.8
+# were live for about 40 minutes on PyPI); a week of delay costs nothing
+# against that. Security updates are not delayed by it.
+version: 2
+updates:
+  # Every `uses:` is pinned to a commit SHA with the version in a comment;
+  # Dependabot rewrites both. scripts/check-pinned-actions.sh keeps it that way.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Most versions come from spring-boot-starter-parent; a parent bump is the
+  # usual PR. Majors stay separate, minors and patches come together.
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      maven-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /src/main/frontend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The Dockerfile pins its base images by digest; this moves the digest (and
+  # the tag next to it) when eclipse-temurin publishes a rebuild.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      base-images:
+        patterns: ["*"]

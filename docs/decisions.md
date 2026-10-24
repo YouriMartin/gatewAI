@@ -7,6 +7,60 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot C — C.1 (a release people can pull and verify)
+
+- **arm64 is tested on a native arm64 runner, not under QEMU.** The roadmap says
+  "arm64 under QEMU in the workflow" — written for a runner that only has amd64. The
+  repository is public, so GitHub's `ubuntu-24.04-arm` runner is available, and it
+  tests the arm64 natives (ONNX Runtime, DJL tokenizer) on real hardware rather than
+  through an emulator with its own failure modes. QEMU is still used, but only to
+  *build* the arm64 runtime stage (`apt-get`, `useradd`): the Dockerfile builds the
+  jar on `$BUILDPLATFORM` because it is architecture-independent (both natives are
+  inside it), so Maven never runs emulated.
+- **The image is pushed by digest and tagged only after the smoke tests.** The
+  roadmap lists the push to `:<version>` and `:latest` before the acceptance
+  checks. Read literally, a failed boot would leave a broken, pullable tag. Here
+  `:<version>` (and `:latest`) are added by `docker buildx imagetools create` once
+  both architectures answered, and the step fails if the tag does not resolve to the
+  tested and attested digest. Checked on a local registry: re-tagging an index with
+  one source keeps its digest.
+- **Pinning goes beyond `uses:`.** The base images and the Dockerfile frontend are
+  pinned by digest in the `Dockerfile`, and BuildKit and the QEMU `binfmt` installer
+  in `release.yml`: `setup-qemu-action` and `setup-buildx-action` otherwise pull
+  `tonistiigi/binfmt:latest` and `moby/buildkit:buildx-stable-1`, which is the
+  same hole as a tag-pinned action. Dependabot's `docker` ecosystem keeps the
+  Dockerfile digests moving; the two workflow images are bumped by hand.
+- **Dependabot waits 7 days** (`cooldown`) before proposing a version update. That
+  was not in the roadmap. Security updates are exempt, according to GitHub's docs.
+- **Action versions are at least ~2 weeks old where a choice existed**:
+  `docker/login-action` v4.6.0 rather than v4.7.0 (published the day before), and
+  `actions/setup-java` v6.0.1 rather than v6.1.0 (10 days). The major bumps (checkout
+  v4→v7, setup-java v4→v6, upload-artifact v4→v7) were checked against each
+  action's `action.yml`: every input the workflows pass still exists.
+- **The rationale is quoted from what the cited page says.** The roadmap's wording
+  ("the TeamPCP campaign", "an unpinned Trivy dependency") is not on
+  <https://docs.litellm.ai/blog/security-update-march-2026> as read on 2026-10-24.
+  That page attributes the compromise to the Trivy dependency of LiteLLM's CI
+  security-scanning workflow and stolen credentials. `security.md` says that much
+  and no more.
+- **The version is visible at runtime.** `build-info` was added to
+  `spring-boot-maven-plugin` so that `GET /actuator/info` serves `build.version`.
+  The bug-report template asks for the version, and the smoke test checks that the
+  tag's version reached the running jar. Without it, a user would have no answer
+  except the image tag.
+- **Pre-release tags** (`v0.1.0-rc.1`) are published as GitHub pre-releases, never
+  move `:latest`, and may use the `[Unreleased]` changelog section. A final tag must
+  have its own section, or the run stops before building.
+- **The release does not rerun the tests.** It refuses a commit that is not on
+  `main`, where CI runs on every push, and the image build skips tests as it always
+  has. `releasing.md` asks for a green CI on the tagged commit.
+- **Small hardening in the existing workflows:** `ci.yml` now declares
+  `permissions: contents: read`, and every checkout uses `persist-credentials: false`.
+- **`SECURITY.md` response times** (acknowledge within 7 days, assess within 30) are
+  a proposal for the maintainer to confirm. Reports go through GitHub private
+  vulnerability reporting, which must be enabled in the repository settings. No
+  e-mail address is published.
+
 ## v4 lot B — B.6 (split pricing and an explicit currency)
 
 - **The `_eur` names are renamed, not kept.** The roadmap left the choice open. The

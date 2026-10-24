@@ -10,14 +10,21 @@
 	</parent>
 	<groupId>io.github.yourimartin</groupId>
 	<artifactId>gatewai</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<!-- CI-friendly version (v4 C.1): a release build passes -Drevision=<tag
+	     without the v>, so no release ever carries the SNAPSHOT below. The
+	     Dockerfile forwards it from the GATEWAI_VERSION build argument. -->
+	<version>${revision}</version>
 	<name>gatewAI</name>
 	<description>Open-source LLM proxy: semantic cache, smart routing and carbon accounting</description>
 	<properties>
+		<revision>0.0.1-SNAPSHOT</revision>
 		<java.version>25</java.version>
 		<spring-ai.version>2.0.0</spring-ai.version>
 		<checkstyle.version>13.6.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
+		<!-- Hugging Face commit of Xenova/paraphrase-multilingual-MiniLM-L12-v2
+		     (2025-07-22), checked on 2026-10-24 to serve both pinned SHA-256s. -->
+		<embedding-model.revision>2c4055b12046f11709e9df2c122e59ffbdc2f900</embedding-model.revision>
 		<archunit.version>1.4.2</archunit.version>
 		<!--
 			Security overrides, on top of what spring-boot-starter-parent manages.
@@ -209,9 +216,11 @@
 			     once, verified by SHA-256, cached under ~/.m2 (which CI already
 			     caches), and copied straight into the classpath output — so the
 			     packaged jar still carries the model and the shipped artifact is
-			     unchanged. Swapping the model means changing these two URLs, their
-			     checksums, and the two `spring.ai.embedding.transformer.*`
-			     properties. -->
+			     unchanged. The URLs name a pinned repository revision rather than
+			     `main`, so an upstream push cannot break the build (the checksums
+			     would catch a changed file, not prevent the failure). Swapping the
+			     model means changing the revision, these two URLs, their checksums,
+			     and the two `spring.ai.embedding.transformer.*` properties. -->
 			<plugin>
 				<groupId>com.googlecode.maven-download-plugin</groupId>
 				<artifactId>download-maven-plugin</artifactId>
@@ -222,7 +231,7 @@
 						<phase>generate-resources</phase>
 						<goals><goal>wget</goal></goals>
 						<configuration>
-							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/onnx/model_quantized.onnx</uri>
+							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/${embedding-model.revision}/onnx/model_quantized.onnx</uri>
 							<outputDirectory>${project.build.outputDirectory}/onnx/paraphrase-multilingual-MiniLM-L12-v2</outputDirectory>
 							<outputFileName>model.onnx</outputFileName>
 							<sha256>66fc00f5f29afcaff34092e1bdd20008ca3918265a82fb9695a551e510cc4ebc</sha256>
@@ -234,7 +243,7 @@
 						<phase>generate-resources</phase>
 						<goals><goal>wget</goal></goals>
 						<configuration>
-							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/tokenizer.json</uri>
+							<uri>https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/${embedding-model.revision}/tokenizer.json</uri>
 							<outputDirectory>${project.build.outputDirectory}/onnx/paraphrase-multilingual-MiniLM-L12-v2</outputDirectory>
 							<outputFileName>tokenizer.json</outputFileName>
 							<sha256>b60b6b43406a48bf3638526314f3d232d97058bc93472ff2de930d43686fa441</sha256>
@@ -268,6 +277,13 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<!-- META-INF/build-info.properties → `build.version` on the public
+					     /actuator/info, which is what a bug report quotes. -->
+					<execution>
+						<goals><goal>build-info</goal></goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

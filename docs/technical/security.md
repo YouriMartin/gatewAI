@@ -205,6 +205,43 @@ SSR path, which this client-only dashboard never builds.)
 file with a reason **and an expiry date**, so a suppression cannot quietly become
 permanent. Do not disable the job.
 
+## Supply chain: CI and releases
+
+(v4 C.1.) The workflows are the code that holds the publishing credentials, so they
+get the same scrutiny as a dependency.
+
+- **Every `uses:` is pinned to a full commit SHA**, the version in a trailing comment
+  (`actions/checkout@3d3c42e5… # v7.0.1`). A tag can be moved to other code after it
+  was reviewed; a commit SHA cannot. `scripts/check-pinned-actions.sh` fails the
+  `pinned-actions` CI job on any tag- or branch-pinned reference (local `./` actions
+  and `docker://…@sha256:` images are exempt).
+- **The images a build runs are pinned by digest** too: the `eclipse-temurin` bases
+  and the Dockerfile frontend in the `Dockerfile`, BuildKit and the QEMU `binfmt`
+  installer in the release workflow. An action pinned by SHA that pulls `:latest`
+  of an image would reopen the hole one level down.
+- **Updates arrive through Dependabot** (`github-actions`, `maven`, `npm`, `docker`),
+  weekly, grouped, with a **7-day cooldown** on version updates: a hijacked release is
+  usually pulled within days, and a week of delay costs nothing against that.
+  Security updates are not delayed (GitHub's Dependabot options reference, read
+  2026-10-24).
+- **Least privilege**: workflows default to `contents: read` (`release.yml` to
+  nothing); each job asks for what it uses — only the `image` job can push packages
+  and sign, only `publish` can create a release. Checkouts do not keep the token
+  (`persist-credentials: false`), and the release build uses no cache a branch or
+  pull-request build could have written.
+- **Releases are verifiable**: the image is attested from the workflow's OIDC
+  identity (Sigstore), carries an SBOM, and is tagged only after it booted and
+  answered on both architectures — see [`../developpment/releasing.md`](../developpment/releasing.md).
+
+Why this is not theoretical: on 2026-03-24, two litellm releases carrying a
+credential stealer (1.82.7 and 1.82.8) were published to PyPI and live for about 40
+minutes. LiteLLM's incident report attributes the compromise to the Trivy dependency
+of its CI security-scanning workflow, linked to the broader Trivy compromise in which
+stolen credentials were used to reach its publishing pipeline
+(<https://docs.litellm.ai/blog/security-update-march-2026>, read 2026-10-24). A
+security scanner in CI is exactly the kind of tool this project runs too — which is
+why `osv-scanner` is installed by version *and* checksum in `security.yml`.
+
 ## Provider credentials and pass-through (v4 B.3)
 
 - **Anthropic takes Console API keys only.** Startup fails when an `anthropic`
@@ -237,6 +274,8 @@ permanent. Do not disable the job.
   variables and never committed.
 - The CVE scan covers **declared dependencies only** — not the base images
   (`eclipse-temurin`, `pgvector/pgvector`, `ollama/ollama`), and not the JDK. Image
-  scanning is not wired up.
+  scanning is not wired up: the release image carries an SBOM a scanner can read,
+  but nothing reads it in CI. Base-image digests move only when Dependabot proposes
+  a newer one.
 
 See also the functional [`limitations.md`](../functional/limitations.md).

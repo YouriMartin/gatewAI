@@ -48,6 +48,14 @@ its process group. The Svelte dashboard hot-reload stays separate
 > docker-compose.yml up`), not both at once — they bind the same ports and Compose
 > project name.
 
+### Releases and CI workflows
+
+Releases are cut by pushing a `v<semver>` tag — the procedure is
+[`releasing.md`](releasing.md). Any `uses:` you add to a workflow must be pinned to a
+full commit SHA with the version in a trailing comment; `scripts/check-pinned-actions.sh`
+(the `pinned-actions` CI job) fails otherwise. A user-visible change gets a line
+under `## [Unreleased]` in the root `CHANGELOG.md`.
+
 ## Conventions
 
 - **English only.** All code, comments, docs, commit messages and UI strings are in

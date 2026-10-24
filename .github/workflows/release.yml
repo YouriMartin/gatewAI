@@ -1,0 +1,228 @@
+name: Release
+
+# A `v<semver>` tag → a multi-arch image on GHCR, an SBOM, a signed provenance
+# attestation and a GitHub release (v4 C.1). Pushing the tag is the maintainer's
+# step; the procedure is docs/developpment/releasing.md.
+#
+# Order matters: the image is pushed by digest only, with no tag, then booted on
+# both architectures, and only an image that answered a request on both is given
+# its version tag (and `latest`). A broken build never becomes a pullable tag.
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yourimartin/gatewai
+
+jobs:
+  # Fails in seconds, before anything is built, on a tag that is not a version,
+  # a commit that is not on main, or a release with no changelog section.
+  prepare:
+    name: Version and release notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      created: ${{ steps.version.outputs.created }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Derive the version from the tag
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not v<major>.<minor>.<patch>[-<pre-release>]"
+            exit 1
+          fi
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          # `created` is the commit's date, not the run's: the base image's own
+          # `created` label would otherwise be inherited and read as ours.
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "created=$(git log -1 --format=%cI "$GITHUB_SHA")"
+          } >> "$GITHUB_OUTPUT"
+      # CI ran on every commit of main; a tag elsewhere would ship untested code.
+      - name: Require the tagged commit to be on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main: tag a commit of main"
+            exit 1
+          fi
+      - name: Require a changelog section
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/changelog-excerpt.sh "$VERSION"
+
+  image:
+    name: Build and push by digest
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Emulation is only for the arm64 *runtime* stage (apt-get, useradd): the
+      # Dockerfile builds the jar on the runner's own architecture. Both helper
+      # images are pinned by digest, as the actions are by SHA.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: docker.io/tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+          cache-image: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: image=moby/buildkit:v0.34.0@sha256:b059f8d7226d0b326bc871af489a5dddf65e36af4d20d14251b072974d9ee87c
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # No build cache on purpose: a release must not read layers a branch or
+      # pull-request build could have written.
+      - name: Build and push (linux/amd64, linux/arm64)
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          build-args: GATEWAI_VERSION=${{ needs.prepare.outputs.version }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            index:org.opencontainers.image.revision=${{ github.sha }}
+            index:org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
+            index:org.opencontainers.image.licenses=MIT
+            index:org.opencontainers.image.description=Self-hosted LLM gateway: semantic cache, routing and carbon accounting
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+      # Signed with Sigstore through the workflow's OIDC identity and stored
+      # both in the GitHub attestations API and next to the image, so
+      # `gh attestation verify` works with or without registry access.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  # Each architecture on its own hardware. ONNX Runtime and the DJL tokenizer
+  # load a per-architecture native library at startup, so an image that only
+  # booted on amd64 proves nothing about arm64.
+  smoke:
+    name: Boot and answer (${{ matrix.arch }})
+    needs: [prepare, image]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Boot with the mock profile and answer one request
+        env:
+          REF: ${{ env.IMAGE }}@${{ needs.image.outputs.digest }}
+          PLATFORM: linux/${{ matrix.arch }}
+          EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/image-smoke.sh "$REF" "$PLATFORM"
+
+  publish:
+    name: Tag the image and publish the release
+    needs: [prepare, image, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      attestations: read
+    env:
+      DIGEST: ${{ needs.image.outputs.digest }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The same command the release notes give users, run before the image has
+      # a tag anyone could pull.
+      - name: Verify the provenance attestation
+        run: gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "$GITHUB_REPOSITORY"
+      # A pre-release never moves `latest`. Re-tagging an index with one source
+      # keeps its digest, which the check below makes sure of: the attestation
+      # is bound to that digest.
+      - name: Tag ${{ needs.prepare.outputs.version }}
+        run: |
+          tags=(-t "${IMAGE}:${VERSION}")
+          [ "$PRERELEASE" = "true" ] || tags+=(-t "${IMAGE}:latest")
+          docker buildx imagetools create "${tags[@]}" "${IMAGE}@${DIGEST}"
+          tagged=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest}}' | jq -r .digest)
+          if [ "$tagged" != "$DIGEST" ]; then
+            echo "::error::${IMAGE}:${VERSION} is ${tagged}, expected ${DIGEST}"
+            exit 1
+          fi
+      - name: Publish the GitHub release
+        run: |
+          {
+            scripts/changelog-excerpt.sh "$VERSION"
+            cat <<EOF
+
+          ## Image
+
+          \`\`\`bash
+          docker pull ${IMAGE}:${VERSION}    # linux/amd64, linux/arm64
+          gh attestation verify oci://${IMAGE}:${VERSION} --repo ${GITHUB_REPOSITORY}
+          \`\`\`
+
+          Index digest: \`${DIGEST}\`. The SBOM (SPDX) is attached to the image:
+          \`docker buildx imagetools inspect ${IMAGE}:${VERSION} --format '{{json .SBOM}}'\`.
+          EOF
+          } > release-notes.md
+          flags=(--verify-tag --title "gatewAI ${VERSION}" --notes-file release-notes.md)
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
