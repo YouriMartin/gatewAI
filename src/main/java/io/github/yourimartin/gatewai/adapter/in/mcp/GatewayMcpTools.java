@@ -82,7 +82,7 @@ class GatewayMcpTools {
   }
 
   @Tool(name = "routed_chat",
-      description = "Complete a prompt through the Green AI gateway: semantic "
+      description = "Complete a prompt through gatewAI: semantic "
           + "cache, cost/carbon-aware model routing and green accounting. "
           + "Returns the answer plus which model actually served it, whether it "
           + "was a cache hit, and token usage.")

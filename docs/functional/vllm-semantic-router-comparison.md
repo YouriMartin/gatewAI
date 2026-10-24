@@ -46,24 +46,26 @@ pool and picks the most suitable model per request. Notable traits:
 | **Carbon awareness** | Not a focus | **Carbon model, real-time grid intensity, avoided-CO2, temporal/geo-aware deferral** |
 | **Reporting/UI** | Routing/observability metrics | **Green dashboard + CSV/PDF CSRD reports** |
 | **MCP** | — | **Exposes itself as an MCP server** (assistants can drive it) |
-| **Scale target** | Production serving scale | **Single-instance, portfolio-grade** |
+| **Scale target** | Production serving scale | **One or more replicas on one PostgreSQL** (v3 lot B); a gateway in front of model servers, not one |
 
 ## Honest positioning
 
 - vLLM Semantic Router is a **heavier, serving-grade** component with a trained
   classifier and security guardrails, aimed at production model-serving
   infrastructure. It is more capable on **accuracy** and **safety** features.
-- gatewAI is a **lighter, narrower** gateway whose distinctive value is the
-  **green/cost/CSRD** lens, on-premise privacy, an OpenAI **and** MCP ingress, and a
-  clean Spring AI advisor architecture — not feature parity with vLLM SR.
+- gatewAI is a **lighter, narrower** gateway whose distinctive value is that its
+  decisions can be **audited**: every cache hit and routing decision is traced,
+  explained and replayable. Around that: a cost and carbon lens, on-premise privacy,
+  an OpenAI **and** MCP ingress, and PostgreSQL as its only infrastructure
+  dependency — not feature parity with vLLM SR.
 - They are not strictly competitors: a fair summary is "**same family of idea
-  (semantic routing + caching), different intent**". gatewAI trades breadth and
-  scale for a focused, reportable sustainability story.
+  (semantic routing + caching), different intent**". gatewAI trades breadth for
+  decisions an operator can check after the fact.
 
 ## What gatewAI would need to close the gap
 
 If the goal were to approach vLLM SR's capabilities, the natural additions would
-be: a trained classifier for better routing accuracy, guardrails (PII / jailbreak
-detection), a real multi-model/multi-provider pool wired by default, and a
-cluster-ready runtime. See [`limitations.md`](limitations.md) for the current
+be a trained classifier for better routing accuracy and guardrails (PII / jailbreak
+detection). The multi-provider pool (Phase 8) and multi-replica operation (v3 lot B)
+are no longer on that list. See [`limitations.md`](limitations.md) for the current
 boundaries.

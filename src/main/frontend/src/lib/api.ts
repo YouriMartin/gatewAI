@@ -1,4 +1,4 @@
-// Thin client for the Green AI Proxy API.
+// Thin client for the gatewAI API.
 // The API key is sent as a Bearer token (entered by the user, kept in the browser).
 
 export interface GreenReport {

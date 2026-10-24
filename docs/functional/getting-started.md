@@ -76,7 +76,8 @@ for `/v1/admin/**`. Only its hash is stored. Prefix with `gw_` for consistency.
 > A separate `Using generated security password: <uuid>` line, if present, is an
 > unrelated Spring default — **not** your API key. If the grep is empty, an admin
 > already exists; set `GATEWAI_ADMIN_API_KEY` and restart, or reset with
-> `psql -U dev -d greenaiproxy -c "DELETE FROM api_client;"` then restart.
+> `psql -U dev -d greenaiproxy -c "DELETE FROM api_client;"` then restart (the
+> database keeps its name from before the gatewAI rename, so existing volumes work).
 
 Use the admin key directly, or better, create a **dedicated client key** for your
 application (admin role required):
@@ -237,6 +238,8 @@ routing configuration. A full tour is in
 
 ## 8. Next steps
 
+- Something failed: [`troubleshooting.md`](troubleshooting.md) — every error, and how
+  to find a request by its `X-Request-Id`
 - Understand each capability: [`features.md`](features.md)
 - Know the boundaries before relying on the numbers: [`limitations.md`](limitations.md)
 - Why the defaults are what they are: [`functional-choices.md`](functional-choices.md)

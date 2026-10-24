@@ -32,14 +32,14 @@ services:
   pgvector:
     image: 'pgvector/pgvector:pg17'
     environment:
-      - 'POSTGRES_DB=${POSTGRES_DB:-greenaiproxy}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-gatewai}'
       - 'POSTGRES_USER=${POSTGRES_USER:-dev}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev}'
     volumes:
       # ':z' relabels the file for SELinux (needed on Fedora/RHEL, harmless elsewhere)
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-greenaiproxy}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-gatewai}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -53,7 +53,7 @@ services:
     environment: &gateway-env
       SPRING_DOCKER_COMPOSE_ENABLED: 'false'
       SPRING_PROFILES_ACTIVE: 'mock'
-      SPRING_DATASOURCE_URL: 'jdbc:postgresql://pgvector:5432/${POSTGRES_DB:-greenaiproxy}'
+      SPRING_DATASOURCE_URL: 'jdbc:postgresql://pgvector:5432/${POSTGRES_DB:-gatewai}'
       SPRING_DATASOURCE_USERNAME: '${POSTGRES_USER:-dev}'
       SPRING_DATASOURCE_PASSWORD: '${POSTGRES_PASSWORD:-dev}'
       GATEWAI_ADMIN_API_KEY: '${GATEWAI_ADMIN_API_KEY:-gw_cluster-demo-admin-key}'

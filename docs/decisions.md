@@ -7,6 +7,47 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot C — C.2 (one name, one story, docs that match the code)
+
+- **The database name stays `greenaiproxy` in the two stacks with a volume.**
+  `POSTGRES_DB` only applies to an empty volume, so a new default in
+  `docker-compose.yml` or `compose.yaml` would point an existing install at a
+  database that does not exist (and `.env.example`, `scripts/dev.sh` and the
+  `getting-started.md` reset command follow them). The cluster stack and CI keep no
+  volume and now use `gatewai`. `CHANGELOG.md` carries the upgrade note. The
+  quickstart compose of C.3 is new, so it can start on `gatewai`.
+- **Positioning wording**: the maintainer picked "The LLM gateway you can audit."
+  The roadmap's "PostgreSQL as the only dependency" is written "its only
+  *infrastructure* dependency", because the providers it routes to are
+  dependencies too.
+- **The MCP server is renamed `gatewai`** (was `gatewai-green-proxy`) and reports the
+  jar's version through `@project.version@` instead of a fixed `0.1.0`. Not in the
+  roadmap, but the server name is the one place an MCP client shows the product
+  name. Its instructions no longer say "CSRD-grade": the PDF itself says it is not
+  an externally assured disclosure.
+- **Doc drift found beyond the roadmap's examples, and fixed**: `attribution.md`
+  (embeddings "through an HTTP port", "the same local Ollama"), `features.md`
+  (tools and images "refused until pass-through lands"; pass-through has shipped),
+  `vllm-semantic-router-comparison.md` ("single-instance", and multi-provider and
+  clustering still listed as gaps), `functional-choices.md` ("a demo/portfolio
+  context"). Two other claims were tested on a live gateway and turned out wrong:
+  - `api-reference.md` said streamed failures are reported inline on the SSE
+    stream. A failure before the first chunk gets the ordinary error envelope. A
+    failure after it ends the stream without an error event and without `[DONE]`.
+    The doc now says so. Sending an OpenAI-style error event instead is a code
+    change, left for later.
+  - The 429 from gatewAI's own rate limiter is `{"error":"rate limit exceeded"}`,
+    not the OpenAI envelope. Documented as it is, not changed: C.2 is a docs batch.
+- **No configuration reference page was written.** The user path in `docs/README.md`
+  points at the existing one in `routing.md` (providers, registry, failover,
+  pricing) and at `application.properties`, where every property is commented. One
+  page covering every `gatewai.*` property would be a doc with nothing to keep it in
+  sync with the code.
+- **Client compatibility says what was checked and how.** Open WebUI v0.12.0 and curl
+  were run live. The SDKs (OpenAI Python, Vercel AI, LangChain) are request
+  *shapes* replayed in tests, which is not a client run. C.3's tested-versions
+  table will replace that section's second half.
+
 ## v4 lot C — C.1 (a release people can pull and verify)
 
 - **arm64 is tested on a native arm64 runner, not under QEMU.** The roadmap says

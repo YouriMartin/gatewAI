@@ -5,21 +5,38 @@
 ![Java 25](https://img.shields.io/badge/Java-25-orange.svg)
 ![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0-6db33f.svg)
 
-Open-source, self-hosted LLM proxy for enterprises.
-It secures, caches, routes and measures the carbon footprint of AI requests.
+**The LLM gateway you can audit.**
 
+Every cache hit and every routing decision is traced, explained and replayable. One
+OpenAI-compatible endpoint in front of your local and cloud models — Spring Boot,
+with PostgreSQL as its only infrastructure dependency.
 
 ![gatewAI dashboard](docs/assets/dashboard.png)
 
 ## Why gatewAI?
 
-Enterprises are adopting LLMs but face three problems:
+A team that puts several providers — local models included — behind one endpoint
+has to answer for what that endpoint does: why this request went to the expensive
+model, why that one got an answer from the cache, what it cost and what it emitted.
+Routing and caching are common. gatewAI keeps the receipts.
 
-- **Cost** — redundant requests billed twice (or three times)
-- **Privacy** — data flows through third parties with no control
-- **Environmental impact** — no visibility into the carbon footprint of AI
+- **Every decision is traced.** Each cache lookup and each routing choice is stored
+  with its scores, its threshold, the cache scope and the configuration version
+  that produced it, and read back as stored rather than recomputed
+  ([decision tracing](docs/technical/decision-tracing.md)).
+- **And explained.** On demand: which part of the prompt carried the routing
+  decision, and how close the next tier came
+  ([attribution and counterfactuals](docs/technical/attribution.md)).
+- **Thresholds can be calibrated** on labelled data with a stated error rate, and
+  the gateway says so when they are not
+  ([conformal calibration](docs/technical/conformal-calibration.md)).
+- **Cost and carbon per request**, with every coefficient sourced and labelled,
+  never presented as measured ([green accounting](docs/technical/green-accounting.md)).
+- **Few moving parts.** One Spring Boot jar, embeddings computed in-process, one
+  PostgreSQL for the cache, the traces and the metrics. Any mix of Ollama, vLLM,
+  OpenAI-compatible servers, OpenAI and Anthropic behind it, local-first by default.
 
-gatewAI solves all three in a single infrastructure component.
+What it does *not* do is listed, up front, in [limitations](docs/functional/limitations.md).
 
 ## Architecture
 
@@ -210,6 +227,7 @@ Full index: [`docs/`](docs/README.md). Curated entry points:
 **Using it** (`docs/functional/`)
 - [Getting started](docs/functional/getting-started.md) — deploy, get a key, first request (OpenAI + MCP)
 - [Overview](docs/functional/overview.md) · [Features](docs/functional/features.md) · [Dashboard guide](docs/functional/dashboard-guide.md)
+- [Troubleshooting](docs/functional/troubleshooting.md) — every error a client can get, and finding a request by `X-Request-Id`
 - [Limitations](docs/functional/limitations.md) — what it does *not* do (read before relying on the numbers)
 
 **Understanding it** (`docs/technical/`)
@@ -219,7 +237,8 @@ Full index: [`docs/`](docs/README.md). Curated entry points:
 
 **Working on it** (`docs/developpment/`)
 - [Contributing](docs/developpment/contributing.md) — build, test, conventions, how to make common changes
-- [Post-v1 roadmap](docs/developpment/roadmap-post-v1.md)
+- [Releasing](docs/developpment/releasing.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
+- [v4 roadmap](docs/developpment/roadmap-v4.md) — the current plan
 
 ## License
 

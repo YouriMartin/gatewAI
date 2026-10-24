@@ -42,3 +42,21 @@ The first published release: everything below is new to anyone pulling an image.
 - **Release pipeline**: a multi-arch image (`linux/amd64`, `linux/arm64`) on
   `ghcr.io/yourimartin/gatewai` with an SBOM and a verifiable build-provenance
   attestation; the version is stamped from the tag and served on `/actuator/info`.
+- **Troubleshooting guide** listing every client-facing error and how to find a
+  request by its `X-Request-Id`.
+
+### Changed
+
+- **One name: gatewAI.** The dashboard, its HTML title and the MCP server no longer
+  carry the project's former name. The MCP server reports itself as `gatewai` (was
+  `gatewai-green-proxy`) with the jar's version (was a fixed `0.1.0`).
+
+### Upgrading from a source build
+
+- **The database name does not change.** The compose stacks that keep data in a
+  volume (`docker-compose.yml`, `compose.yaml`) still create and use `greenaiproxy`,
+  because `POSTGRES_DB` only applies when a volume is first initialised: renaming the
+  default would point an existing install at a database that does not exist. Only
+  the volume-less stacks (the cluster demo, CI) now use `gatewai`. Nothing to do.
+- **MCP clients** key their configuration by the name you gave the server, so the
+  server's rename needs no change on their side.

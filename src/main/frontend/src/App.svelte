@@ -305,8 +305,8 @@ async function revoke(id: string) {
 
 <main>
   <header>
-    <h1>🌱 Green AI Proxy</h1>
-    <p class="subtitle">Carbon footprint dashboard</p>
+    <h1>gatewAI</h1>
+    <p class="subtitle">Decisions, cost and carbon of every request</p>
   </header>
 
   <section class="connect">

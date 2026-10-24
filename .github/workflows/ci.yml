@@ -60,13 +60,13 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg17
         env:
-          POSTGRES_DB: greenaiproxy
+          POSTGRES_DB: gatewai
           POSTGRES_USER: dev
           POSTGRES_PASSWORD: dev
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U dev -d greenaiproxy"
+          --health-cmd "pg_isready -U dev -d gatewai"
           --health-interval 5s --health-timeout 5s --health-retries 10
       ollama:
         image: ollama/ollama:latest
@@ -96,7 +96,7 @@ jobs:
         # CI does not download the ~3 GB default Qwen models it never calls.
         env:
           SPRING_DOCKER_COMPOSE_ENABLED: 'false'
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/greenaiproxy
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gatewai
           SPRING_DATASOURCE_USERNAME: dev
           SPRING_DATASOURCE_PASSWORD: dev
           GATEWAI_PROVIDERS_OLLAMA_PULLMODELSTRATEGY: 'never'

@@ -40,10 +40,14 @@ adapter/in/mcp
 
 ```properties
 spring.ai.mcp.server.enabled=true
-spring.ai.mcp.server.name=gatewai-green-proxy
-spring.ai.mcp.server.version=0.1.0
+spring.ai.mcp.server.name=gatewai
+spring.ai.mcp.server.version=@project.version@
 spring.ai.mcp.server.instructions=...
 ```
+
+The server reports itself as `gatewai` (named `gatewai-green-proxy` before v4 C.2) with
+the version of the jar, filtered in at build time. An MCP client keys its own
+configuration by the name *you* give the server, so the rename breaks nothing there.
 
 Set `spring.ai.mcp.server.enabled=false` to fully disable the MCP exposure.
 

@@ -44,7 +44,7 @@ the configurable fallback decides whether to err toward cost or toward quality.
 ## Embedding routes by default, heuristic and LLM as alternatives
 
 **Choice:** the default classifier is **semantic routes** — the request is
-embedded locally (same Ollama model as the cache) and matched against
+embedded in-process (the same ONNX model as the cache, no model server) and matched against
 example prompts configured per route/tier. Pure heuristics (length, code
 blocks, keywords) and an LLM-based classifier remain available and serve as
 fallbacks.
@@ -88,9 +88,8 @@ part of the methodology and should be stated when reporting.
 
 **Choice:** cached answers do not expire unless you set a TTL.
 
-**Why:** maximizes hit rate and savings for stable Q&A, which is the common case in
-a demo/portfolio context. The trade-off is potential staleness — documented, and
-fixable by setting a TTL per deployment. See [`limitations.md`](limitations.md).
+**Why:** maximizes hit rate and savings for stable Q&A. The trade-off is potential
+staleness — documented, and fixable by setting a TTL per deployment. See [`limitations.md`](limitations.md).
 
 ## CSV/PDF reporting aimed at CSRD
 

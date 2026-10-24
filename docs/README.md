@@ -1,7 +1,27 @@
 # gatewAI documentation
 
+## Using gatewAI
+
+The short path, in the order you need it:
+
+1. **Quickstart** — [`getting-started.md`](functional/getting-started.md): deploy, get a
+   key, send a first request (OpenAI SDK, a chat UI, MCP).
+2. **Configuration reference** — providers, the model registry, routing, failover and
+   pricing: [`routing.md` → Configuration reference](technical/routing.md#configuration-reference).
+   Every other property is commented where it is defined, in
+   [`application.properties`](../src/main/resources/application.properties).
+3. **Client compatibility** — which clients were checked and how:
+   [`features.md` → Client compatibility](functional/features.md#client-compatibility);
+   what a request may carry: [`api-reference.md`](technical/api-reference.md#chat-completions-openai-compatible).
+4. **Troubleshooting** — [`troubleshooting.md`](functional/troubleshooting.md): every
+   error a client can get, and how to find a request by its `X-Request-Id`.
+
+Before relying on the numbers: [`limitations.md`](functional/limitations.md).
+
+## Everything else
+
 Documentation is split into three areas. See the root [`README.md`](../README.md)
-for the project overview and quick start.
+for the project overview.
 
 | Area | Audience | Content |
 |---|---|---|
@@ -12,12 +32,12 @@ for the project overview and quick start.
 [`decisions.md`](decisions.md) records implementation deviations — where the
 code departs from the plan it belongs to, and why.
 
-## Technical ([`technical/`](technical/))
+### Technical ([`technical/`](technical/))
 
 Start here: [`architecture.md`](technical/architecture.md) — the entry point that links the rest.
 
 - [`architecture.md`](technical/architecture.md) — hexagonal layers, advisor chain, request lifecycle, ArchUnit
-- [`tech-stack.md`](technical/tech-stack.md) — Java 25, Spring Boot 4, Spring AI 2.0, Postgres+pgvector, Ollama
+- [`tech-stack.md`](technical/tech-stack.md) — Java 25, Spring Boot 4, Spring AI 2.0, Postgres+pgvector, in-process ONNX embeddings, Ollama egress
 - [`semantic-cache.md`](technical/semantic-cache.md) — the short-circuiting cache advisor
 - [`routing.md`](technical/routing.md) — model registry, classifiers, routing advisor
 - [`green-accounting.md`](technical/green-accounting.md) — carbon model, avoided figures, reporting
@@ -38,17 +58,18 @@ Start here: [`architecture.md`](technical/architecture.md) — the entry point t
 - [`clustering.md`](technical/clustering.md) — what is shared and what is node-local across replicas
 - [`adr/`](technical/adr/) — architecture decision records
 
-## Functional ([`functional/`](functional/))
+### Functional ([`functional/`](functional/))
 
 - [`overview.md`](functional/overview.md) — problem, value proposition, audience, vocabulary
 - [`getting-started.md`](functional/getting-started.md) — deploy, get a key, first request (OpenAI + MCP), dashboard
+- [`troubleshooting.md`](functional/troubleshooting.md) — every client-facing error, what to do, and finding a request by `X-Request-Id`
 - [`features.md`](functional/features.md) — every capability explained from a usage angle
 - [`dashboard-guide.md`](functional/dashboard-guide.md) — screen-by-screen tour
 - [`limitations.md`](functional/limitations.md) — owned limitations and trade-offs
 - [`functional-choices.md`](functional/functional-choices.md) — functional decisions and their why
 - [`vllm-semantic-router-comparison.md`](functional/vllm-semantic-router-comparison.md) — inspiration from vLLM Semantic Router and differences
 
-## Development ([`developpment/`](developpment/))
+### Development ([`developpment/`](developpment/))
 
 - [`contributing.md`](developpment/contributing.md) — build, test, conventions, how to make common changes
 - [`releasing.md`](developpment/releasing.md) — cutting a release: tag, image, attestation, what each step checks

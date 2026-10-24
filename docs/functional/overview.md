@@ -1,9 +1,11 @@
 # Overview
 
-gatewAI is an **open-source, self-hosted LLM gateway** for enterprises. It sits
+gatewAI is an **open-source, self-hosted LLM gateway you can audit**. It sits
 between your applications and the LLM providers you use, and does four things on
-every request: **secures**, **caches**, **routes**, and **measures the carbon
-footprint** of AI traffic.
+every request: **secures**, **caches**, **routes**, and **accounts the cost and
+carbon footprint** of AI traffic — and it records why it cached or routed each
+request the way it did, so the answer to "why did this happen?" is a lookup, not a
+guess.
 
 It speaks the **OpenAI API format** on the way in, so existing apps and SDKs work
 by only changing the `base_url` — no code rewrite.

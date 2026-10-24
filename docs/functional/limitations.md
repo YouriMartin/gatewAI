@@ -1,6 +1,6 @@
 # Limitations
 
-gatewAI is a portfolio-grade project with deliberate scope. These limits are
+gatewAI is maintained by one person and has a deliberate scope. These limits are
 **owned, not hidden** — read them before relying on the numbers or deploying for
 real traffic. Where relevant, the technical rationale is linked.
 

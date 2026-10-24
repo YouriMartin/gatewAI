@@ -43,8 +43,10 @@ finding, not noise. It takes no share of the reason (shares are normalized over
 positive contributions only), but it keeps its sign in the report.
 
 Gradient-based attribution would be sharper and is not available: the gateway
-reaches the embedding model through an HTTP port, with no access to its
-internals from the JVM. Occlusion needs nothing but the port already in use
+reaches the embedding model through Spring AI's `EmbeddingModel` port, and behind
+it is an int8 ONNX inference session — no gradients to read, even in-process
+(the ADR was written when the model was still behind HTTP on Ollama). Occlusion
+needs nothing but the port already in use
 ([ADR 0009](adr/0009-occlusion-over-gradient-attribution.md)).
 
 ### Segmentation
@@ -75,8 +77,9 @@ is still an attribution.
 
 ### Cost, and what keeps it in hand
 
-**n + 1 embedding calls** per uncached report, against the same local Ollama the
-gateway serves requests with. This is the one place v2 can visibly load the box.
+**n + 1 embedding calls** per uncached report, on the same in-process ONNX model —
+and the same CPU — the gateway serves requests with. This is the one place the
+explanation features can visibly load the box.
 Four things bound it:
 
 - **On demand only.** Nothing computes an attribution while routing. The router

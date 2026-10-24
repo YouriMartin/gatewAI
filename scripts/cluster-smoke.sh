@@ -39,7 +39,7 @@ contains() { # $1 = url, $2 = needle
 
 psql_q() {
   $COMPOSE exec -T pgvector psql -U "${POSTGRES_USER:-dev}" \
-    -d "${POSTGRES_DB:-greenaiproxy}" -t -A -c "$1" 2>/dev/null | tr -d '\r'
+    -d "${POSTGRES_DB:-gatewai}" -t -A -c "$1" 2>/dev/null | tr -d '\r'
 }
 
 chat() { # $1 = base url, $2 = prompt -> prints the HTTP status

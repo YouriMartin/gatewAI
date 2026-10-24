@@ -189,10 +189,12 @@ statuses only appear once failover inside the tier has run out
 ([ADR 0017](adr/0017-ordered-failover-inside-a-tier.md)).
 
 Upstream provider details are logged server-side but **not echoed** to the caller.
-Streaming (`"stream": true`) reports failures inline on the SSE stream rather than
-as this envelope, since the response is already committed when the egress fails.
-A streamed pass-through is the exception up to its first byte: the upstream is
-connected before the stream starts, so a refusal there gets the envelope.
+Streaming (`"stream": true`): a failure **before the first chunk** gets this
+envelope and status too, on the chain as on a pass-through. A failure **after** it
+cannot change a status already sent: the stream ends without `data: [DONE]` and
+without an error event, and the cause is in the gateway log. Both verified on
+2026-10-24 against an unreachable and a mid-stream-dropping Ollama
+([troubleshooting](../functional/troubleshooting.md#a-stream-that-stops-early)).
 
 ## Models (OpenAI-compatible, v4 B.2)
 

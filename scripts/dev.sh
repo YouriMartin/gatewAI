@@ -26,6 +26,7 @@ BACK_PID="$DEV_DIR/backend.pid"
 BACK_LOG="$DEV_DIR/backend.log"
 
 # Datasource/Ollama coordinates matching compose.yaml (published on localhost).
+# The database keeps its pre-rename name, as compose.yaml explains.
 DB_URL="jdbc:postgresql://localhost:5432/greenaiproxy"
 DB_USER="dev"
 DB_PASS="dev"

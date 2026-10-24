@@ -50,16 +50,17 @@ on the same Spring Boot 4 baseline.
 - The vector store is used **through Spring AI's `VectorStore` interface**, never
   pgvector directly, so it can be swapped for Qdrant by changing a dependency and
   config — not the cache logic.
-- Config: HNSW index, cosine distance, 768-dimension vectors (matching the
+- Config: HNSW index, cosine distance, 384-dimension vectors (matching the
   embedding model), `initialize-schema=true`.
 
 ## Embeddings: in-process ONNX (v3 lot A)
 
 - The embedding model runs **inside the JVM** — DJL + ONNX Runtime behind Spring
   AI's `TransformersEmbeddingModel` (`spring-ai-starter-model-transformers`).
-  Provisional model: `paraphrase-multilingual-MiniLM-L12-v2`, int8-quantised,
-  **384 dimensions**, EN/FR. v3 batch A.3 measures the candidates and confirms
-  or replaces it.
+  Model: `paraphrase-multilingual-MiniLM-L12-v2`, int8-quantised,
+  **384 dimensions**, EN/FR — kept in v3 lot A on measurements (82.0 % calibrated
+  routing, against 73.0 % for an English-only model and 81.0 % for e5;
+  [`evaluation.md`](evaluation.md)).
 - The model (118 MB) and its tokenizer (17 MB) are **fetched at build time**
   (`download-maven-plugin`, pinned SHA-256, cached in `~/.m2`) into the jar's
   classpath, so they are in the artifact but not in git. A cold *start* downloads
@@ -97,7 +98,9 @@ on the same Spring Boot 4 baseline.
 - Spring AI immutable builders — porting older snippets that used setters will not
   compile.
 - Jackson 3 package move — `@JsonNaming`/imports come from `tools.jackson`.
-- pgvector dimension must equal the embedding dimension (768) or inserts fail.
+- pgvector dimension must equal the embedding dimension (384) or inserts fail —
+  a table left at 768 by a pre-v3 install must be dropped
+  ([`data-model.md`](data-model.md#upgrading-to-v3-the-vector-cache-must-be-dropped-v3-lot-a)).
 - Virtual threads + Scoped Values pair well; Scoped Values are the right context
   mechanism here (not `ThreadLocal`, which does not propagate cleanly and is
   mutable).

@@ -23,6 +23,9 @@ services:
   pgvector:
     image: 'pgvector/pgvector:pg17'
     environment:
+      # The database keeps its pre-rename name: POSTGRES_DB only applies when the
+      # volume is first initialised, so an existing pgdata volume holds a
+      # `greenaiproxy` database and nothing else (v4 C.2).
       - 'POSTGRES_DB=${POSTGRES_DB:-greenaiproxy}'
       - 'POSTGRES_USER=${POSTGRES_USER:-dev}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev}'

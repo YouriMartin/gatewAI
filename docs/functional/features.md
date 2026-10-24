@@ -24,9 +24,32 @@ touching client code.
   `stream_options.include_usage` adds the final usage chunk.
 - **The message shapes SDKs send are accepted** (v4 B.1): `content` as a string or
   an array of parts, the `developer` role, `max_completion_tokens`, and `top_p`,
-  penalties and `seed` forwarded where the provider supports them. Tools, images
-  and structured outputs are refused with a clear 400 until pass-through lands
-  (see [limitations](limitations.md)).
+  penalties and `seed` forwarded where the provider supports them.
+- **Tools, images and structured outputs are forwarded as written** (pass-through,
+  v4 B.3–B.4): such a request skips the cache and the router, goes to the model it
+  pins (or the configured default), streamed or not, and is still rate-limited,
+  traced and accounted. The async endpoint and MCP refuse it with a 400 that names
+  the field ([troubleshooting](troubleshooting.md#400--code-unsupported_feature-param--the-field)).
+
+### Client compatibility
+
+What has actually been checked, and how. "Live" means the client itself was run
+against a gateway; "shape" means its request body was reconstructed from the
+client's source and is replayed by `OpenAiMapperTest`
+(`src/test/resources/fixtures/openai-requests/`, sources read 2026-10-08), which
+proves the gateway parses it, not that the client works end to end.
+
+| Client | Checked | How |
+|---|---|---|
+| curl | live | every example in [getting started](getting-started.md) and [troubleshooting](troubleshooting.md) |
+| Open WebUI v0.12.0 | live (v4 B.2) | through its own API: model list, streamed chats, title task ([walkthrough](getting-started.md#5-use-it-from-a-chat-ui--open-webui)) |
+| OpenAI Python SDK | shape | string content, `developer` role |
+| Vercel AI SDK (`@ai-sdk/openai-compatible`) | shape | text parts array, streaming with `include_usage` |
+| LangChain (`langchain-openai`) | shape | tool-calling turn (`tool_calls`, `tool` message) |
+| A chat UI attaching an image | shape | `image_url` part with a `data:` URI |
+
+A client that is not here may well work: anything that speaks Chat Completions
+should. Report what you find with the [bug template](../../.github/ISSUE_TEMPLATE/bug_report.yml).
 
 ## Semantic cache
 
