@@ -163,6 +163,20 @@ watch. Its output and the reasoning behind each check are in
 [`clustering.md`](clustering.md). Not in CI yet — it needs Docker, and the
 integration job's service containers are a different shape.
 
+## The README quickstart is a test (v4 C.3)
+
+`scripts/quickstart-check.sh` reads the first `bash` block after the
+`quickstart-check` marker in `README.md` and runs it: the download line is checked
+for the file it names and replaced by a copy from the checkout (the branch under
+test, not `main`), every other line runs verbatim in a scratch directory, and the
+last one — the chat completion — runs twice and must answer `X-GatewAI-Cache: MISS`,
+then `HIT`. The CI job `quickstart` builds the image from the commit and runs it with
+`GATEWAI_IMAGE` pointing there, so an edit to the README's commands is an edit to a
+test. It covers the `mock` preset only. The `ollama` and `openai-compatible` presets
+were run by hand on 2026-10-25 (an Ollama 0.30.11 container published on the host;
+a second gatewAI in `mock` as the OpenAI-compatible upstream) and their property
+resolution is unit-tested in `QuickstartPresetsTest`.
+
 ## `mock` profile — run with no provider, no key, no cost (Phase 7.4)
 
 Activate the `mock` Spring profile (`SPRING_PROFILES_ACTIVE=mock`) to swap the

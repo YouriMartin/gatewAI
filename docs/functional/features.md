@@ -41,7 +41,7 @@ proves the gateway parses it, not that the client works end to end.
 
 | Client | Checked | How |
 |---|---|---|
-| curl | live | every example in [getting started](getting-started.md) and [troubleshooting](troubleshooting.md) |
+| curl 8.15.0 | live (v4 C.3) | the [README quickstart](../../README.md#quickstart), run by CI on every commit; every example in [getting started](getting-started.md) and [troubleshooting](troubleshooting.md) |
 | Open WebUI v0.12.0 | live (v4 B.2) | through its own API: model list, streamed chats, title task ([walkthrough](getting-started.md#5-use-it-from-a-chat-ui--open-webui)) |
 | OpenAI Python SDK | shape | string content, `developer` role |
 | Vercel AI SDK (`@ai-sdk/openai-compatible`) | shape | text parts array, streaming with `include_usage` |

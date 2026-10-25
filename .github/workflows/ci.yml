@@ -52,6 +52,22 @@ jobs:
           path: target/eval/
           if-no-files-found: warn
 
+  # The README's quickstart, run as written on an image built from this commit
+  # (v4 C.3): the mock preset must answer MISS, then HIT, so the README cannot
+  # silently rot. The script reads the commands out of README.md itself.
+  quickstart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build -t gatewai:ci .
+      - name: Run the README quickstart (mock preset)
+        env:
+          GATEWAI_IMAGE: gatewai:ci
+        run: scripts/quickstart-check.sh
+
   # Full-context boot: catches bean-wiring regressions (Phase 7.3). Runs the
   # @Tag("integration") suite against real Postgres + Ollama service containers.
   integration:

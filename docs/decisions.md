@@ -7,6 +7,42 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot C — C.3 (quickstart on the published image)
+
+- **Presets are Spring profiles, selected by one variable.** `GATEWAI_PRESET` sets
+  `SPRING_PROFILES_ACTIVE`. `mock` already was a profile; `openai-compatible` is a new
+  profile file in the jar; `ollama` has no file, because the default configuration
+  *is* the Ollama one and the compose file only points it at the host. A profile
+  keeps the preset usable outside compose (`SPRING_PROFILES_ACTIVE=openai-compatible
+  java -jar …`), where placeholders in `application.properties` for the provider of
+  every entry would have spread one preset across the default file.
+- **The `openai-compatible` preset reuses the three default entries** (`local-small`
+  …) rather than declaring new ones: the registry binds as a map merged across
+  property sources, so new entries would have *added* to the Ollama ones, not
+  replaced them. The keys keep their `local-` names, which show in the startup log;
+  clients see the model ids (`/v1/models`), not the keys.
+- **Not planned: startup refuses an unresolved placeholder.** Property binding keeps
+  an unset `${VAR}` without a default as literal text, so the preset booted and failed
+  on the first request. `EgressProviderConfiguration` now fails on `${` in a model
+  id, or in the base URL or API key of a referenced instance, naming the variable but
+  never the value.
+- **The `ollama` preset pulls nothing by default** (`OLLAMA_PULL_MODEL_STRATEGY`
+  defaults to `never` in the quickstart file only). The lot's goal is "point it at a
+  model you already have"; with the application default (`when_missing`), forgetting
+  the three variables would have started a ~3 GB pull into the user's own Ollama.
+- **Three distinct model ids are still required** by both real presets: the registry's
+  uniqueness rule is unchanged, and an Ollama with one model cannot fill the three
+  tiers. Relaxing it is out of scope (the roadmap leaves the defaults to the
+  maintainer); the README and the compose file say so.
+- **No `init.sql`**: the vector store creates the `vector` extension, so the
+  quickstart is one downloadable file. The other compose files keep theirs.
+- **The timing is not from a clean machine**: 22 s was measured on the maintainer's
+  workstation with fresh volumes and the images already pulled, and the README says
+  exactly that. A clean-machine figure stays open.
+- **The CI check covers `mock` only**, as the acceptance asks. The two other presets
+  were run by hand (see the progress log) and their property resolution is
+  unit-tested.
+
 ## v4 lot C — C.2 (one name, one story, docs that match the code)
 
 - **The database name stays `greenaiproxy` in the two stacks with a volume.**

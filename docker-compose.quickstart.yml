@@ -1,0 +1,100 @@
+# Quickstart on the published image (v4 C.3): pgvector + the gateway, nothing to
+# build, no bundled model server. This one file is all you need — the README's
+# quickstart downloads it on its own.
+#
+#   docker compose -f docker-compose.quickstart.yml up -d --wait
+#
+# The egress is a PRESET, chosen by environment variables (never by editing
+# application.properties). GATEWAI_PRESET is the Spring profile the gateway runs:
+#
+#   mock (default)     Zero dependency. A built-in echo answers instead of a model;
+#                      the cache, the router, the traces and the dashboard all run
+#                      for real. This is what the README's "what you should see" uses.
+#
+#   ollama             An Ollama already running on this machine:
+#                        GATEWAI_PRESET=ollama
+#                        GATEWAI_MODEL_SMALL=… GATEWAI_MODEL_MEDIUM=… GATEWAI_MODEL_LARGE=…
+#                      Three distinct models you already have (`ollama list`); unset,
+#                      they default to qwen2.5 0.5b/1.5b/3b. Nothing is pulled unless
+#                      you set OLLAMA_PULL_MODEL_STRATEGY=when_missing. On Linux,
+#                      Ollama listens on 127.0.0.1 by default, which a container
+#                      cannot reach: start it with OLLAMA_HOST=0.0.0.0 (or set
+#                      OLLAMA_BASE_URL to where it listens).
+#
+#   openai-compatible  Any OpenAI-compatible endpoint (vLLM, LM Studio, llama.cpp,
+#                      OpenRouter, OpenAI itself…):
+#                        GATEWAI_PRESET=openai-compatible
+#                        OPENAI_COMPATIBLE_BASE_URL=https://…/v1
+#                        OPENAI_COMPATIBLE_API_KEY=…   (blank = no auth header)
+#                        GATEWAI_MODEL_SMALL=… GATEWAI_MODEL_MEDIUM=… GATEWAI_MODEL_LARGE=…
+#                      All four are required; the gateway refuses to start without
+#                      them. A server on this machine is http://host.docker.internal:<port>/v1.
+#
+# Put the variables in a `.env` file next to this one, or export them.
+#
+# The admin key below is a DEMO default and the port is published on 127.0.0.1
+# only, so nothing outside this machine can use it. Set GATEWAI_ADMIN_API_KEY to
+# your own value before you publish the port anywhere else.
+#
+# Dashboard http://localhost:8080/ · OpenAI API http://localhost:8080/v1/chat/completions
+# Stop: `docker compose -f docker-compose.quickstart.yml down` (add -v to drop the data).
+
+name: gatewai-quickstart
+
+services:
+  pgvector:
+    image: 'pgvector/pgvector:pg17'
+    environment:
+      # A new volume, so the database takes the new name (the pre-rename default
+      # only stays in docker-compose.yml, whose volumes may predate v4 C.2).
+      - 'POSTGRES_DB=gatewai'
+      - 'POSTGRES_USER=${POSTGRES_USER:-dev}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev}'
+    # No init script: the gateway creates the vector extension itself
+    # (spring.ai.vectorstore.pgvector.initialize-schema), so no repo file is needed.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d gatewai"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  gateway:
+    image: '${GATEWAI_IMAGE:-ghcr.io/yourimartin/gatewai:latest}'
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    environment:
+      - 'SPRING_PROFILES_ACTIVE=${GATEWAI_PRESET:-mock}'
+      - 'SPRING_DATASOURCE_URL=jdbc:postgresql://pgvector:5432/gatewai'
+      - 'SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-dev}'
+      - 'SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-dev}'
+      - 'GATEWAI_ADMIN_API_KEY=${GATEWAI_ADMIN_API_KEY:-gw_quickstart-demo-key}'
+      # ollama preset
+      - 'OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
+      - 'GATEWAI_PROVIDERS_OLLAMA_PULLMODELSTRATEGY=${OLLAMA_PULL_MODEL_STRATEGY:-never}'
+      # openai-compatible preset
+      - 'OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}'
+      - 'OPENAI_COMPATIBLE_API_KEY=${OPENAI_COMPATIBLE_API_KEY:-}'
+      # Both real presets: the three registry entries' model ids. Passed only
+      # when set, so the defaults (or the preset's own refusal) still apply.
+      - 'GATEWAI_MODEL_SMALL'
+      - 'GATEWAI_MODEL_MEDIUM'
+      - 'GATEWAI_MODEL_LARGE'
+    extra_hosts:
+      # host.docker.internal on Linux too (Docker Desktop defines it already).
+      - 'host.docker.internal:host-gateway'
+    # Polled more often than the image's own check, so `up --wait` returns as soon
+    # as the gateway answers rather than up to 15 s later.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 2s
+      timeout: 5s
+      start_period: 300s
+      retries: 30
+    ports:
+      - '127.0.0.1:8080:8080'
+
+volumes:
+  pgdata:

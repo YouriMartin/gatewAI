@@ -11,6 +11,69 @@ Every cache hit and every routing decision is traced, explained and replayable. 
 OpenAI-compatible endpoint in front of your local and cloud models — Spring Boot,
 with PostgreSQL as its only infrastructure dependency.
 
+## Quickstart
+
+Docker with Compose v2 is all it takes — no clone, no build, no API key, no model
+download.
+
+<!-- quickstart-check: CI runs the block below as written (scripts/quickstart-check.sh) -->
+```bash
+curl -fsSLO https://raw.githubusercontent.com/YouriMartin/gatewAI/main/docker-compose.quickstart.yml
+docker compose -f docker-compose.quickstart.yml up -d --wait
+curl -si http://localhost:8080/v1/chat/completions -H "Authorization: Bearer gw_quickstart-demo-key" -H "Content-Type: application/json" -d '{"model":"gatewai-auto","messages":[{"role":"user","content":"What does a semantic cache do?"}]}'
+```
+
+**What you should see.** Run the last command twice. The first answer comes from the
+model and the second from the cache, without a model call:
+
+```
+HTTP/1.1 200
+X-Request-Id: 1853513f-…
+X-GatewAI-Cache: MISS
+X-GatewAI-Model: qwen2.5:1.5b
+…
+{"object":"chat.completion","model":"qwen2.5:1.5b","choices":[{"message":{"role":"assistant","content":"[mock] echo: What does a semantic cache do?"}, …
+
+HTTP/1.1 200
+X-Request-Id: 944d7370-…
+X-GatewAI-Cache: HIT
+…
+```
+
+From `up` to that first answer: **22 s** (three runs, 21.8–22.1 s; images already
+pulled, fresh volume), measured 2026-10-25 on the maintainer's workstation — AMD
+Ryzen 7 5800X, 32 GB RAM, Fedora 43, Docker 29.8.2 — not on a clean machine.
+
+That default is the **`mock`** preset: a built-in echo stands in for the model (the
+answer reads `[mock] echo: …`, under the model id the router picked) while the
+cache, the router, the traces and the
+[dashboard](http://localhost:8080/) run for real. Point it at a real model with one
+of the two other presets, chosen by environment variables (in a `.env` file next to
+the compose file, or exported) — never by editing configuration:
+
+| Preset | Set | Notes |
+|---|---|---|
+| `mock` (default) | nothing | zero dependency |
+| `ollama` | `GATEWAI_PRESET=ollama`, `GATEWAI_MODEL_SMALL`, `_MEDIUM`, `_LARGE` | an Ollama already running on this machine; three distinct models it holds. On Linux, start Ollama with `OLLAMA_HOST=0.0.0.0` so the container can reach it |
+| `openai-compatible` | `GATEWAI_PRESET=openai-compatible`, `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_API_KEY`, the three `GATEWAI_MODEL_*` | vLLM, LM Studio, llama.cpp, OpenRouter, OpenAI… — the base URL is the root that serves `/chat/completions` |
+
+The three models fill the three routing tiers, smallest first. Every variable is
+explained at the top of
+[`docker-compose.quickstart.yml`](docker-compose.quickstart.yml); the next steps —
+your own API keys, a chat UI, MCP — are in
+[getting started](docs/functional/getting-started.md). The demo admin key above is
+published on `127.0.0.1` only; set `GATEWAI_ADMIN_API_KEY` before exposing the port.
+
+**Clients checked against it** ([full table and method](docs/functional/features.md#client-compatibility)):
+
+| Client | Version | Checked |
+|---|---|---|
+| curl | 8.15.0 | live — this quickstart, the getting-started and troubleshooting examples |
+| Open WebUI | v0.12.0 | live — model list, streamed chats, title task |
+| OpenAI Python SDK, Vercel AI SDK, LangChain | sources read 2026-10-08 | request shapes replayed by the test suite, not run end to end |
+
+Read [limitations](docs/functional/limitations.md) before relying on the numbers.
+
 ![gatewAI dashboard](docs/assets/dashboard.png)
 
 ## Why gatewAI?
@@ -90,19 +153,20 @@ observability, MCP, native image).
 | Local infra | Docker Compose |
 | Build | Maven (wrapper included) |
 
-## Prerequisites
+## Build and run from source
 
-- **Docker** and **Docker Compose** (enough for plug & play mode)
-- **Java 25** + Maven *(only for development mode)*
+- **Docker** and **Docker Compose** for the full stack below; **Java 25** only for
+  development mode.
 
 No API key is required: by default all three routing tiers run on the bundled
 Ollama. Cloud providers (Anthropic, OpenAI, any OpenAI-compatible endpoint) are
 opt-in via the model registry.
 
-## Quick start — plug & play (all in containers)
+### Full stack in containers, with a bundled Ollama
 
 No JDK required: Docker builds the app (back end + dashboard) and starts the whole
-stack.
+stack. Unlike the [quickstart](#quickstart), it builds the image and pulls the
+default models.
 
 ```bash
 # 1. Clone the project
@@ -143,7 +207,7 @@ the gateway seeds an admin client with that exact key at startup. Use it as the
 > (A `Using generated security password: <uuid>` line, if present, is an unrelated
 > Spring default — not your API key.)
 
-## Development mode (local JDK, hot reload)
+### Development mode (local JDK, hot reload)
 
 The quickest way is the dev environment script (manages infra + backend):
 
