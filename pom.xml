@@ -20,7 +20,7 @@
 		<revision>0.0.1-SNAPSHOT</revision>
 		<java.version>25</java.version>
 		<spring-ai.version>2.0.0</spring-ai.version>
-		<checkstyle.version>13.6.0</checkstyle.version>
+		<checkstyle.version>14.3.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
 		<!-- Hugging Face commit of Xenova/paraphrase-multilingual-MiniLM-L12-v2
 		     (2025-07-22), checked on 2026-10-24 to serve both pinned SHA-256s. -->
