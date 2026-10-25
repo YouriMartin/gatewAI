@@ -113,6 +113,8 @@ io.github.yourimartin.gatewai
 - After an implementation: explain what was done and why (choices, trade-offs, link to the architecture).
 - Before running a command that needs confirmation: say why it is needed.
 - End every implementation with a proposed commit message: short, English, imperative mood.
+- `main` is protected (`.github/rulesets/main.json`): work on a branch per batch or fix
+  (`v4-c3-quickstart`, `fix-…`); it reaches `main` by pull request once CI is green.
 
 ## Status
 v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5–B.6 done, C.1 code done (first test tag open), C.2 done, C.3 code done (first CI run, clean-machine timing and the published image open); next: B.4 manual check and the C.1 test tag, then C.4 (docs/developpment/roadmap-v4.md)
