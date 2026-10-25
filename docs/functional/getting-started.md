@@ -4,6 +4,12 @@ This guide takes you from nothing to a first answer through gatewAI: deploy, get
 an API key, send a request via the OpenAI SDK **and** via MCP, plug in a chat UI,
 and open the dashboard.
 
+> **Just want to see it work?** The [README quickstart](../../README.md#quickstart)
+> runs the published image with one downloaded file — no clone, no build, no model
+> download — and points it at a mock, an Ollama you already run, or any
+> OpenAI-compatible endpoint (`docker-compose.quickstart.yml`, v4 C.3). Its admin key
+> is the demo value `gw_quickstart-demo-key`: in section 3 on, use it as `ADMIN`. This guide builds the full stack from source instead.
+
 ## 1. Prerequisites
 
 - **Docker** and **Docker Compose** (enough for the plug & play mode below).

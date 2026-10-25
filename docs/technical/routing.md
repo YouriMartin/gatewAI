@@ -467,3 +467,9 @@ every coefficient:
 `gatewai.failover.*` (v4 B.5): `pinned` (default false), `failure-threshold` (default
 3), `cooldown` (default `PT30S`).
 `gatewai.billing.currency` (v4 B.6): ISO 4217 code of every price, default `EUR`.
+The three default entries' model ids read `GATEWAI_MODEL_SMALL`, `GATEWAI_MODEL_MEDIUM`
+and `GATEWAI_MODEL_LARGE` (v4 C.3; defaults `qwen2.5` 0.5b/1.5b/3b), and the
+`openai-compatible` profile (`application-openai-compatible.properties`) moves all
+three to one instance read from `OPENAI_COMPATIBLE_BASE_URL` and
+`OPENAI_COMPATIBLE_API_KEY`, with no default model id. A model id, base URL or API key
+that is still an unresolved `${…}` fails startup and names the variable.

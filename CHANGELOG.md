@@ -44,6 +44,16 @@ The first published release: everything below is new to anyone pulling an image.
   attestation; the version is stamped from the tag and served on `/actuator/info`.
 - **Troubleshooting guide** listing every client-facing error and how to find a
   request by its `X-Request-Id`.
+- **Quickstart on the published image**: `docker-compose.quickstart.yml` (pgvector
+  and the gateway, nothing to build) with three egress presets chosen by
+  `GATEWAI_PRESET` — `mock`, an `ollama` already running on the host, or any
+  `openai-compatible` endpoint. CI runs the README's quickstart commands on every
+  commit.
+- **The three default model ids are environment variables**: `GATEWAI_MODEL_SMALL`,
+  `GATEWAI_MODEL_MEDIUM`, `GATEWAI_MODEL_LARGE` (defaults unchanged).
+- **Startup refuses an unresolved placeholder** in a model id, or in the base URL or
+  API key of a referenced provider instance, naming the variable to set — such a
+  value used to bind as literal `${…}` text and fail on the first request.
 
 ### Changed
 

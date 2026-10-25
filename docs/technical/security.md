@@ -63,6 +63,13 @@ system is usable without hand-inserting a key. Two modes:
   set, an admin is seeded with that exact key. **Idempotent**: created only if no
   client already has that key's hash, so restarts are safe and the key is the one
   you chose. The key value is not logged (you already have it).
+  The quickstart compose (`docker-compose.quickstart.yml`, v4 C.3) sets a **public
+  demo key**, `gw_quickstart-demo-key`, so its commands work as pasted. It is
+  safe only because that file publishes the port on `127.0.0.1`: set your own
+  `GATEWAI_ADMIN_API_KEY` before binding it to any other interface. A configured
+  key is seeded *in addition to* existing admins, so changing it later leaves the
+  demo admin in the database — revoke it (`POST /v1/admin/clients/{id}/revoke`) or
+  start on a fresh volume.
 - **Random key** — when unset, and only if no admin exists, one is created with a
   generated key logged **once** (`WARN: "...Admin API key (shown ONCE, copy it now):
   gw_…"`). Copy it; it is never shown again.

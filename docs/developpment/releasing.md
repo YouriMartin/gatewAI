@@ -28,6 +28,17 @@ bound to the index digest that the tag points to.
   Package settings → Change visibility*). GHCR creates a new package as private,
   whatever the repository's visibility, so until then an anonymous `docker pull`
   fails. The workflow's own jobs log in and are not affected.
+- **Protect `main`** with the ruleset kept in the repository,
+  [`.github/rulesets/main.json`](../../.github/rulesets/main.json): every change
+  arrives by pull request (no approval required — one maintainer cannot approve
+  their own), the CI jobs `pinned-actions`, `build`, `integration` and `quickstart`
+  must pass, and `main` cannot be force-pushed or deleted. Nobody bypasses it,
+  admins included. `integration_id` 15368 is GitHub Actions, so only a check run by
+  Actions satisfies a requirement. The weekly CVE scan is left out on purpose: a
+  new advisory would block every unrelated merge.
+  `gh api -X POST repos/YouriMartin/gatewAI/rulesets --input .github/rulesets/main.json`
+  (to change it later: `gh api repos/YouriMartin/gatewAI/rulesets` for its id, then
+  `-X PUT …/rulesets/<id>` with the same file).
 - **Restrict who can create `v*` tags** (*Settings → Rules → Rulesets*, target: tags
   `v*`, restrict creations to the maintainer). A tag is what triggers a release.
 

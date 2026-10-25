@@ -135,6 +135,17 @@ try to launch a `gateway` container (port 8080 clash). The gateway container set
 `SPRING_DOCKER_COMPOSE_ENABLED=false`, connects to `pgvector`/`ollama` by service
 name, and pulls its chat models from Ollama on first start.
 
+- **`docker-compose.quickstart.yml`** — the **published image** and pgvector, nothing
+  to build and no bundled Ollama (v4 C.3); the README's quickstart downloads this one
+  file. The egress is a preset chosen by `GATEWAI_PRESET` (the Spring profile):
+  `mock` (default), `ollama` (an Ollama on the host, reached through
+  `host.docker.internal`, which `extra_hosts: host-gateway` defines on Linux too) or
+  `openai-compatible`. It needs no `init.sql`: the vector store creates the `vector`
+  extension itself (`initialize-schema=true`; the database user is the image's
+  superuser). The port is published on `127.0.0.1` only, because the file sets a
+  public demo admin key. `GATEWAI_IMAGE` overrides the image — the CI job
+  `quickstart` sets it to the image built from the commit and runs
+  `scripts/quickstart-check.sh`, which executes the README's commands as written.
 - **`docker-compose.observability.yml`** — optional Prometheus + Grafana stack (see
   [`observability.md`](observability.md)).
 - **`docker-compose.cluster.yml`** — **two gateway replicas behind an nginx

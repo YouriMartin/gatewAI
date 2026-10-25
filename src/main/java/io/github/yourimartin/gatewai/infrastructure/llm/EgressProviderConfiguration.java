@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.anthropic.client.AnthropicClient;
@@ -67,6 +69,10 @@ import org.springframework.web.reactive.function.client.WebClient;
  *       none is the reserved routed alias {@code auto} (v4 B.2);</li>
  *   <li>every registry entry references a declared provider instance;</li>
  *   <li>referenced instances have the credentials their type requires;</li>
+ *   <li>no model id, and no base URL or API key of a referenced instance, is still
+ *       an unresolved {@code ${...}} placeholder (v4 C.3): property binding keeps
+ *       such a value as literal text, which would otherwise fail on the first
+ *       request instead of at startup;</li>
  *   <li>no {@code anthropic} instance, referenced or not, holds a subscription
  *       OAuth token instead of an API key (v4 B.3, ADR 0016).</li>
  * </ul>
@@ -92,6 +98,8 @@ class EgressProviderConfiguration {
   private static final String DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
   /** Spring AI's Ollama model retries unless told otherwise (ADR 0017). */
   private static final RetryTemplate NO_RETRY = new RetryTemplate(RetryPolicy.withMaxRetries(0));
+  /** An unset {@code ${NAME}} or {@code ${NAME:…}}; group 1 is the name. */
+  private static final Pattern UNRESOLVED_PLACEHOLDER = Pattern.compile("\\$\\{([^}:]*)");
   /** Anthropic requires max_tokens; used when the client sends none. */
   private static final int ANTHROPIC_DEFAULT_MAX_TOKENS = 4096;
 
@@ -130,6 +138,8 @@ class EgressProviderConfiguration {
         throw new IllegalStateException("Provider '" + name + "' has no type. Set gatewai.providers."
             + name + ".type=(anthropic|openai|openai-compatible|ollama).");
       }
+      refuseUnresolved(entry.getBaseUrl(), "gatewai.providers." + name + ".base-url");
+      refuseUnresolved(entry.getApiKey(), "gatewai.providers." + name + ".api-key");
       instances.put(name, new ProviderChatModels.ProviderInstance(
           entry.getType(), build(name, entry, models, tools, observations)));
       LOG.info("Egress provider '{}' ({}) serves models {} in region {}",
@@ -207,6 +217,7 @@ class EgressProviderConfiguration {
             + " gatewAI route. Give gatewai.models.registry." + model.key()
             + ".model-id another value.");
       }
+      refuseUnresolved(model.modelId(), "gatewai.models.registry." + model.key() + ".model-id");
       if (!seen.add(model.modelId())) {
         throw new IllegalStateException("Duplicate model id '" + model.modelId()
             + "' in gatewai.models.registry — dispatch resolves by model id, so each id must be unique.");
@@ -334,6 +345,24 @@ class EgressProviderConfiguration {
         .toolCallingManager(tools)
         .observationRegistry(observations)
         .build();
+  }
+
+  /**
+   * A {@code ${VAR}} with no default whose variable is unset binds as its own text,
+   * so a preset that requires a variable (application-openai-compatible.properties)
+   * would boot and then send {@code ${GATEWAI_MODEL_LARGE}} upstream. Only the
+   * variable's name is printed, never the value: on an API key it could be a real
+   * key that merely contains the characters.
+   */
+  private static void refuseUnresolved(String value, String property) {
+    if (value == null) {
+      return;
+    }
+    Matcher placeholder = UNRESOLVED_PLACEHOLDER.matcher(value);
+    if (placeholder.find()) {
+      throw new IllegalStateException(property + " is an unresolved placeholder: set the"
+          + " environment variable " + placeholder.group(1) + ", or give the property a value.");
+    }
   }
 
   /**

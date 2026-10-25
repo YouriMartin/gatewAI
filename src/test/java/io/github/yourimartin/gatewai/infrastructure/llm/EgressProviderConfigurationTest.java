@@ -165,6 +165,38 @@ class EgressProviderConfigurationTest {
   }
 
   @Test
+  void failsOnAModelIdThatIsStillAnUnresolvedPlaceholder() {
+    // v4 C.3: binding keeps an unset ${VAR} as text; it must not reach a provider.
+    ModelRegistry registry = registry(
+        model("ollama", "qwen2.5:0.5b", ModelTier.LOCAL),
+        model("ollama", "qwen2.5:1.5b", ModelTier.CLOUD_ENTRY),
+        model("ollama", "${GATEWAI_MODEL_LARGE}", ModelTier.CLOUD_PREMIUM));
+
+    assertThatThrownBy(() -> configuration.create(
+        providers(Map.of("ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null))),
+        registry, tools, observations))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("model-id is an unresolved placeholder")
+        .hasMessageContaining("set the environment variable GATEWAI_MODEL_LARGE");
+  }
+
+  @Test
+  void failsOnAReferencedBaseUrlThatIsStillAnUnresolvedPlaceholder() {
+    ProviderProperties providers = providers(Map.of(
+        "ollama", entry(ProviderProperties.ProviderType.OLLAMA, null, null),
+        "vllm", entry(ProviderProperties.ProviderType.OPENAI_COMPATIBLE, null,
+            "${OPENAI_COMPATIBLE_BASE_URL}")));
+    ModelRegistry registry = registry(
+        model("ollama", "qwen2.5:0.5b", ModelTier.LOCAL),
+        model("ollama", "qwen2.5:1.5b", ModelTier.CLOUD_ENTRY),
+        model("vllm", "llama-3.3-70b", ModelTier.CLOUD_PREMIUM));
+
+    assertThatThrownBy(() -> configuration.create(providers, registry, tools, observations))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("gatewai.providers.vllm.base-url is an unresolved placeholder");
+  }
+
+  @Test
   void failsOnARegistryEntryThatClaimsTheRoutedAlias() {
     // v4 B.2: "auto" means "let gatewAI route"; an entry by that id would pin it.
     ModelRegistry registry = registry(
