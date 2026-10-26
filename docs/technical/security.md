@@ -230,7 +230,8 @@ get the same scrutiny as a dependency.
   weekly, grouped, with a **7-day cooldown** on version updates: a hijacked release is
   usually pulled within days, and a week of delay costs nothing against that.
   Security updates are not delayed (GitHub's Dependabot options reference, read
-  2026-10-24).
+  2026-10-24). `vite` and `@sveltejs/vite-plugin-svelte` come in one PR (the plugin
+  pins vite's major), and TypeScript 7 is ignored until `svelte-check` accepts it.
 - **Least privilege**: workflows default to `contents: read` (`release.yml` to
   nothing); each job asks for what it uses — only the `image` job can push packages
   and sign, only `publish` can create a release. Checkouts do not keep the token
