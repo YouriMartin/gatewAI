@@ -68,7 +68,7 @@ The full native compilation is **not** run here (no GraalVM in the dev
 environment). To verify in a dedicated CI:
 
 - **OpenPDF** (PDF export) loads fonts/resources by reflection; the native image
-  may need extra resource hints (`com/lowagie/text/pdf/fonts/**`). Otherwise PDF
+  may need extra resource hints (`org/openpdf/text/pdf/fonts/**`). Otherwise PDF
   export may fail at native runtime while JSON/CSV work.
 - **Hibernate/JPA**: `process-aot` refreshes the context → the database must be
   reachable at build time (or use a build profile without a DataSource).
