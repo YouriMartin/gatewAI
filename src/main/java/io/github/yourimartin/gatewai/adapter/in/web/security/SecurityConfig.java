@@ -14,10 +14,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.HeaderWriterFilter;
 
 @Configuration
 @Import(RateLimitConfiguration.class)
@@ -32,6 +34,17 @@ public class SecurityConfig {
       throws Exception {
     http
         .csrf(csrf -> csrf.disable())
+        // Security headers before the chain, not after it: a pass-through stream is
+        // written by its own thread as soon as the controller returns (v4 B.4), so a
+        // header written on the way back out would race that thread on the response.
+        .headers(headers -> headers.withObjectPostProcessor(
+            new ObjectPostProcessor<HeaderWriterFilter>() {
+              @Override
+              public <O extends HeaderWriterFilter> O postProcess(O filter) {
+                filter.setShouldWriteHeadersEagerly(true);
+                return filter;
+              }
+            }))
         .exceptionHandling(ex -> ex
             .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
         .addFilterBefore(
