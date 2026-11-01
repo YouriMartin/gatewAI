@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["src/**", "*.ts", "*.js", "*.json", "*.mjs"]
+    "includes": ["src/**", "scripts/**", "*.ts", "*.js", "*.json", "*.mjs"]
   },
   "formatter": {
     "enabled": true,
@@ -71,6 +71,19 @@
         "rules": {
           "style": {
             "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["scripts/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "off"
+          },
+          "style": {
+            "noProcessEnv": "off"
           }
         }
       }

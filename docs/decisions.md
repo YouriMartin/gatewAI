@@ -7,6 +7,33 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot C — C.4 (demo data and screenshots)
+
+- **Mock egress only, for now.** The roadmap takes real traffic when the maintainer
+  provides an endpoint and key; none was provided, so the committed images say
+  `Mock egress` and their tiles show what the mock gives: no price declared and
+  local models outside the emissions scope, so zero cost and "excluded from scope".
+  That is the honest picture of this run, not a staged one. `scripts/screenshots.sh`
+  takes a real preset with `GATEWAI_DEMO_PROVIDER` whenever there is one.
+- **The explanation image leaves out the decision table.** The "why this decision"
+  panel is one section: the last 20 decisions, then the explanation. Captured whole,
+  it was 3,024 px high for 1,504 wide (at 2×), mostly table. The image starts at the
+  prompt box; the table still appears in the dashboard, and the trace of the run is
+  in the script's output.
+- **Explained by prompt, not by clicking a past row.** A stored decision answers
+  `PROMPT_UNAVAILABLE` for attribution and counterfactuals (only hashes are kept), so a
+  clicked row would show the decision without the part the panel exists for. The
+  explained prompt is one the traffic sent, with two clauses so that the attribution
+  has two segments.
+- **Not planned: `GATEWAI_PORT` in `docker-compose.quickstart.yml`.** The screenshot
+  stack runs on `18080` so it does not collide with a dev instance or a user's
+  quickstart on `8080`. Default unchanged.
+- **The `playwright` library, not `@playwright/test`.** It is one capture script, not
+  a test suite; the runner would add a config file and a reporter for nothing.
+- **No CI job for the screenshots.** It would download a browser on every run, and an
+  image diff would fail on the capture date alone. The acceptance asks for one command
+  that regenerates them, not for CI to.
+
 ## v4 lot C — C.3 (quickstart on the published image)
 
 - **Presets are Spring profiles, selected by one variable.** `GATEWAI_PRESET` sets

@@ -85,6 +85,7 @@ io.github.yourimartin.gatewai
 | One test class | `./mvnw -DskipFrontend test -Dtest=FooTest` |
 | Run the app | `./mvnw spring-boot:run` (Boot starts Postgres via `compose.yaml`) |
 | Local chat egress | `docker compose --profile inference up -d` |
+| README screenshots (fresh mock stack + demo traffic) | `GATEWAI_IMAGE=gatewai:local scripts/screenshots.sh` |
 | Two-node cluster check | `docker compose -f docker-compose.cluster.yml up -d` then `scripts/cluster-smoke.sh` |
 
 **Run `./mvnw test` before every commit that touches `src/` or `pom.xml`.**
@@ -117,4 +118,4 @@ io.github.yourimartin.gatewai
   (`v4-c3-quickstart`, `fix-…`); it reaches `main` by pull request once CI is green.
 
 ## Status
-v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5–B.6 done, C.1 code done (first test tag open), C.2 done, C.3 code done (first CI run, clean-machine timing and the published image open); next: B.4 manual check and the C.1 test tag, then C.4 (docs/developpment/roadmap-v4.md)
+v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5–B.6 done, C.1 code done (first test tag open), C.2 done, C.3 code done (clean-machine timing and the published image open), C.4 done; next: B.4 manual check and the C.1 test tag, then lot D (docs/developpment/roadmap-v4.md)

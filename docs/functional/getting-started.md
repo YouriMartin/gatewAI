@@ -242,6 +242,13 @@ CSRD report downloads, and — with an **admin** key — key administration and 
 routing configuration. A full tour is in
 [`dashboard-guide.md`](dashboard-guide.md).
 
+Nothing to look at yet? From a clone, `scripts/demo-traffic.sh` sends 30 synthetic
+requests — repeats and paraphrases the cache can hit, a three-turn conversation, a
+tool call that takes the pass-through path — and prints the cache outcome and model
+of each. It targets `http://localhost:8080` with the quickstart key; set
+`GATEWAI_URL` and `GATEWAI_API_KEY` for another gateway. Against a real egress it
+sends real requests, so it costs whatever 30 small requests cost there.
+
 ## 8. Next steps
 
 - Something failed: [`troubleshooting.md`](troubleshooting.md) — every error, and how

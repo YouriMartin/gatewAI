@@ -51,6 +51,12 @@ The first published release: everything below is new to anyone pulling an image.
   commit.
 - **The three default model ids are environment variables**: `GATEWAI_MODEL_SMALL`,
   `GATEWAI_MODEL_MEDIUM`, `GATEWAI_MODEL_LARGE` (defaults unchanged).
+- **Demo traffic and reproducible screenshots**: `scripts/demo-traffic.sh` replays
+  30 synthetic requests (repeats, paraphrases, a three-turn conversation, a
+  pass-through tool call) against any running gateway; `scripts/screenshots.sh`
+  regenerates the README's dashboard pictures from it in one command, each stamped
+  with where its traffic came from and the date. `GATEWAI_PORT` moves the
+  quickstart's port off 8080.
 - **Startup refuses an unresolved placeholder** in a model id, or in the base URL or
   API key of a referenced provider instance, naming the variable to set — such a
   value used to bind as literal `${…}` text and fail on the first request.
