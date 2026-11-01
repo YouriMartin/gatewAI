@@ -1,0 +1,27 @@
+{"id":"capital-pt","kind":"chat","prompt":"What is the capital of Portugal?"}
+{"id":"capital-pt-repeat","kind":"chat","prompt":"What is the capital of Portugal?"}
+{"id":"capital-pt-paraphrase","kind":"chat","prompt":"Which city is the capital of Portugal?"}
+{"id":"greeting","kind":"chat","prompt":"Hello! How are you today?"}
+{"id":"greeting-fr","kind":"chat","prompt":"Bonjour, comment ça va aujourd'hui ?"}
+{"id":"joke","kind":"chat","prompt":"Tell me a short joke about databases"}
+{"id":"joke-repeat","kind":"chat","prompt":"Tell me a short joke about databases"}
+{"id":"translate","kind":"chat","prompt":"Translate 'see you tomorrow' into Italian"}
+{"id":"cache-summary","kind":"chat","prompt":"Summarize the benefits of a semantic cache in three bullet points"}
+{"id":"cache-summary-paraphrase","kind":"chat","prompt":"In three bullet points, summarize the benefits of a semantic cache"}
+{"id":"email-fr","kind":"chat","prompt":"Rédige un e-mail poli pour décaler la revue de sprint à jeudi"}
+{"id":"email-fr-repeat","kind":"chat","prompt":"Rédige un e-mail poli pour décaler la revue de sprint à jeudi"}
+{"id":"vector-db","kind":"chat","prompt":"Explain what a vector database is in simple terms"}
+{"id":"vector-db-paraphrase","kind":"chat","prompt":"Explain in simple words what a vector database is"}
+{"id":"product-copy","kind":"chat","prompt":"Write a short product description for a reusable water bottle"}
+{"id":"refactor","kind":"chat","prompt":"Refactor this Java service so its repository is injected through the constructor"}
+{"id":"refactor-repeat","kind":"chat","prompt":"Refactor this Java service so its repository is injected through the constructor"}
+{"id":"security-review","kind":"chat","prompt":"Review this login handler for SQL injection and other security vulnerabilities. Keep it short, please."}
+{"id":"complexity-fr","kind":"chat","prompt":"Analyse la complexité de ce tri et propose une optimisation"}
+{"id":"schema","kind":"chat","prompt":"Design a database schema for invoices in a multi-tenant SaaS application"}
+{"id":"schema-paraphrase","kind":"chat","prompt":"Design the database schema of a multi-tenant SaaS application that stores invoices"}
+{"id":"event-sourcing","kind":"chat","prompt":"Compare event sourcing and CRUD for an audit log"}
+{"id":"stack-trace","kind":"chat","prompt":"Debug this NullPointerException stack trace and explain the root cause"}
+{"id":"capital-pt-again","kind":"chat","prompt":"What is the capital of Portugal?"}
+{"id":"cache-summary-repeat","kind":"chat","prompt":"Summarize the benefits of a semantic cache in three bullet points"}
+{"id":"backup-incident","kind":"conversation","system":"You are a concise assistant for an operations team.","turns":["Our nightly backup failed with a disk-full error. What should I check first?","It was the PostgreSQL WAL directory that filled up. How do I free space safely?","Write a short postmortem summary for the team."]}
+{"id":"weather-tool","kind":"tool","prompt":"What is the weather in Lyon right now?","tools":[{"type":"function","function":{"name":"get_weather","description":"Current weather for a city","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}],"tool_result":"{\"city\":\"Lyon\",\"temperature_c\":14,\"sky\":\"overcast\"}"}

@@ -74,7 +74,15 @@ published on `127.0.0.1` only; set `GATEWAI_ADMIN_API_KEY` before exposing the p
 
 Read [limitations](docs/functional/limitations.md) before relying on the numbers.
 
-![gatewAI dashboard](docs/assets/dashboard.png)
+<!-- screenshots: written by scripts/screenshots.sh — edit that script, not this block -->
+![gatewAI dashboard: the figures after the demo traffic](docs/assets/dashboard.png)
+
+![The "why this decision" panel: one prompt from the demo set explained](docs/assets/decision-explanation.png)
+
+*Mock egress: the built-in echo answered, no model was called. Synthetic demo traffic ([`scripts/demo-traffic.jsonl`](scripts/demo-traffic.jsonl),
+30 requests), captured 2026-11-01 by `scripts/screenshots.sh` — rerun it to check
+every figure.*
+<!-- /screenshots -->
 
 ## Why gatewAI?
 

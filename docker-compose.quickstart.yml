@@ -94,7 +94,9 @@ services:
       start_period: 300s
       retries: 30
     ports:
-      - '127.0.0.1:8080:8080'
+      # GATEWAI_PORT moves it off 8080 (scripts/screenshots.sh runs its own stack
+      # on 18080, next to whatever already uses 8080).
+      - '127.0.0.1:${GATEWAI_PORT:-8080}:8080'
 
 volumes:
   pgdata:

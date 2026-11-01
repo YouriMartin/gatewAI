@@ -13,5 +13,10 @@ Scoped to `src/main/frontend/`. The root [`AGENTS.md`](../../../AGENTS.md) still
 - Charts are hand-rolled SVG (`Sparkline.svelte`) — no charting dependency.
 - A zero CO2 figure may mean "excluded from scope", not "measured zero": always render the
   `emissions_scope` / scope notes the API sends next to the number.
+- `scripts/capture-screenshots.mjs` takes the README screenshots with Playwright (a
+  devDependency: a capture tool, not shipped). Run it through the root
+  `scripts/screenshots.sh`, which starts the stack and passes its environment. A
+  dashboard change that moves the header, the "Model mix" section, `.explain-prompt` or
+  `.explanation` must keep that script working.
 - Before handing back: `npm run lint` (Biome: 2 spaces, 100 cols, organised imports) and
   `npm run check` (svelte-check).

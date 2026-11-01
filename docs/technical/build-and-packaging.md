@@ -117,6 +117,34 @@ each architecture, on native runners; only then is it tagged `:<version>` (and
 `CHANGELOG.md` section. Procedure, checks and one-time setup:
 [`../developpment/releasing.md`](../developpment/releasing.md).
 
+## Demo traffic and screenshots (v4 C.4)
+
+The README's dashboard pictures are generated, not hand-made, so every figure in
+them can be reproduced:
+
+```bash
+docker build -t gatewai:local .              # until a release publishes the image
+GATEWAI_IMAGE=gatewai:local scripts/screenshots.sh
+```
+
+`scripts/screenshots.sh` starts the quickstart compose as its own project
+(`gatewai-screenshots`, port `18080` via `GATEWAI_PORT`, fresh volume), replays
+`scripts/demo-traffic.jsonl` with `scripts/demo-traffic.sh`, captures
+`docs/assets/dashboard.png` and `docs/assets/decision-explanation.png` with
+Playwright (`src/main/frontend/scripts/capture-screenshots.mjs`, a devDependency of
+the dashboard; Chromium's headless shell is downloaded on the first run), rewrites
+the README block between the `screenshots` markers, then removes the stack.
+Locale, time zone, viewport and the explained prompt are fixed, so the mock egress
+gives the same figures on every run; only the clock times in the decision trace and
+the capture date change.
+
+The egress is the `mock` preset unless the quickstart preset variables say
+otherwise. Real traffic also needs `GATEWAI_DEMO_PROVIDER`, the provider's name as
+the caption prints it; the caption then lists the registered models too. Every
+image carries the same provenance line as the README caption, so it still says
+where it comes from once copied elsewhere. The script needs Docker, `jq` and Node
+24 (on the `PATH`, or the one `./mvnw package` leaves in `target/node`).
+
 ## Compose: four files, on purpose
 
 - **`compose.yaml`** — infra only, with Spring Boot service-connection labels.
@@ -143,7 +171,7 @@ name, and pulls its chat models from Ollama on first start.
   `openai-compatible`. It needs no `init.sql`: the vector store creates the `vector`
   extension itself (`initialize-schema=true`; the database user is the image's
   superuser). The port is published on `127.0.0.1` only, because the file sets a
-  public demo admin key. `GATEWAI_IMAGE` overrides the image — the CI job
+  public demo admin key; `GATEWAI_PORT` moves it off `8080`. `GATEWAI_IMAGE` overrides the image — the CI job
   `quickstart` sets it to the image built from the commit and runs
   `scripts/quickstart-check.sh`, which executes the README's commands as written.
 - **`docker-compose.observability.yml`** — optional Prometheus + Grafana stack (see
