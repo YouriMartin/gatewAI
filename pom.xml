@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.1</version>
+		<version>4.1.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>io.github.yourimartin</groupId>
@@ -19,7 +19,7 @@
 	<properties>
 		<revision>0.0.1-SNAPSHOT</revision>
 		<java.version>25</java.version>
-		<spring-ai.version>2.0.1</spring-ai.version>
+		<spring-ai.version>2.0.2</spring-ai.version>
 		<checkstyle.version>14.3.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 		<!-- Hugging Face commit of Xenova/paraphrase-multilingual-MiniLM-L12-v2
