@@ -210,7 +210,14 @@ SSR path, which this client-only dashboard never builds.)
 
 **When a finding does not apply.** Add an entry to an `osv-scanner.toml` ignore
 file with a reason **and an expiry date**, so a suppression cannot quietly become
-permanent. Do not disable the job.
+permanent. Do not disable the job. The file goes next to the file scanned
+(`src/main/frontend/osv-scanner.toml` for the lockfile), which is where
+osv-scanner looks for it. When the date passes the scan fails again, and the entry
+is removed or renewed with its reason checked again. That is also the route when
+there is nothing to bump to. (First case, accepted 2026-11-01 until 2027-02-01:
+`deepmerge` 4.3.1 for GHSA-gcqx-w48m-w2h4, prototype poisoning with no fixed release,
+reached only through `@sveltejs/vite-plugin-svelte` merging its own build-time
+config. It is not in the built dashboard, so not in the jar or the image.)
 
 ## Supply chain: CI and releases
 

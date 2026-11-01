@@ -1,0 +1,17 @@
+# osv-scanner exceptions for package-lock.json (read by .github/workflows/security.yml:
+# osv-scanner applies the osv-scanner.toml next to the file it scans).
+#
+# Every entry expires. When it does, the scan fails again and the entry is either
+# removed (a fix shipped) or renewed with its reason re-checked — never renewed blind.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-02-01
+reason = """
+deepmerge <= 4.3.1, prototype poisoning in mergeObject(); no fixed version exists \
+(4.3.1 is the latest, 2023). Only path: @sveltejs/vite-plugin-svelte -> deepmerge, \
+a dev dependency. The plugin calls it at build time to merge its own config \
+(svelte.config.js and inline options, both written in this repository), so no \
+attacker-controlled object reaches it; the built dashboard does not contain it, so \
+neither does the jar or the image. Accepted 2026-11-01; re-check when it expires.\
+"""
