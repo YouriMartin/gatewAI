@@ -47,7 +47,11 @@ authenticated, rate-limited, traced and accounted like any other. Both paths sha
 to know which path a request took. Since B.4 a marked request with `stream: true` is
 relayed event by event. The upstream is opened on the request thread, so a refusal is
 still an HTTP error, then relayed from a virtual thread and accounted when it ends. A
-client that goes away cancels the upstream call.
+client that goes away cancels the upstream call. That thread writes as soon as the
+controller returns, while the request thread is still on its way back out through the
+filters, so nothing may write a header there: Spring Security writes its headers
+before the chain, not after (`SecurityConfig`, `SecurityConfigTest`). Written after,
+they raced the relay on the response and could cut a stream after its first chunk.
 
 ### Accurate vs conceptual
 
