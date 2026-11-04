@@ -152,6 +152,40 @@ export async function setClientMode(
   return (await (await ensureOk(response)).json()) as ApiClientView;
 }
 
+/** One shadow client's estimated wrong-hit rate under one judge (v4 D.2). */
+export interface WrongHitView {
+  client_id: string;
+  judge_model: string | null;
+  rubric_version: string | null;
+  would_hits: number;
+  mean_answer_similarity: number | null;
+  beyond_window: number;
+  /** YES + NO: the sample size of the rate. */
+  judged: number;
+  yes: number;
+  no: number;
+  unsure: number;
+  failed: number;
+  wrong_hit_rate: number | null;
+  interval_low: number | null;
+  interval_high: number | null;
+  confidence: number;
+  /** Who judged (never a human), or why there is no rate. Always shown with it. */
+  label: string;
+}
+
+export async function listWrongHits(
+  apiKey: string,
+  from: string,
+  to: string,
+): Promise<WrongHitView[]> {
+  const params = new URLSearchParams({ from, to });
+  const response = await fetch(`/v1/admin/shadow/wrong-hits?${params.toString()}`, {
+    headers: authHeaders(apiKey),
+  });
+  return (await (await ensureOk(response)).json()) as WrongHitView[];
+}
+
 export interface SemanticRoute {
   name: string;
   tier: string;

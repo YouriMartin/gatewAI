@@ -184,6 +184,26 @@ The one write that changes the model at an unchanged tier is the failover's
 (v4 B.5): an `UPDATE` that moves a live row to the model that actually answered,
 only while the row is still on that tier, and never creates one.
 
+## `would_hit_assessment` (v4 D.2)
+
+One row per shadow would-hit: how the answer the cache would have served compares
+with the one the client received. Written off the request path by
+`AsyncDecisionRecorder`, purged with the decision tables, joined on `correlation_id`
+to the shadow request's `cache_decision` and `request_log` rows.
+
+| Column | Type | Notes |
+|---|---|---|
+| `answer_similarity` | `float8` | cosine of the two answers under the in-process embedding model; null when it could not be computed |
+| `beyond_window` | `boolean` | an answer is longer than the embedding window (128 tokens for the default model): the similarity covers its opening only |
+| `embedding_model` | `varchar(255)` | the model behind the similarity |
+| `judge_outcome` | `varchar(16)` | `NOT_SAMPLED` · `JUDGED` · `FAILED` |
+| `judge_verdict` | `varchar(16)` | `YES` · `NO` · `UNSURE` when judged, else null |
+| `judge_model_id` / `rubric_version` | `varchar` | who judged and under which rubric; null when not sampled |
+| `judge_correlation_id` | `varchar(64)` | the judge call's own `request_log` row (client `gatewai:shadow-judge`) |
+
+**No answer text.** Both answers are compared in memory and discarded; the table has
+no text column, and `WouldHitAssessmentSchemaTest` fails if one is added.
+
 ## `failover_event` (v4 B.5)
 
 One row per failed attempt of a request that was allowed to fail over inside its
@@ -398,6 +418,7 @@ startup instead of silently altering a table.
 | `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
 | `V12__failover_event.sql` | `failover_event` and its indexes (v4 B.5) |
 | `V13__split_pricing.sql` | `request_log.cost_eur`/`cost_avoided_eur` renamed `cost`/`cost_avoided`, plus `cached_prompt_tokens`, `pricing_basis`, `currency` (v4 B.6) |
+| `V15__would_hit_assessment.sql` | `would_hit_assessment` and its indexes (v4 D.2) |
 | `V14__shadow_mode.sql` | `api_client.mode` / `mode_changed_at` / `mode_changed_by`, plus `mode` on `cache_decision` and `routing_decision` (v4 D.1) |
 
 The `vector_store` table and the `vector` extension are **not** managed by

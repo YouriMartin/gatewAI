@@ -150,9 +150,21 @@ Shadow mode (v4 D.1, [ADR 0018](../technical/adr/0018-shadow-mode-serves-by-pass
 records what the cache and the router would have done for a client, while it receives
 the upstream answer of the model it names. Know what it does not do yet:
 
-- **It does not say whether a would-hit would have been right.** That is D.2's job (an
-  answer-similarity check and an optional LLM judge). Until then, a would-hit rate is
-  an upper bound on the cache's usefulness, not its accuracy.
+- **Whether a would-hit would have been right is judged by a model, not a person**
+  (v4 D.2). The wrong-hit rate comes from an LLM judge on a sample, labelled
+  `judged by <model> (rubric <version>), not by a human`. A judge has its own error
+  rate, which nothing here measures; read the interval as the uncertainty of the
+  sample, not of the judge. UNSURE verdicts, and replies the rubric does not allow
+  (read as UNSURE), are excluded from the rate and counted beside it.
+- **The judge is off by default**, because it costs a model call per sampled
+  would-hit (accounted under the client `gatewai:shadow-judge`). Without it there is
+  only the answer similarity, which says two answers *read alike*, not that the cached
+  one is right: two answers giving different numbers in the same sentence embed almost
+  identically. The embedding sees the first 128 tokens of each answer (default model);
+  `beyond_window` counts the would-hits where that cut an answer.
+- **The answer received is the reference.** The judge grades the cached answer against
+  what the model answered this time, so a would-hit is only as "wrong" as the two
+  answers differ; a model that would have answered badly both times is not caught.
 - **A shadow client must name its model.** `auto` (or no `model`) goes to
   `gatewai.passthrough.default-model`; any other unregistered name is a 400. Shadow
   never routes the client's request: that would be applying a decision.

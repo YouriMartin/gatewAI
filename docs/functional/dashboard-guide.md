@@ -75,6 +75,21 @@ Client/key administration:
 Revoking disables the key immediately. Only hashes of keys are stored, so a lost
 key cannot be recovered — create a new one.
 
+## Shadow mode: would the cache have been right? (admin only)
+
+One row per shadow client and judge, over the last 30 days (v4 D.2):
+
+- **Would-hits** — how often the cache would have answered.
+- **Answer similarity** — the mean similarity of the cached answer to the one the
+  client received; a dashed *beyond window* tag counts the answers too long for the
+  embedding to see whole.
+- **Judged** and **Wrong-hit rate (95 %)** — the share an LLM judge rejected, with
+  its interval and its sample size. Shown only when the judge is on
+  (`gatewai.shadow.judge.sample-rate`).
+- **Unsure** — verdicts excluded from the rate, plus failed judge calls.
+- **Judge** — always says which model judged under which rubric, and that it was not
+  a human.
+
 ## Routing config (admin only)
 
 Read and hot-tune the router without a restart:

@@ -7,6 +7,28 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot D — D.2 (would the cached answer have been right?)
+
+- **The assessment is its own table, not columns on `cache_decision`.** The cache
+  decision is recorded inside the cache advisor, before the replay returns; the
+  comparison happens after. Updating that row would break "decisions as persisted,
+  never rewritten", so `would_hit_assessment` holds it and joins on `correlation_id`.
+- **The judge call gets its own correlation id** in `request_log` (linked from the
+  assessment), not the shadow request's: a second `request_log` row under the same
+  id would make one request look like two.
+- **An unparseable judge reply is UNSURE**, not a separate outcome: it is no evidence
+  either way, and the rate excludes it like any UNSURE. A failed call is `FAILED`,
+  with no verdict.
+- **The judge sees the whole conversation**, not only the last turn: the cache scope
+  already guarantees the context was identical, and a turn like "and in French?" is
+  ungradable without it.
+- **The judge runs inside the shadow concurrency limit.** A slow judge holds a permit,
+  so under load it causes drops (counted) rather than unbounded work.
+- **The API is `GET /v1/admin/shadow/wrong-hits`**, admin-only; the roadmap left the
+  endpoint open, and D.4's `/v1/reports/shadow` will carry the rate into the report.
+- **The interval is Wilson 95 % only**; no configurable level, since the API states the
+  confidence on every row.
+
 ## v4 lot D — D.1 (shadow mode per client)
 
 - **An ADR the roadmap did not plan.** Serving a shadow client's plain requests by

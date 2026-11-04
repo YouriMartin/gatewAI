@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
+import io.github.yourimartin.gatewai.NoOpDecisionRecorder;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.carbon.EnergyProfile;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -462,24 +463,10 @@ class SemanticCacheScopeTest {
   }
 
   static DecisionRecorder recording(List<CacheDecision> decisions) {
-    return new DecisionRecorder() {
-      @Override
-      public void record(RoutingDecision decision) {
-        // The cache records no routing decision.
-      }
-
-      @Override
-      public void record(FailoverEvent event) {
-      }
-
+    return new NoOpDecisionRecorder() {
       @Override
       public void record(CacheDecision decision) {
         decisions.add(decision);
-      }
-
-      @Override
-      public int purgeOlderThan(java.time.Instant cutoff) {
-        return 0;
       }
     };
   }

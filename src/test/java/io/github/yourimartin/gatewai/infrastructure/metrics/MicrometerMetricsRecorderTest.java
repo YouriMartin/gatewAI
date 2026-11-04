@@ -11,6 +11,8 @@ import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeVerdict;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -94,5 +96,19 @@ class MicrometerMetricsRecorderTest {
         .tags("outcome", "would_hit").counter().count(), DELTA);
     assertEquals(1.0, registry.get("gatewai.shadow.decisions")
         .tags("outcome", "dropped").counter().count(), DELTA);
+  }
+
+  @Test
+  void countsEachWouldHitByWhatTheJudgeMadeOfIt() {
+    recorder.recordShadowJudgement(JudgeOutcome.JUDGED, JudgeVerdict.NO);
+    recorder.recordShadowJudgement(JudgeOutcome.NOT_SAMPLED, null);
+    recorder.recordShadowJudgement(JudgeOutcome.FAILED, null);
+
+    assertEquals(1.0, registry.get("gatewai.shadow.judgements")
+        .tags("outcome", "no").counter().count(), DELTA);
+    assertEquals(1.0, registry.get("gatewai.shadow.judgements")
+        .tags("outcome", "not_sampled").counter().count(), DELTA);
+    assertEquals(1.0, registry.get("gatewai.shadow.judgements")
+        .tags("outcome", "failed").counter().count(), DELTA);
   }
 }

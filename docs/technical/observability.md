@@ -134,6 +134,8 @@ pass-through, however it ends.
 |---|---|---|---|
 | `gatewai_shadow_decisions_total` | counter | `outcome` (`would_hit`/`miss`/`bypass`/`dropped`/`failed`) | what became of each shadow client's request ([ADR 0018](adr/0018-shadow-mode-serves-by-pass-through.md)) |
 
+| `gatewai_shadow_judgements_total` | counter | `outcome` (`yes`/`no`/`unsure`/`not_sampled`/`failed`) | what the LLM judge made of each would-hit (v4 D.2); `not_sampled` when it was compared by similarity only |
+
 `bypass` counts the shadow requests the cache would not have consulted, mostly the
 ones the chain cannot honour (tools, images…). `dropped` is shadow work skipped
 because `gatewai.shadow.max-concurrent` replays were already running; it leaves no
