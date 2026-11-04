@@ -8,9 +8,11 @@ import io.github.yourimartin.gatewai.domain.port.in.ManageApiClientsUseCase;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,5 +48,21 @@ class AdminClientController {
   ResponseEntity<Void> revoke(@PathVariable UUID id) {
     useCase.revoke(id);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Puts a client in {@code ENFORCE} or {@code SHADOW} (v4 D.1), from its next
+   * request on. The change is recorded with the id of the admin client making it.
+   */
+  @PutMapping("/{id}/mode")
+  ResponseEntity<ApiClientView> changeMode(@PathVariable UUID id,
+                                           @RequestBody ChangeModeRequest request,
+                                           Authentication admin) {
+    if (request == null || request.mode() == null) {
+      return ResponseEntity.badRequest().build();
+    }
+    return useCase.changeMode(id, request.mode(), admin.getName())
+        .map(client -> ResponseEntity.ok(ApiClientView.of(client)))
+        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 }

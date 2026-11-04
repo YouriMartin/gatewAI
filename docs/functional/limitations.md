@@ -144,6 +144,40 @@ What that costs:
 - **The response's `model` is the provider's name**, often a dated variant. The
   registry id is in `X-GatewAI-Model` and in `request_log`.
 
+## Shadow mode: verdicts, not yet grades
+
+Shadow mode (v4 D.1, [ADR 0018](../technical/adr/0018-shadow-mode-serves-by-pass-through.md))
+records what the cache and the router would have done for a client, while it receives
+the upstream answer of the model it names. Know what it does not do yet:
+
+- **It does not say whether a would-hit would have been right.** That is D.2's job (an
+  answer-similarity check and an optional LLM judge). Until then, a would-hit rate is
+  an upper bound on the cache's usefulness, not its accuracy.
+- **A shadow client must name its model.** `auto` (or no `model`) goes to
+  `gatewai.passthrough.default-model`; any other unregistered name is a 400. Shadow
+  never routes the client's request: that would be applying a decision.
+- **Only `/v1/chat/completions` serves a shadow client.** The async endpoint and the
+  MCP `routed_chat` tool answer `unsupported_in_shadow_mode`: they could only serve it
+  through the chain.
+- **The replay costs what the decision costs**: an in-process embedding, a vector
+  search and, when the routing strategy calls an LLM (`llm`, or the cascade's third
+  level), a classifier call. It runs off the request path, but it is not free.
+- **Under load, some requests are not evaluated.** Past `gatewai.shadow.max-concurrent`
+  concurrent replays, a replay is dropped and counted, and that request has no decision
+  row. Watch `gatewai_shadow_decisions_total{outcome="dropped"}`.
+- **No figure yet for the latency it adds.** By construction the client does not wait
+  for the replay (a test blocks the replay and the answer still arrives); on the request
+  thread shadow adds a permit, a virtual-thread start and, on a stream, one JSON parse
+  per event after the event is sent. That has not been benchmarked: E.2's overhead
+  benchmark is where the number belongs.
+- **Rapid repeats undercount would-hits.** In `ENFORCE` a miss is stored before the
+  answer returns; in shadow it is stored by the replay, after. Two identical requests
+  sent back to back can both read `MISS` (seen on the mock stack, 2026-11-04: the same
+  question twice in a row missed twice, then hit after a 3 s pause). The would-hit rate
+  is a slight underestimate for bursty repeats.
+- **The answer is read in memory and never stored by shadow itself.** On a miss the
+  cache stores it under its usual rules, which is what it would have done in `ENFORCE`.
+
 ## Failover inside a tier
 
 A tier with several registry entries fails over from one to the next on a connection

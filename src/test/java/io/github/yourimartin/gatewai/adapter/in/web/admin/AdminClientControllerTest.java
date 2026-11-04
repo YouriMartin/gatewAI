@@ -1,20 +1,25 @@
 package io.github.yourimartin.gatewai.adapter.in.web.admin;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
 import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.client.CreatedApiClient;
 import io.github.yourimartin.gatewai.domain.port.in.ManageApiClientsUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
@@ -95,6 +100,49 @@ class AdminClientControllerTest {
   @Test
   void nonAdminIsForbidden() throws Exception {
     mockMvc.perform(get("/v1/admin/clients")
+            .with(authentication(userAuth())))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void changeModeRecordsTheAdminMakingTheChange() throws Exception {
+    UUID id = UUID.randomUUID();
+    ApiClient shadow = client(false).withMode(ClientMode.SHADOW, "admin-id", Instant.now());
+    when(useCase.changeMode(eq(id), eq(ClientMode.SHADOW), any())).thenReturn(Optional.of(shadow));
+
+    mockMvc.perform(put("/v1/admin/clients/" + id + "/mode")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"SHADOW\"}")
+            .with(authentication(adminAuth())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mode").value("SHADOW"))
+        .andExpect(jsonPath("$.mode_changed_by").value("admin-id"));
+
+    verify(useCase).changeMode(id, ClientMode.SHADOW, adminAuth().getName());
+  }
+
+  @Test
+  void changeModeOfAnUnknownClientIs404AndAMissingModeIs400() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(useCase.changeMode(eq(id), any(), any())).thenReturn(Optional.empty());
+
+    mockMvc.perform(put("/v1/admin/clients/" + id + "/mode")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"ENFORCE\"}")
+            .with(authentication(adminAuth())))
+        .andExpect(status().isNotFound());
+    mockMvc.perform(put("/v1/admin/clients/" + id + "/mode")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}")
+            .with(authentication(adminAuth())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void onlyAnAdminMayChangeAMode() throws Exception {
+    mockMvc.perform(put("/v1/admin/clients/" + UUID.randomUUID() + "/mode")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"SHADOW\"}")
             .with(authentication(userAuth())))
         .andExpect(status().isForbidden());
   }

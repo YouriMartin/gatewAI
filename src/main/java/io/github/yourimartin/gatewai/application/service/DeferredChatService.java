@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.CarbonAwareZoneSelector;
 import io.github.yourimartin.gatewai.domain.model.carbon.CarbonZoneContext;
+import io.github.yourimartin.gatewai.domain.model.client.ShadowModeException;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.dispatch.DeferredJob;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -61,6 +62,7 @@ class DeferredChatService implements SubmitDeferredRequestUseCase,
   @Override
   public UUID submit(LlmRequest request) {
     // A job is replayed through the advisor chain later; refuse it now, not then.
+    ShadowModeException.refuseInShadow("An asynchronous completion");
     request.requireServableByChain();
     UUID id = UUID.randomUUID();
     DeferredJob job =

@@ -7,6 +7,37 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot D — D.1 (shadow mode per client)
+
+- **An ADR the roadmap did not plan.** Serving a shadow client's plain requests by
+  pass-through breaks the `AGENTS.md` rule that the chain is the path for every request
+  it can honour, so it is recorded as [ADR 0018](technical/adr/0018-shadow-mode-serves-by-pass-through.md)
+  and the rule is amended. D.3's calibration ADR, announced as 0018, becomes 0019.
+- **The verdict is a replay of the real chain, not a separate computation.** The
+  roadmap says the gateway "computes the cache verdict and the routing verdict". It does
+  so by running the request through the advisor chain with `ShadowReplayAdvisor` in
+  place of the model call, so the verdicts cannot drift from the code that enforces
+  them, and the cache stores the real answer exactly as it would have.
+- **One decision row per kind, not two.** A shadow request the chain could have
+  honoured records no `BYPASS`/`PASSTHROUGH_*` rows for the way it was served: its trace
+  is the replay's, stamped `SHADOW`, and the model that served it is in `request_log`.
+  A shadow request the chain cannot honour keeps its pass-through rows, stamped
+  `SHADOW`, because they are also what `ENFORCE` would have done.
+- **"Logged with the admin client id"** is both an INFO log line and two columns on the
+  client row (`mode_changed_at`, `mode_changed_by`), the last change only. No history
+  table: none of the other admin actions keeps one, and the log has every change.
+- **Not planned: refusing the async endpoint and MCP `routed_chat` for shadow clients**
+  (`unsupported_in_shadow_mode`). Both could only serve a shadow client through the
+  chain, which would apply its decisions to it. The guard sits in the use cases, so a
+  future entry point inherits it.
+- **Not planned: `X-GatewAI-Mode: SHADOW`** on a shadow client's answer, so a client
+  can see which mode served it.
+- **The latency acceptance is met by construction and by a test, not by a figure.**
+  `ShadowModeAcceptanceTest` blocks the replay and the answer still arrives; on the
+  request thread shadow adds a permit, a virtual-thread start and, on a stream, one JSON
+  parse per event after it is sent. No benchmark was run; the number belongs to E.2's
+  overhead benchmark, which measures the pass-through path anyway.
+
 ## v4 lot C — C.4 (demo data and screenshots)
 
 - **Mock egress only, for now.** The roadmap takes real traffic when the maintainer

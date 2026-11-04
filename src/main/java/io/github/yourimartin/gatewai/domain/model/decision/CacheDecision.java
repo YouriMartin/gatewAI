@@ -1,9 +1,11 @@
 package io.github.yourimartin.gatewai.domain.model.decision;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 
 /**
  * One semantic-cache decision, as taken (v2 batch 2).
@@ -44,6 +46,9 @@ import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
  *                                hash — never text — so a hit can be traced to
  *                                the context it was allowed in; null when no
  *                                scope was computed
+ * @param mode                    the mode of the client the request was decided
+ *                                for (v4 D.1): a {@code SHADOW} row is what the
+ *                                cache would have done, not what was served
  */
 public record CacheDecision(
     UUID id,
@@ -60,6 +65,11 @@ public record CacheDecision(
     String embeddingModel,
     ConformalStatus conformalStatus,
     CacheDecisionReason reason,
-    String cacheScope
+    String cacheScope,
+    ClientMode mode
 ) {
+
+  public CacheDecision {
+    Objects.requireNonNull(mode, "mode");
+  }
 }

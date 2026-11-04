@@ -1,5 +1,6 @@
 package io.github.yourimartin.gatewai.domain.port.out;
 
+import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
@@ -17,4 +18,7 @@ public interface MetricsRecorder {
    * {@link RequestLog} exists for: a client that disconnects leaves no usage to log.
    */
   void recordPassThroughStream(String model, PassThroughStreamOutcome outcome);
+
+  /** Counts what became of one shadow client's request (v4 D.1). */
+  void recordShadowDecision(ShadowOutcome outcome);
 }

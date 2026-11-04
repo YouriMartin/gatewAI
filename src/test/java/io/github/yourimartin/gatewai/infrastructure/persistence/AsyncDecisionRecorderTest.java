@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
@@ -144,13 +145,13 @@ class AsyncDecisionRecorderTest {
         ClassificationStrategy.EMBEDDING, ClassificationStrategy.EMBEDDING,
         ClassificationJustification.Heuristic.of(HeuristicRule.DEFAULT),
         DecisionReason.MATCH, ModelTier.LOCAL, "qwen2.5:0.5b", 4L, null, null,
-        null, null, null, null);
+        null, null, null, null, ClientMode.ENFORCE);
   }
 
   private static CacheDecision cacheDecision() {
     return new CacheDecision(
         UUID.randomUUID(), "corr-1", Instant.now(), "b".repeat(64),
         CacheOutcome.MISS, 0.4, 0.2, 0.92, null, null, null,
-        "nomic-embed-text", ConformalStatus.NOT_CALIBRATED, null, null);
+        "nomic-embed-text", ConformalStatus.NOT_CALIBRATED, null, null, ClientMode.ENFORCE);
   }
 }

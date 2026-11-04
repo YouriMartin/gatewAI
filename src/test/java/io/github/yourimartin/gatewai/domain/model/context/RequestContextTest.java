@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
+
 import org.junit.jupiter.api.Test;
 
 class RequestContextTest {
@@ -55,5 +57,18 @@ class RequestContextTest {
         throw new RuntimeException(e);
       }
     });
+  }
+
+  @Test
+  void theModeIsEnforceUnlessTheClientIsInShadow() {
+    assertEquals(ClientMode.ENFORCE, new RequestContext("c", "t").mode());
+    assertEquals(ClientMode.ENFORCE, RequestContext.currentMode());
+    assertFalse(RequestContext.shadow());
+
+    ScopedValue.where(RequestContext.CURRENT, new RequestContext("c", "t", ClientMode.SHADOW))
+        .run(() -> {
+          assertEquals(ClientMode.SHADOW, RequestContext.currentMode());
+          assertTrue(RequestContext.shadow());
+        });
   }
 }

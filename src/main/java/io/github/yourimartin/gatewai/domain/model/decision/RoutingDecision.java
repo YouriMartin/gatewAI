@@ -2,8 +2,10 @@ package io.github.yourimartin.gatewai.domain.model.decision;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
@@ -66,6 +68,9 @@ import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
  *                              {@code conversationRouting}
  * @param conversationFingerprint the opening's hash, null with
  *                              {@code conversationRouting}
+ * @param mode                  the mode of the client the request was decided
+ *                              for (v4 D.1): a {@code SHADOW} row is where the
+ *                              router would have sent it, not where it went
  */
 public record RoutingDecision(
     UUID id,
@@ -87,10 +92,12 @@ public record RoutingDecision(
     CascadeLevel escalatedTo,
     ConversationRouting conversationRouting,
     ModelTier classifiedTier,
-    String conversationFingerprint
+    String conversationFingerprint,
+    ClientMode mode
 ) {
 
   public RoutingDecision {
+    Objects.requireNonNull(mode, "mode");
     conformalSet = conformalSet == null ? null : List.copyOf(conformalSet);
   }
 }

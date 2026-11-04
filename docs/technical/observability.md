@@ -128,6 +128,24 @@ pass-through, however it ends.
 |---|---|---|---|
 | `gatewai_passthrough_streams_total` | counter | `model`, `outcome` (`completed`/`client_disconnected`/`upstream_failed`) | how streamed pass-through requests ended |
 
+### Shadow mode (v4 D.1)
+
+| Metric | Type | Tags | Meaning |
+|---|---|---|---|
+| `gatewai_shadow_decisions_total` | counter | `outcome` (`would_hit`/`miss`/`bypass`/`dropped`/`failed`) | what became of each shadow client's request ([ADR 0018](adr/0018-shadow-mode-serves-by-pass-through.md)) |
+
+`bypass` counts the shadow requests the cache would not have consulted, mostly the
+ones the chain cannot honour (tools, images…). `dropped` is shadow work skipped
+because `gatewai.shadow.max-concurrent` replays were already running; it leaves no
+decision row, so a rising `dropped` share means the shadow report sees less of the
+traffic than the request log. `failed` covers a replay that threw and an answer that
+could not be read back (no single text choice). Would-hit rate:
+
+```promql
+sum(rate(gatewai_shadow_decisions_total{outcome="would_hit"}[1h]))
+  / sum(rate(gatewai_shadow_decisions_total{outcome=~"would_hit|miss"}[1h]))
+```
+
 `client_disconnected` is the part of streamed pass-through traffic the green report
 cannot see. The provider billed those tokens, but their count only arrives in the
 last chunk, so no `request_log` row exists for them (ADR 0016). Read it as a ratio

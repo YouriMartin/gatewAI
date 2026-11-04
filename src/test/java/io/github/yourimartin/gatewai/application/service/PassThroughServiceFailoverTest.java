@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +46,7 @@ import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
+import io.github.yourimartin.gatewai.domain.port.out.RelayedAnswerReader;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
@@ -256,7 +258,8 @@ class PassThroughServiceFailoverTest {
   private PassThroughService service(boolean failoverPinned) {
     return new PassThroughService(client, modelRegistry, decisionRecorder, decisionMetrics,
         requestLogRepository, carbonIntensityProvider, new GreenAccountant(new CarbonCalculator(), "EUR"),
-        metricsRecorder, providerRegions, cloudRegionZones, health, "", failoverPinned);
+        metricsRecorder, providerRegions, cloudRegionZones, health,
+        mock(ShadowEvaluator.class), mock(RelayedAnswerReader.class), "", failoverPinned);
   }
 
   private static PassThroughResponse ok(ModelDefinition model) {

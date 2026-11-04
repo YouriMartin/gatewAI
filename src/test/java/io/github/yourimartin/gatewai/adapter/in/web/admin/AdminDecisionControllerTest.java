@@ -18,6 +18,7 @@ import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthenticatio
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
@@ -204,7 +205,7 @@ class AdminDecisionControllerTest {
   private static CacheDecision cache() {
     return new CacheDecision(UUID.randomUUID(), "req-1", NOW, "b".repeat(64),
         CacheOutcome.MISS, 0.71, 0.42, 0.92, null, null, null,
-        "nomic-embed-text", ConformalStatus.EMPTY_SET, null, null);
+        "nomic-embed-text", ConformalStatus.EMPTY_SET, null, null, ClientMode.ENFORCE);
   }
 
   private static RoutingDecision routing() {
@@ -213,7 +214,7 @@ class AdminDecisionControllerTest {
         ClassificationStrategy.EMBEDDING,
         new ClassificationJustification.Embedding(List.of(), 0.81, 0.12, 0.60),
         DecisionReason.MATCH, ModelTier.CLOUD_PREMIUM, "qwen3:14b", 12L,
-        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null);
+        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null, ClientMode.ENFORCE);
   }
 
   private static DecisionExplanation promptExplanation() {

@@ -50,7 +50,13 @@ export interface ApiClientView {
   enabled: boolean;
   admin: boolean;
   created_at: string;
+  /** ENFORCE, or SHADOW: served by the model it names, decisions only recorded (v4 D.1). */
+  mode: ClientMode;
+  mode_changed_at: string | null;
+  mode_changed_by: string | null;
 }
+
+export type ClientMode = 'ENFORCE' | 'SHADOW';
 
 export interface CreatedClient {
   client: ApiClientView;
@@ -131,6 +137,19 @@ export async function revokeClient(apiKey: string, id: string): Promise<void> {
     headers: authHeaders(apiKey),
   });
   await ensureOk(response);
+}
+
+export async function setClientMode(
+  apiKey: string,
+  id: string,
+  mode: ClientMode,
+): Promise<ApiClientView> {
+  const response = await fetch(`/v1/admin/clients/${id}/mode`, {
+    method: 'PUT',
+    headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+  return (await (await ensureOk(response)).json()) as ApiClientView;
 }
 
 export interface SemanticRoute {
@@ -221,6 +240,8 @@ export interface DecisionView {
   at: string;
   cache: CacheDecisionView | null;
   routing: RoutingDecisionView | null;
+  /** SHADOW: what the gateway would have done, not what it served (v4 D.1). */
+  mode: 'ENFORCE' | 'SHADOW';
 }
 
 export interface SegmentView {

@@ -63,8 +63,14 @@ Client/key administration:
 - **Create a key** — enter a client **name**, optionally tick **admin**, click
   **Create a key**. The new key is displayed **once** ("copy it, shown only
   once") — copy it immediately.
-- **Client table** — lists each client with **Name**, **Role** (admin/user) and
-  **Status** (active/revoked), plus a **Revoke** action for active clients.
+- **Client table** — lists each client with **Name**, **Role** (admin/user),
+  **Status** (active/revoked) and **Mode** (`enforce`/`shadow`), plus a **Revoke**
+  action for active clients.
+- **Shadow / Enforce** (v4 D.1) — switches an active client's mode from its next
+  request on. In `shadow` the client is served by the model it names, unchanged, and
+  the cache and the router only record what they would have done; those decisions
+  carry a dashed **shadow** tag in *Why this decision*. The change is recorded with
+  the admin key that made it.
 
 Revoking disables the key immediately. Only hashes of keys are stored, so a lost
 key cannot be recovered — create a new one.

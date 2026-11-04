@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
@@ -154,7 +155,7 @@ class MicrometerDecisionMetricsRecorderTest {
     recorder.record(new RoutingDecision(UUID.randomUUID(), "corr", Instant.now(),
         "hash", 10, null, "cfg", ClassificationStrategy.EMBEDDING, null, null,
         DecisionReason.CLIENT_PINNED, ModelTier.CLOUD_PREMIUM, "qwen2.5:3b",
-        1L, null, null, null, null, null, null));
+        1L, null, null, null, null, null, null, ClientMode.ENFORCE));
 
     assertEquals(1.0, registry.get("gatewai.routing.decisions")
         .tag("reason", "client_pinned")
@@ -236,13 +237,13 @@ class MicrometerDecisionMetricsRecorderTest {
         "hash", 42, "nomic-embed-text", "cfg", strategy,
         justification.strategy(), justification, reason, tier, "model-x", 3L,
         conformalSet, conformalSet == null ? null : 0.10, escalatedTo,
-        null, null, null);
+        null, null, null, ClientMode.ENFORCE);
   }
 
   private static CacheDecision cache(CacheOutcome outcome,
                                      ConformalStatus status, double score) {
     return new CacheDecision(UUID.randomUUID(), "corr", Instant.now(), "hash",
         outcome, score, null, 0.94, null, null, null, "nomic-embed-text",
-        status, null, null);
+        status, null, null, ClientMode.ENFORCE);
   }
 }

@@ -60,6 +60,12 @@ The first published release: everything below is new to anyone pulling an image.
 - **Startup refuses an unresolved placeholder** in a model id, or in the base URL or
   API key of a referenced provider instance, naming the variable to set — such a
   value used to bind as literal `${…}` text and fail on the first request.
+- **Shadow mode per client** (ADR 0018): an admin puts a client in `SHADOW`
+  (`PUT /v1/admin/clients/{id}/mode`, or the dashboard). Its requests get the
+  upstream answer of the model they name, unchanged (`X-GatewAI-Mode: SHADOW`), while
+  the cache and the router decide off the request path and record what they would have
+  done, stamped `SHADOW`. The cache warms up as it would in production.
+  `gatewai_shadow_decisions_total{outcome}`, `gatewai.shadow.max-concurrent`.
 
 ### Changed
 

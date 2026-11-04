@@ -87,6 +87,12 @@ the set of turns a conversation held up. `conversation_fingerprint` is the
 opening's hash, the same on every turn of one conversation. Rows written before
 `V11` hold null in all three.
 
+Both tables carry `mode` (`V14`, v4 D.1): the mode of the client the request was
+decided for. `ENFORCE` is what the gateway did; `SHADOW` is what it **would** have
+done for a shadow client, which received the upstream answer of the model it named
+([ADR 0018](adr/0018-shadow-mode-serves-by-pass-through.md)). Rows written before
+`V14` read `ENFORCE`, which is what they were.
+
 `decision_reason` ∈ `MATCH` · `AMBIGUOUS_ESCALATED` · `CLIENT_PINNED` ·
 `BELOW_THRESHOLD_FALLBACK` · `ERROR_FALLBACK` · `NO_MODEL_FOR_TIER`.
 
@@ -321,6 +327,9 @@ per client, so the table is bounded by the client count and needs no purge.
 | `enabled` | boolean | revoked = `false` |
 | `created_at` | instant | |
 | `admin` | boolean | grants `ROLE_ADMIN` |
+| `mode` | varchar(16) | `ENFORCE` (default) or `SHADOW` (v4 D.1, `V14`) |
+| `mode_changed_at` | instant | last change of `mode`; null if never changed |
+| `mode_changed_by` | varchar(64) | id of the admin client that made it; null if never changed |
 
 Lookups: by `api_key_hash` (auth), plus an `adminExists()` check used by the
 bootstrap seeding. See [`security.md`](security.md).
@@ -389,6 +398,7 @@ startup instead of silently altering a table.
 | `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
 | `V12__failover_event.sql` | `failover_event` and its indexes (v4 B.5) |
 | `V13__split_pricing.sql` | `request_log.cost_eur`/`cost_avoided_eur` renamed `cost`/`cost_avoided`, plus `cached_prompt_tokens`, `pricing_basis`, `currency` (v4 B.6) |
+| `V14__shadow_mode.sql` | `api_client.mode` / `mode_changed_at` / `mode_changed_by`, plus `mode` on `cache_decision` and `routing_decision` (v4 D.1) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

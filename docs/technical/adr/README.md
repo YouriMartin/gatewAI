@@ -23,3 +23,4 @@ part that ages well.
 | [0015](0015-conversation-sticky-routing.md) | Conversation-sticky routing: a conversation keeps its model unless a later turn needs a higher tier | Accepted |
 | [0016](0016-pass-through-what-the-chain-cannot-honour.md) | Pass through what the advisor chain cannot honour: one registered model, the original body, still traced and accounted | Accepted |
 | [0017](0017-ordered-failover-inside-a-tier.md) | Ordered failover inside a tier: the entries of one tier, in a declared order, before the first byte; the gateway is the only retry layer | Accepted |
+| [0018](0018-shadow-mode-serves-by-pass-through.md) | Shadow mode: a shadow client is served by pass-through, and the chain decides by replaying the answer it received | Accepted |

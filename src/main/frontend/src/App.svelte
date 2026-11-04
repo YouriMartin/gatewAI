@@ -15,6 +15,7 @@ import {
   listDecisions,
   type RoutingConfig,
   revokeClient,
+  setClientMode,
   updateRoutingConfig,
 } from './lib/api';
 import Sparkline from './lib/Sparkline.svelte';
@@ -293,6 +294,15 @@ async function create() {
   }
 }
 
+async function toggleMode(client: ApiClientView) {
+  try {
+    await setClientMode(apiKey, client.id, client.mode === 'SHADOW' ? 'ENFORCE' : 'SHADOW');
+    await loadClients();
+  } catch (e) {
+    adminError = message(e);
+  }
+}
+
 async function revoke(id: string) {
   try {
     await revokeClient(apiKey, id);
@@ -513,7 +523,14 @@ async function revoke(id: string) {
               >
                 <td>{clockTime(decision.at)}</td>
                 <td><code>{shortId(decision.correlationId)}</code></td>
-                <td>{decision.cache?.outcome ?? '—'}</td>
+                <td>
+                  {decision.cache?.outcome ?? '—'}
+                  {#if decision.mode === 'SHADOW'}
+                    <span class="tag" title="Would have been: the client was served unchanged">
+                      shadow
+                    </span>
+                  {/if}
+                </td>
                 <td>{decision.routing?.chosenTier ?? 'served from cache'}</td>
                 <td>{decision.routing?.decisionReason ?? '—'}</td>
                 <td>{num(decision.routing?.confidence?.margin ?? null)}</td>
@@ -670,7 +687,7 @@ async function revoke(id: string) {
       {#if clients.length > 0}
         <table>
           <thead>
-            <tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr>
+            <tr><th>Name</th><th>Role</th><th>Status</th><th>Mode</th><th></th></tr>
           </thead>
           <tbody>
             {#each clients as client (client.id)}
@@ -678,6 +695,16 @@ async function revoke(id: string) {
                 <td>{client.name}</td>
                 <td>{client.admin ? 'admin' : 'user'}</td>
                 <td>{client.enabled ? 'active' : 'revoked'}</td>
+                <td title={client.mode === 'SHADOW'
+                  ? 'Served by the model it names; cache and routing decisions recorded, not applied'
+                  : 'Cache and routing applied'}>
+                  {client.mode.toLowerCase()}
+                  {#if client.enabled}
+                    <button class="link" onclick={() => toggleMode(client)}>
+                      {client.mode === 'SHADOW' ? 'Enforce' : 'Shadow'}
+                    </button>
+                  {/if}
+                </td>
                 <td>
                   {#if client.enabled}
                     <button class="link" onclick={() => revoke(client.id)}>

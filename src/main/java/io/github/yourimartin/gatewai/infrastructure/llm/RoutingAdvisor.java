@@ -335,7 +335,8 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           escalatedTo(justification),
           placement.routing(),
           placement.classifiedTier(),
-          placement.fingerprint()));
+          placement.fingerprint(),
+          RequestContext.currentMode()));
     } catch (RuntimeException e) {
       LOG.warn("Could not build routing decision: {}", e.toString());
     }
@@ -367,12 +368,9 @@ class RoutingAdvisor implements CallAdvisor, StreamAdvisor {
           pinned.tier(),
           pinned.modelId(),
           latencyMs,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null));
+          // No conformal set, alpha, escalation or conversation: nothing was classified.
+          null, null, null, null, null, null,
+          RequestContext.currentMode()));
     } catch (RuntimeException e) {
       LOG.warn("Could not build pinned routing decision: {}", e.toString());
     }

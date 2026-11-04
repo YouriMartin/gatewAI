@@ -495,7 +495,7 @@ been wrong. It also closes the loop `conformal-calibration.md` leaves open: labe
 come from production traffic, so the calibration is exchangeable with it. Depends on B.3,
 B.4 and B.6.
 
-## D.1 — Shadow mode per client
+## D.1 — Shadow mode per client — ✅ done (ADR 0018)
 
 - `api_client` gains a mode: `ENFORCE` (default, today's behaviour) | `SHADOW` (new
   migration); admin API and dashboard toggle; a mode change is logged with the admin
@@ -539,7 +539,7 @@ B.4 and B.6.
 
 ## D.3 — Calibrate on production-labelled cases
 
-**Decision to record (ADR 0018).**
+**Decision to record (ADR 0019** — 0018 went to D.1's shadow path**).**
 
 - `POST /v1/admin/calibration` accepts `source=shadow` (judge-labelled would-hits, for one
   client or all) next to the shipped hand-labelled set. The conformal machinery is

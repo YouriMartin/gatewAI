@@ -11,6 +11,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
+import io.github.yourimartin.gatewai.domain.model.llm.RelayedAnswer;
 import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import io.github.yourimartin.gatewai.domain.model.routing.RequestEmbeddingMemo;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
@@ -47,6 +48,22 @@ class SpringAiLlmClient implements LlmClient {
             .chatResponse()),
         "ChatResponse must not be null");
 
+    return toLlmResponse(chatResponse);
+  }
+
+  /**
+   * The blocking path, with the answer handed to {@link ShadowReplayAdvisor}
+   * through the chain's context (v4 D.1): the advisors above it see an ordinary
+   * call, and no model is called.
+   */
+  @Override
+  public LlmResponse replay(LlmRequest request, RelayedAnswer answer) {
+    ChatResponse chatResponse = Objects.requireNonNull(
+        RequestEmbeddingMemo.callWith(() -> prompt(request)
+            .advisors(advisors -> advisors.param(ShadowReplayAdvisor.REPLAY_KEY, answer))
+            .call()
+            .chatResponse()),
+        "ChatResponse must not be null");
     return toLlmResponse(chatResponse);
   }
 

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
@@ -82,5 +83,16 @@ class MicrometerMetricsRecorderTest {
         .tags("model", "gpt-5", "outcome", "completed").counter().count(), DELTA);
     assertEquals(1.0, registry.get("gatewai.passthrough.streams")
         .tags("model", "gpt-5", "outcome", "client_disconnected").counter().count(), DELTA);
+  }
+
+  @Test
+  void countsWhatBecameOfEachShadowRequest() {
+    recorder.recordShadowDecision(ShadowOutcome.WOULD_HIT);
+    recorder.recordShadowDecision(ShadowOutcome.DROPPED);
+
+    assertEquals(1.0, registry.get("gatewai.shadow.decisions")
+        .tags("outcome", "would_hit").counter().count(), DELTA);
+    assertEquals(1.0, registry.get("gatewai.shadow.decisions")
+        .tags("outcome", "dropped").counter().count(), DELTA);
   }
 }
