@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,5 +73,14 @@ class JpaApiClientAdapterTest {
 
     assertTrue(adapter.adminExists());
     verify(jpaRepository).existsByAdminTrue();
+  }
+
+  @Test
+  void theModeAndWhoChangedItSurviveTheEntity() {
+    Instant changedAt = Instant.parse("2026-11-04T10:00:00Z");
+    ApiClient client = new ApiClient(UUID.randomUUID(), "shadow-app", "c".repeat(64), true,
+        Instant.now(), false).withMode(ClientMode.SHADOW, "admin-1", changedAt);
+
+    assertEquals(client, new ApiClientEntity(client).toDomain());
   }
 }

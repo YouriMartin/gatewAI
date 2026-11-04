@@ -16,6 +16,7 @@ import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
@@ -169,13 +170,13 @@ class DecisionExplanationServiceTest {
         ClassificationStrategy.EMBEDDING, ClassificationStrategy.EMBEDDING,
         new ClassificationJustification.Embedding(List.of(), 0.81, 0.12, 0.60),
         DecisionReason.MATCH, ModelTier.CLOUD_PREMIUM, "qwen3:14b", 12L,
-        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null);
+        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null, ClientMode.ENFORCE);
   }
 
   private static CacheDecision cacheHit() {
     return new CacheDecision(UUID.randomUUID(), "req-2", NOW, "b".repeat(64),
         CacheOutcome.HIT, 0.97, 0.42, 0.92, "entry-1", 30L, "origin-1",
-        "nomic-embed-text", ConformalStatus.SINGLETON, null, null);
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE);
   }
 
   private static final class StubHistory implements DecisionHistory {

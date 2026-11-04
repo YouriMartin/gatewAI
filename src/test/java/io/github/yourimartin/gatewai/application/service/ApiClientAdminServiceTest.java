@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.application.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
 import io.github.yourimartin.gatewai.domain.model.client.ApiKeyHasher;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.client.CreatedApiClient;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
@@ -96,5 +98,51 @@ class ApiClientAdminServiceTest {
     service.revoke(id);
 
     verify(repository, never()).save(any());
+  }
+
+  @Test
+  void changeModeRecordsWhoChangedItAndWhen() {
+    UUID id = UUID.randomUUID();
+    when(repository.findById(id)).thenReturn(Optional.of(
+        new ApiClient(id, "a", "h", true, Instant.now(), false)));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    ApiClient changed = service.changeMode(id, ClientMode.SHADOW, "admin-1").orElseThrow();
+
+    assertEquals(ClientMode.SHADOW, changed.mode());
+    assertEquals("admin-1", changed.modeChangedBy());
+    assertNotNull(changed.modeChangedAt());
+    verify(repository).save(changed);
+  }
+
+  @Test
+  void changeModeToTheCurrentModeRecordsNothing() {
+    UUID id = UUID.randomUUID();
+    ApiClient client = new ApiClient(id, "a", "h", true, Instant.now(), false);
+    when(repository.findById(id)).thenReturn(Optional.of(client));
+
+    assertEquals(Optional.of(client), service.changeMode(id, ClientMode.ENFORCE, "admin-1"));
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void changeModeOfAnUnknownClientIsEmpty() {
+    UUID id = UUID.randomUUID();
+    when(repository.findById(id)).thenReturn(Optional.empty());
+
+    assertEquals(Optional.empty(), service.changeMode(id, ClientMode.SHADOW, "admin-1"));
+  }
+
+  @Test
+  void revokeKeepsTheMode() {
+    UUID id = UUID.randomUUID();
+    ApiClient shadow = new ApiClient(id, "a", "h", true, Instant.now(), false)
+        .withMode(ClientMode.SHADOW, "admin-1", Instant.now());
+    when(repository.findById(id)).thenReturn(Optional.of(shadow));
+
+    service.revoke(id);
+
+    verify(repository).save(shadow.revoked());
+    assertEquals(ClientMode.SHADOW, shadow.revoked().mode());
   }
 }

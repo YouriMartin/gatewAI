@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
@@ -68,6 +69,10 @@ class CacheDecisionEntity {
   @Column(name = "cache_scope", updatable = false, length = 64)
   private String cacheScope;
 
+  @Enumerated(EnumType.STRING)
+  @Column(updatable = false, nullable = false, length = 16)
+  private ClientMode mode;
+
   protected CacheDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -88,6 +93,7 @@ class CacheDecisionEntity {
     this.conformalStatus = decision.conformalStatus();
     this.reason = decision.reason();
     this.cacheScope = decision.cacheScope();
+    this.mode = decision.mode();
   }
 
   CacheDecision toDomain() {
@@ -95,6 +101,6 @@ class CacheDecisionEntity {
         id, correlationId, createdAt, promptHash, outcome,
         similarityScore, runnerUpScore, threshold,
         matchedEntryId, matchedEntryAgeSeconds, originCorrelationId,
-        embeddingModel, conformalStatus, reason, cacheScope);
+        embeddingModel, conformalStatus, reason, cacheScope, mode);
   }
 }

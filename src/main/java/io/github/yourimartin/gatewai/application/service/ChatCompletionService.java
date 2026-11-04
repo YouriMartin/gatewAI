@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.carbon.ResolvedCarbonZone;
+import io.github.yourimartin.gatewai.domain.model.client.ShadowModeException;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
@@ -46,6 +47,8 @@ class ChatCompletionService
 
   @Override
   public LlmResponse complete(LlmRequest request) {
+    // The chain applies its decisions: never to a shadow client (v4 D.1).
+    ShadowModeException.refuseInShadow("A completion served by the advisor chain");
     request.requireServableByChain();
     long startNanos = System.nanoTime();
 
@@ -67,6 +70,7 @@ class ChatCompletionService
    */
   @Override
   public void streamComplete(LlmRequest request, Consumer<LlmStreamChunk> onChunk) {
+    ShadowModeException.refuseInShadow("A completion served by the advisor chain");
     request.requireServableByChain();
     long startNanos = System.nanoTime();
     String clientId = RequestAccounting.clientId();

@@ -69,7 +69,8 @@ class CacheDecisionTracer {
           embeddingModel(),
           conformalStatus,
           reason,
-          scope));
+          scope,
+          RequestContext.currentMode()));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }
@@ -99,7 +100,8 @@ class CacheDecisionTracer {
           embeddingModel(),
           null,
           reason,
-          scope));
+          scope,
+          RequestContext.currentMode()));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }

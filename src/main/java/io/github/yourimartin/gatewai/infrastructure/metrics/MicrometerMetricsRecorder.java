@@ -4,6 +4,7 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
@@ -70,6 +71,13 @@ class MicrometerMetricsRecorder implements MetricsRecorder {
   public void recordPassThroughStream(String model, PassThroughStreamOutcome outcome) {
     registry.counter("gatewai.passthrough.streams",
         "model", model == null ? "unknown" : model,
+        "outcome", outcome.name().toLowerCase(Locale.ROOT)).increment();
+  }
+
+  /** {@code gatewai_shadow_decisions_total{outcome}} (v4 D.1). */
+  @Override
+  public void recordShadowDecision(ShadowOutcome outcome) {
+    registry.counter("gatewai.shadow.decisions",
         "outcome", outcome.name().toLowerCase(Locale.ROOT)).increment();
   }
 }

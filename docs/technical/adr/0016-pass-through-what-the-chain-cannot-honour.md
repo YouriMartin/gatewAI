@@ -4,7 +4,9 @@
 and the "one processing chain" rule of `AGENTS.md`. Amended by
 [ADR 0017](0017-ordered-failover-inside-a-tier.md) (v4 B.5): a request sent to the
 default model fails over inside its tier, and the target instance's `read-timeout`
-replaces `gatewai.passthrough.timeout`.
+replaces `gatewai.passthrough.timeout`. Amended by
+[ADR 0018](0018-shadow-mode-serves-by-pass-through.md) (v4 D.1): a shadow client's
+requests take this path even when the chain could honour them.
 
 ## Context
 

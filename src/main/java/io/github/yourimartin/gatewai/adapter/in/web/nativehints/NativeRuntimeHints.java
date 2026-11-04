@@ -4,6 +4,7 @@ import java.util.List;
 
 import io.github.yourimartin.gatewai.adapter.in.web.admin.ApiClientView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.CalibrationView;
+import io.github.yourimartin.gatewai.adapter.in.web.admin.ChangeModeRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.CreateClientRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.CreatedClientView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.DecisionView;
@@ -57,6 +58,7 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       ApiClientView.class,
       CreatedClientView.class,
       CreateClientRequest.class,
+      ChangeModeRequest.class,
       RoutingConfigView.class,
       RoutingConfigView.RouteView.class,
       CalibrationView.class,

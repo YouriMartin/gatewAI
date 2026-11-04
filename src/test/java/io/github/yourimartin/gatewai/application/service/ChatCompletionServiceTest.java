@@ -21,6 +21,8 @@ import java.util.List;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
+import io.github.yourimartin.gatewai.domain.model.client.ShadowModeException;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -213,5 +215,19 @@ class ChatCompletionServiceTest {
     assertThrows(UnsupportedFeatureException.class,
         () -> service.streamComplete(request, chunk -> { }));
     verifyNoInteractions(llmClient, requestLogRepository);
+  }
+
+  @Test
+  void theChainNeverServesAShadowClient() {
+    LlmRequest request = new LlmRequest("auto",
+        java.util.List.of(new LlmMessage("user", "Hi")), null, null);
+    RequestContext shadow = new RequestContext("tenant-7", "trace", ClientMode.SHADOW);
+
+    assertThrows(ShadowModeException.class, () ->
+        ScopedValue.where(RequestContext.CURRENT, shadow).run(() -> service.complete(request)));
+    assertThrows(ShadowModeException.class, () ->
+        ScopedValue.where(RequestContext.CURRENT, shadow)
+            .run(() -> service.streamComplete(request, chunk -> { })));
+    verifyNoInteractions(llmClient);
   }
 }

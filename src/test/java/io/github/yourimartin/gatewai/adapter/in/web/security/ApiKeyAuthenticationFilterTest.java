@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.client.ApiClient;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
@@ -181,5 +182,21 @@ class ApiKeyAuthenticationFilterTest {
 
     assertEquals(64, hash.length());
     assertEquals(hash, ApiKeyAuthenticationFilter.hashApiKey("test-key"));
+  }
+
+  @Test
+  void bindsTheClientsModeSoEveryDecisionCanBeStampedWithIt() throws Exception {
+    String rawKey = "sk-shadow-key";
+    String keyHash = ApiKeyAuthenticationFilter.hashApiKey(rawKey);
+    ApiClient client = new ApiClient(UUID.randomUUID(), "shadow-app", keyHash, true,
+        Instant.now(), false).withMode(ClientMode.SHADOW, "admin-1", Instant.now());
+    when(apiClientRepository.findByApiKeyHash(keyHash)).thenReturn(Optional.of(client));
+    request.addHeader("Authorization", "Bearer " + rawKey);
+
+    var mode = new ClientMode[]{null};
+    filter.doFilterInternal(request, response,
+        (ServletRequest req, ServletResponse res) -> mode[0] = RequestContext.currentMode());
+
+    assertEquals(ClientMode.SHADOW, mode[0]);
   }
 }

@@ -43,6 +43,12 @@ public class ChatCompletionController {
   /** {@code X-GatewAI-Cache} on a pass-through answer: the cache was never consulted. */
   static final String BYPASS = "BYPASS";
 
+  /**
+   * {@code SHADOW} on a shadow client's answer (v4 D.1): the upstream answer of the
+   * model the request named, unchanged. Absent in {@code ENFORCE}.
+   */
+  static final String MODE_HEADER = "X-GatewAI-Mode";
+
   private final ChatCompletionUseCase useCase;
   private final StreamChatCompletionUseCase streamUseCase;
   private final PassThroughUseCase passThroughUseCase;
@@ -68,6 +74,11 @@ public class ChatCompletionController {
     ChatCompletionRequest request = read(body);
     LlmRequest llmRequest = OpenAiMapper.toLlmRequest(request);
     boolean stream = Boolean.TRUE.equals(request.stream());
+    if (RequestContext.shadow()) {
+      // Served as the client wrote it; the chain decides off the request path (v4 D.1).
+      PassThroughRequest shadow = PassThroughRequest.shadow(llmRequest, body.toString());
+      return stream ? streamPassThrough(shadow) : passThrough(shadow);
+    }
     if (llmRequest.needsPassThrough()) {
       PassThroughRequest passThrough = new PassThroughRequest(llmRequest, body.toString());
       return stream ? streamPassThrough(passThrough) : passThrough(passThrough);
@@ -89,7 +100,7 @@ public class ChatCompletionController {
   /** The upstream's status and body, as they came (ADR 0016). */
   private ResponseEntity<String> passThrough(PassThroughRequest passThrough) {
     PassThroughResponse answer = passThroughUseCase.forward(passThrough);
-    return ResponseEntity.status(answer.status())
+    return withMode(ResponseEntity.status(answer.status()), passThrough)
         .contentType(MediaType.APPLICATION_JSON)
         .header(CACHE_HEADER, BYPASS)
         .header(MODEL_HEADER, answer.model())
@@ -127,10 +138,15 @@ public class ChatCompletionController {
         ? task
         : () -> ScopedValue.where(RequestContext.CURRENT, context).run(task));
 
-    return ResponseEntity.ok()
+    return withMode(ResponseEntity.ok(), passThrough)
         .header(CACHE_HEADER, BYPASS)
         .header(MODEL_HEADER, upstream.model())
         .body(emitter);
+  }
+
+  private static ResponseEntity.BodyBuilder withMode(ResponseEntity.BodyBuilder response,
+                                                     PassThroughRequest passThrough) {
+    return passThrough.shadow() ? response.header(MODE_HEADER, "SHADOW") : response;
   }
 
   /** One upstream event, as it came; a failed write means the client is gone. */

@@ -40,6 +40,10 @@ Non-negotiable:
   **pass-through** path: one registered model, the original body, still rate-limited,
   traced and accounted, and never classified or cached (ADR 0016). Never serve a marked
   request on the chain with its features dropped.
+- A **shadow** client (ADR 0018) is the one exception: every request it sends is served by
+  pass-through to the model it names, unchanged, and the chain only *replays* it off the
+  request path, recording decisions stamped `SHADOW`. Never apply a chain decision to a
+  shadow client.
 - **Ingress** (the OpenAI format clients speak) and **egress** (the provider called) are independent.
 - Egress is **provider-agnostic and local-first**: providers are declared under
   `gatewai.providers.<name>` (anthropic | openai | openai-compatible | ollama); the model
@@ -118,4 +122,4 @@ io.github.yourimartin.gatewai
   (`v4-c3-quickstart`, `fix-…`); it reaches `main` by pull request once CI is green.
 
 ## Status
-v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5–B.6 done, C.1 code done (first test tag open), C.2 done, C.3 code done (clean-machine timing and the published image open), C.4 done; next: B.4 manual check and the C.1 test tag, then lot D (docs/developpment/roadmap-v4.md)
+v4 in progress — lot A done (A.1–A.3), B.1–B.3 done, B.4 code done (manual coding-agent check open), B.5–B.6 done, C.1 code done (first test tag open), C.2 done, C.3 code done (clean-machine timing and the published image open), C.4 done, D.1 done; next: B.4 manual check and the C.1 test tag (maintainer), D.2 (docs/developpment/roadmap-v4.md)

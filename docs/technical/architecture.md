@@ -33,6 +33,14 @@ Marked request (B.1: tools, non-text parts, response_format, n > 1, logprobs, lo
             → the provider's OpenAI-format endpoint (no advisor, no Spring AI)
       → same green accounting → persist RequestLog → record metrics
    ← upstream status + body, as sent (errors → OpenAI envelope, upstream body never relayed)
+
+Shadow client (v4 D.1, ADR 0018), any request
+   → PassThroughService: the model it names (registry id, or auto → default), never a guess
+   ← upstream answer, unchanged (X-GatewAI-Mode: SHADOW)
+   → then, off the request path, bounded (ShadowEvaluator, virtual thread):
+      LlmClient.replay(...) ── the same advisor chain, SHADOW context:
+         → SemanticCache → Routing → [Advisor] ShadowReplay (answers with the relayed answer)
+      → cache_decision / routing_decision stamped mode = SHADOW; a miss stores the real answer
 ```
 
 ### Two paths, one switch
@@ -52,6 +60,21 @@ controller returns, while the request thread is still on its way back out throug
 filters, so nothing may write a header there: Spring Security writes its headers
 before the chain, not after (`SecurityConfig`, `SecurityConfigTest`). Written after,
 they raced the relay on the response and could cut a stream after its first chunk.
+
+### Shadow mode: serve unchanged, decide by replay
+
+A client in `SHADOW` mode ([ADR 0018](adr/0018-shadow-mode-serves-by-pass-through.md))
+is served by the pass-through path for **every** request, to the model it names, so
+it receives the upstream's bytes unchanged. Once the answer is relayed,
+`ShadowEvaluator` replays the request through the real advisor chain on a virtual
+thread, with `ShadowReplayAdvisor` standing where the model call would be and answering
+with what the client received. The cache and the router decide and record exactly as
+they would in `ENFORCE`, stamped `SHADOW` by the request's context, and a miss stores
+the real answer, so the cache warms up as it would in production. At most
+`gatewai.shadow.max-concurrent` replays run at once; past that one is dropped and
+counted (`gatewai_shadow_decisions_total{outcome="dropped"}`), never queued. The
+async endpoint and the MCP `routed_chat` tool refuse a shadow client
+(`ShadowModeException`), because they could only serve it through the chain.
 
 ### Accurate vs conceptual
 

@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
@@ -180,7 +181,7 @@ class JpaDecisionHistoryTest {
         ClassificationStrategy.EMBEDDING, ClassificationStrategy.EMBEDDING,
         new ClassificationJustification.Embedding(List.of(), 0.81, 0.12, 0.60),
         DecisionReason.MATCH, ModelTier.CLOUD_PREMIUM, "qwen3:14b", 12L,
-        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null));
+        List.of(ModelTier.CLOUD_PREMIUM), 0.05, null, null, null, null, ClientMode.ENFORCE));
   }
 
   private static CacheDecisionEntity cacheEntity(String correlationId,
@@ -192,6 +193,6 @@ class JpaDecisionHistoryTest {
         outcome == CacheOutcome.HIT ? "entry-1" : null,
         outcome == CacheOutcome.HIT ? 120L : null,
         outcome == CacheOutcome.HIT ? "origin-1" : null,
-        "nomic-embed-text", ConformalStatus.SINGLETON, null, null));
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE));
   }
 }

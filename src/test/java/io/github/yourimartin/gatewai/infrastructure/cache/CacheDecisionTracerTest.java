@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
@@ -129,6 +130,19 @@ class CacheDecisionTracerTest {
         .run(() -> tracer.decided("q", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED, null, "scope"));
 
     assertEquals("corr-42", captured().correlationId());
+  }
+
+  @Test
+  void carriesTheModeOfTheClientBeingServed() {
+    tracer.decided("q", List.of(), null, 0.92, ConformalStatus.NOT_CALIBRATED, null, "scope");
+    assertEquals(ClientMode.ENFORCE, captured().mode());
+
+    ScopedValue.where(RequestContext.CURRENT,
+        new RequestContext("client-1", "corr-42", ClientMode.SHADOW))
+        .run(() -> tracer.bypassed("q", CacheDecisionReason.EMPTY_PROMPT, null));
+    ArgumentCaptor<CacheDecision> all = ArgumentCaptor.forClass(CacheDecision.class);
+    verify(recorder, org.mockito.Mockito.times(2)).record(all.capture());
+    assertEquals(ClientMode.SHADOW, all.getAllValues().get(1).mode());
   }
 
   @Test

@@ -154,6 +154,14 @@ Response headers (non-streaming):
 | `X-Request-Id` | the correlation id — the key of the decision API and the carbon record |
 | `X-GatewAI-Cache` | `HIT`, `MISS` or `BYPASS` — what the semantic cache did (v4 A.2); always `BYPASS` on pass-through |
 | `X-GatewAI-Model` | the model that produced the answer; on a hit, the one that produced it first; on pass-through, the registry id it was forwarded to |
+| `X-GatewAI-Mode` | `SHADOW` on a shadow client's answer (v4 D.1): the upstream answer of the model the request named, unchanged. Absent otherwise |
+
+**Shadow clients (v4 D.1).** A client in `SHADOW` mode is always served by the
+pass-through path, to the model it names: a registry id, or `auto` (or no `model`) for
+`gatewai.passthrough.default-model`. Any other name is a `400 unknown_model`: shadow
+never picks a model for the client. `X-GatewAI-Cache` is then `BYPASS`, since the cache
+served nothing; what it *would* have done is in the decision API, with `"mode":
+"SHADOW"` ([ADR 0018](adr/0018-shadow-mode-serves-by-pass-through.md)).
 
 Streaming responses from the chain carry `X-Request-Id` only: headers leave before
 the cache outcome is known to the client-facing layer, so a streaming caller reads
@@ -174,6 +182,7 @@ client SDKs parse them like any other OpenAI error:
 |---|---|---|
 | `400` | `invalid_request_error` | Malformed JSON, a body that is not the Chat Completions shape, or missing/empty `messages` |
 | `400` | `invalid_request_error`, code `unsupported_feature` | A marked request on a path or a target that cannot honour it (above) |
+| `400` | `invalid_request_error`, code `unsupported_in_shadow_mode` | A shadow client asked for an asynchronous completion (`/v1/chat/completions/async`); the MCP `routed_chat` tool refuses it the same way |
 | `400` | `invalid_request_error`, code `upstream_rejected` | The upstream answered 400, 413 or 422 (pass-through, and the chain since v4 B.5). The message names the status |
 | `401` | — | Missing/invalid API key (Spring Security entry point, no body) |
 | `429` | — | Rate limit exceeded (`Retry-After` header) |
@@ -344,8 +353,15 @@ Body: `{"name": "my-app", "admin": false}`. Returns **`201`** with
 `api_key` is shown **once**.
 
 ### `GET /v1/admin/clients`
-Returns `[ApiClientView]` (`id, name, enabled, admin, created_at`) — never the key
-or its hash.
+Returns `[ApiClientView]` (`id, name, enabled, admin, created_at, mode,
+mode_changed_at, mode_changed_by`) — never the key or its hash.
+
+### `PUT /v1/admin/clients/{id}/mode`
+Body: `{"mode": "SHADOW"}` or `{"mode": "ENFORCE"}` (v4 D.1). Takes effect on the
+client's next request. Returns **`200`** with the `ApiClientView`, whose
+`mode_changed_by` is the id of the admin client that made the change (also logged at
+INFO); **`404`** for an unknown id, **`400`** without a `mode`. Setting the mode a
+client already has changes nothing, and records nothing.
 
 ### `POST /v1/admin/clients/{id}/revoke`
 Revokes the client. Returns **`204 No Content`**.

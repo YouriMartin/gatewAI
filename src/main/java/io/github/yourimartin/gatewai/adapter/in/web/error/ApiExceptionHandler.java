@@ -1,6 +1,7 @@
 package io.github.yourimartin.gatewai.adapter.in.web.error;
 
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionController;
+import io.github.yourimartin.gatewai.domain.model.client.ShadowModeException;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
 import io.github.yourimartin.gatewai.domain.model.llm.UnsupportedFeatureException;
 import io.github.yourimartin.gatewai.domain.model.llm.UpstreamFailureException;
@@ -85,7 +86,14 @@ class ApiExceptionHandler {
     };
   }
 
-  /** Semantically invalid request (e.g. missing {@code messages}). */
+  /** A shadow client asked for something only the advisor chain serves (v4 D.1). */
+  @ExceptionHandler(ShadowModeException.class)
+  ResponseEntity<ApiError> handleShadowMode(ShadowModeException e) {
+    return build(HttpStatus.BAD_REQUEST, e.getMessage(), INVALID_REQUEST,
+        "unsupported_in_shadow_mode");
+  }
+
+    /** Semantically invalid request (e.g. missing {@code messages}). */
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<ApiError> handleInvalid(IllegalArgumentException e) {
     LOG.warn("Invalid request on /v1/chat/completions: {}{}", e.getMessage(),

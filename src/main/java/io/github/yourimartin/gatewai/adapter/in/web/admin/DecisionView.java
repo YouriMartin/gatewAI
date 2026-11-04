@@ -23,13 +23,16 @@ import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
  * @param at            when the request was decided
  * @param cache         the cache decision, null when none was recorded
  * @param routing       the routing decision, null on a cache hit
+ * @param mode          ENFORCE, or SHADOW when these are what the gateway would
+ *                      have done for a shadow client, not what it served (v4 D.1)
  */
 public record DecisionView(String correlationId, Instant at, Cache cache,
-                    Routing routing) {
+                    Routing routing, String mode) {
 
   static DecisionView of(TracedDecision decision) {
     return new DecisionView(decision.correlationId(), decision.at(),
-        Cache.of(decision.cache()), Routing.of(decision.routing()));
+        Cache.of(decision.cache()), Routing.of(decision.routing()),
+        name(decision.cache() != null ? decision.cache().mode() : decision.routing().mode()));
   }
 
   /**

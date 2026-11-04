@@ -46,6 +46,7 @@ import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
@@ -101,9 +102,9 @@ class PassThroughAcceptanceTest {
   @ComponentScan(basePackages = "io.github.yourimartin.gatewai.application.service",
       useDefaultFilters = false,
       includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-          pattern = ".*\\.PassThroughService"))
-  @Import({OpenAiFormatPassThroughClient.class, PropertiesModelRegistry.class,
-      InMemoryEgressHealth.class})
+          pattern = ".*\\.(PassThroughService|ShadowEvaluator)"))
+  @Import({OpenAiFormatPassThroughClient.class, OpenAiFormatAnswerReader.class,
+      PropertiesModelRegistry.class, InMemoryEgressHealth.class})
   @EnableConfigurationProperties({ProviderProperties.class, ModelRegistryProperties.class,
       FailoverProperties.class})
   static class Wiring {
@@ -133,6 +134,8 @@ class PassThroughAcceptanceTest {
   private ChatCompletionUseCase chain;
   @MockitoBean
   private StreamChatCompletionUseCase streamChain;
+  @MockitoBean
+  private LlmClient llmClient;
   @MockitoBean
   private ApiClientRepository apiClientRepository;
   @MockitoBean

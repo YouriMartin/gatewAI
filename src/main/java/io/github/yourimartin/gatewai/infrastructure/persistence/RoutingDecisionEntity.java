@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
 import io.github.yourimartin.gatewai.domain.model.routing.CascadeLevel;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
@@ -108,6 +109,10 @@ class RoutingDecisionEntity {
   @Column(name = "conversation_fingerprint", updatable = false, length = 64)
   private String conversationFingerprint;
 
+  @Enumerated(EnumType.STRING)
+  @Column(updatable = false, nullable = false, length = 16)
+  private ClientMode mode;
+
   protected RoutingDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -135,6 +140,7 @@ class RoutingDecisionEntity {
     this.conversationRouting = decision.conversationRouting();
     this.classifiedTier = decision.classifiedTier();
     this.conversationFingerprint = decision.conversationFingerprint();
+    this.mode = decision.mode();
   }
 
   RoutingDecision toDomain() {
@@ -144,7 +150,7 @@ class RoutingDecisionEntity {
         JustificationJson.fromJson(justification), decisionReason,
         chosenTier, chosenModelId, routingLatencyMs,
         conformalSetToDomain(), conformalAlpha, escalatedTo,
-        conversationRouting, classifiedTier, conversationFingerprint);
+        conversationRouting, classifiedTier, conversationFingerprint, mode);
   }
 
   private List<ModelTier> conformalSetToDomain() {

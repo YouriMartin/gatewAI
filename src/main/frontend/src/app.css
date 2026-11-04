@@ -501,3 +501,13 @@ table.decisions code {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* A shadow decision: what the gateway would have done, not what it served (v4 D.1). */
+.tag {
+  margin-left: 0.4em;
+  padding: 0 0.4em;
+  border: 1px dashed currentColor;
+  border-radius: 3px;
+  font-size: 0.8em;
+  opacity: 0.75;
+}

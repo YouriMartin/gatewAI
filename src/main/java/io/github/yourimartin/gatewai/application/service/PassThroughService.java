@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
@@ -43,6 +44,7 @@ import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 import io.github.yourimartin.gatewai.domain.port.out.PassThroughClient;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
+import io.github.yourimartin.gatewai.domain.port.out.RelayedAnswerReader;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
 import io.github.yourimartin.gatewai.domain.port.out.UpstreamEventStream;
 
@@ -64,6 +66,12 @@ import org.springframework.stereotype.Service;
  * that can honour it; a pinned one only when {@code gatewai.failover.pinned} says
  * so. The routing decision names the first target, the failover rows each move,
  * and the request log the model that answered.
+ *
+ * <p>Since v4 D.1 it also serves every request of a shadow client: to the model
+ * it names — a registry id, or {@code auto} for the default — and never to a
+ * guessed one. A shadow request the chain could have honoured records no
+ * decision here: once its answer is relayed, {@link ShadowEvaluator} has the
+ * chain decide on it, and those are its decisions, stamped {@code SHADOW}.
  */
 @Service
 final class PassThroughService implements PassThroughUseCase {
@@ -79,6 +87,8 @@ final class PassThroughService implements PassThroughUseCase {
   private final EgressHealth health;
   private final ModelDefinition defaultTarget;
   private final boolean failoverPinned;
+  private final ShadowEvaluator shadow;
+  private final RelayedAnswerReader answers;
 
   PassThroughService(PassThroughClient client,
                      ModelRegistry modelRegistry,
@@ -91,6 +101,8 @@ final class PassThroughService implements PassThroughUseCase {
                      ProviderRegions providerRegions,
                      CloudRegionZones cloudRegionZones,
                      EgressHealth health,
+                     ShadowEvaluator shadow,
+                     RelayedAnswerReader answers,
                      @Value("${gatewai.passthrough.default-model:}") String defaultModel,
                      @Value("${gatewai.failover.pinned:false}") boolean failoverPinned) {
     this.client = client;
@@ -104,6 +116,8 @@ final class PassThroughService implements PassThroughUseCase {
     this.health = health;
     this.defaultTarget = resolveDefault(modelRegistry, defaultModel);
     this.failoverPinned = failoverPinned;
+    this.shadow = shadow;
+    this.answers = answers;
   }
 
   /**
@@ -124,7 +138,7 @@ final class PassThroughService implements PassThroughUseCase {
 
   @Override
   public PassThroughResponse forward(PassThroughRequest passThrough) {
-    Prepared prepared = prepare(passThrough.request());
+    Prepared prepared = prepare(passThrough);
     FailoverSequence sequence = sequence(prepared);
     ModelDefinition model = sequence.next().orElse(prepared.target());
     while (true) {
@@ -132,6 +146,9 @@ final class PassThroughService implements PassThroughUseCase {
         PassThroughResponse response = client.forward(model, passThrough.body());
         health.succeeded(model);
         account(prepared, model, response.usage());
+        if (prepared.evaluated()) {
+          shadow.submit(prepared.context(), prepared.request(), answers.read(response));
+        }
         return response;
       } catch (UpstreamFailureException e) {
         model = afterFailure(e, model, sequence, prepared);
@@ -145,14 +162,15 @@ final class PassThroughService implements PassThroughUseCase {
    */
   @Override
   public PassThroughStream openStream(PassThroughRequest passThrough) {
-    Prepared prepared = prepare(passThrough.request());
+    Prepared prepared = prepare(passThrough);
     FailoverSequence sequence = sequence(prepared);
     ModelDefinition model = sequence.next().orElse(prepared.target());
     while (true) {
       try {
         UpstreamEventStream upstream = client.openStream(model, passThrough.body());
         health.succeeded(model);
-        return new RelayedStream(prepared, model, upstream);
+        return new RelayedStream(prepared, model, upstream,
+            prepared.evaluated() ? answers.streamed(model.modelId()) : null);
       } catch (UpstreamFailureException e) {
         model = afterFailure(e, model, sequence, prepared);
       }
@@ -209,11 +227,17 @@ final class PassThroughService implements PassThroughUseCase {
    * it would ignore, and the trace — recorded before the upstream is called, so a
    * failed call still explains where it was sent.
    */
-  private Prepared prepare(LlmRequest request) {
+  private Prepared prepare(PassThroughRequest passThrough) {
     long startNanos = System.nanoTime();
+    LlmRequest request = passThrough.request();
     String correlationId = RequestAccounting.correlationId();
     Optional<ModelDefinition> pinned = request.model() == null
         ? Optional.empty() : modelRegistry.findByModelId(request.model());
+    if (passThrough.shadow() && pinned.isEmpty() && !isAuto(request.model())) {
+      throw new UnknownModelException("Unknown model '" + request.model() + "'. A shadow"
+          + " client is served by the model it names: use one of the model ids declared in"
+          + " the gateway's registry, or 'auto' for the default model.");
+    }
     ModelDefinition target = pinned.orElse(defaultTarget);
     if (target == null) {
       throw new UnknownModelException("No model to pass this request through to: it names no"
@@ -222,25 +246,43 @@ final class PassThroughService implements PassThroughUseCase {
     }
     refuseIgnoredFeatures(request, target);
 
-    String userText = lastUserText(request);
-    long decisionMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-    recordCacheBypass(request, userText, correlationId);
-    recordRouting(userText, target,
-        pinned.isPresent() ? DecisionReason.PASSTHROUGH_PINNED : DecisionReason.PASSTHROUGH_DEFAULT,
-        decisionMs, correlationId);
+    boolean evaluated = passThrough.evaluatedInShadow();
+    if (!evaluated) {
+      String userText = lastUserText(request);
+      long decisionMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+      recordCacheBypass(request, userText, correlationId);
+      recordRouting(userText, target,
+          pinned.isPresent() ? DecisionReason.PASSTHROUGH_PINNED
+              : DecisionReason.PASSTHROUGH_DEFAULT,
+          decisionMs, correlationId);
+      if (passThrough.shadow()) {
+        // The chain would have passed it through too: these rows are its verdict.
+        shadow.bypassed();
+      }
+    }
+    RequestContext context = RequestContext.CURRENT.isBound()
+        ? RequestContext.CURRENT.get() : null;
     return new Prepared(request, target, pinned.isEmpty() || failoverPinned, startNanos,
-        correlationId, RequestAccounting.clientId());
+        correlationId, RequestAccounting.clientId(), evaluated && context != null, context);
+  }
+
+  /** {@code auto}, or no model at all: the shadow client leaves the choice to the gateway. */
+  private static boolean isAuto(String model) {
+    return model == null || model.isBlank() || "auto".equals(model.strip());
   }
 
   /**
    * A request on its way, with the context captured on the request thread: a
    * stream is relayed from another one, where the Scoped Value is unbound.
    *
-   * @param target   where it is sent first
-   * @param failover whether it may fail over inside {@code target}'s tier
+   * @param target    where it is sent first
+   * @param failover  whether it may fail over inside {@code target}'s tier
+   * @param evaluated whether the chain decides on its answer in shadow (v4 D.1)
+   * @param context   the request's context, null when none is bound
    */
   private record Prepared(LlmRequest request, ModelDefinition target, boolean failover,
-                          long startNanos, String correlationId, String clientId) {
+                          long startNanos, String correlationId, String clientId,
+                          boolean evaluated, RequestContext context) {
   }
 
   /** Accounts a request {@code model} served, through the chain's code (ADR 0016). */
@@ -269,11 +311,15 @@ final class PassThroughService implements PassThroughUseCase {
     private final Prepared prepared;
     private final ModelDefinition answering;
     private final UpstreamEventStream upstream;
+    /** Reads the answer back for the shadow evaluation; null when there is none. */
+    private final RelayedAnswerReader.StreamedAnswer answer;
 
-    RelayedStream(Prepared prepared, ModelDefinition answering, UpstreamEventStream upstream) {
+    RelayedStream(Prepared prepared, ModelDefinition answering, UpstreamEventStream upstream,
+                  RelayedAnswerReader.StreamedAnswer answer) {
       this.prepared = prepared;
       this.answering = answering;
       this.upstream = upstream;
+      this.answer = answer;
     }
 
     @Override
@@ -287,9 +333,16 @@ final class PassThroughService implements PassThroughUseCase {
       // Anything that is neither a clean end nor a disconnect is the upstream's.
       PassThroughStreamOutcome outcome = PassThroughStreamOutcome.UPSTREAM_FAILED;
       try {
-        TokenUsage usage = upstream.relay(onEvent);
+        // The client has each event before the shadow reader looks at it.
+        TokenUsage usage = upstream.relay(answer == null ? onEvent : event -> {
+          onEvent.accept(event);
+          answer.accept(event);
+        });
         outcome = PassThroughStreamOutcome.COMPLETED;
         account(prepared, answering, usage);
+        if (answer != null) {
+          shadow.submit(prepared.context(), prepared.request(), answer.answer(usage));
+        }
       } catch (ClientDisconnectedException e) {
         outcome = PassThroughStreamOutcome.CLIENT_DISCONNECTED;
         LOG.warn("Client of request {} went away mid-stream: the call to model '{}' was"
@@ -352,7 +405,8 @@ final class PassThroughService implements PassThroughUseCase {
           null,
           null,
           CacheDecisionReason.passThrough(first),
-          null));
+          null,
+          RequestContext.currentMode()));
     } catch (RuntimeException e) {
       LOG.warn("Could not record the pass-through cache decision: {}", e.toString());
     }
@@ -386,7 +440,8 @@ final class PassThroughService implements PassThroughUseCase {
           null,
           null,
           null,
-          null);
+          null,
+          RequestContext.currentMode());
       decisionRecorder.record(decision);
       decisionMetrics.record(decision);
     } catch (RuntimeException e) {
