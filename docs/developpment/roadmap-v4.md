@@ -518,7 +518,7 @@ B.4 and B.6.
 - The latency shadow adds to the served request is measured and stated (target: nothing
   beyond pass-through).
 
-## D.2 — Would the cached answer have been right?
+## D.2 — Would the cached answer have been right? — ✅ done
 
 - For every shadow would-hit, compare the cached answer with the answer the client
   actually received:

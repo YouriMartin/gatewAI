@@ -3,6 +3,8 @@ package io.github.yourimartin.gatewai.domain.port.out;
 import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeVerdict;
 
 /**
  * Records per-request observability metrics (tokens, latency, cost, carbon,
@@ -21,4 +23,11 @@ public interface MetricsRecorder {
 
   /** Counts what became of one shadow client's request (v4 D.1). */
   void recordShadowDecision(ShadowOutcome outcome);
+
+  /**
+   * Counts one would-hit assessment (v4 D.2) by what the judge made of it.
+   *
+   * @param verdict the verdict when {@code outcome} is {@code JUDGED}, else null
+   */
+  void recordShadowJudgement(JudgeOutcome outcome, JudgeVerdict verdict);
 }

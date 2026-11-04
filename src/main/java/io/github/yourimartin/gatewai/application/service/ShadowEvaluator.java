@@ -40,25 +40,27 @@ final class ShadowEvaluator {
   private static final Logger LOG = LoggerFactory.getLogger(ShadowEvaluator.class);
 
   private final LlmClient llmClient;
+  private final WouldHitAssessor assessor;
   private final MetricsRecorder metrics;
   private final Semaphore permits;
   private final Executor executor;
 
   @Autowired
-  ShadowEvaluator(LlmClient llmClient, MetricsRecorder metrics,
+  ShadowEvaluator(LlmClient llmClient, WouldHitAssessor assessor, MetricsRecorder metrics,
                   @Value("${gatewai.shadow.max-concurrent:16}") int maxConcurrent) {
-    this(llmClient, metrics, maxConcurrent,
+    this(llmClient, assessor, metrics, maxConcurrent,
         task -> Thread.ofVirtual().name("shadow-evaluation").start(task));
   }
 
   /** Test seam: runs evaluations on {@code executor}. */
-  ShadowEvaluator(LlmClient llmClient, MetricsRecorder metrics, int maxConcurrent,
-                  Executor executor) {
+  ShadowEvaluator(LlmClient llmClient, WouldHitAssessor assessor, MetricsRecorder metrics,
+                  int maxConcurrent, Executor executor) {
     if (maxConcurrent < 1) {
       throw new IllegalArgumentException(
           "gatewai.shadow.max-concurrent must be at least 1, was " + maxConcurrent);
     }
     this.llmClient = llmClient;
+    this.assessor = assessor;
     this.metrics = metrics;
     this.permits = new Semaphore(maxConcurrent);
     this.executor = executor;
@@ -101,7 +103,13 @@ final class ShadowEvaluator {
   private void evaluate(LlmRequest request, RelayedAnswer answer) {
     try {
       LlmResponse replayed = llmClient.replay(request, answer);
-      metrics.recordShadowDecision(outcome(replayed.cacheOutcome()));
+      ShadowOutcome outcome = outcome(replayed.cacheOutcome());
+      metrics.recordShadowDecision(outcome);
+      if (outcome == ShadowOutcome.WOULD_HIT) {
+        // Would it have been right? (v4 D.2) Inside the same permit: judging is
+        // shadow work too, and must stay as bounded as the replay.
+        assessor.assess(RequestContext.CURRENT.get(), request, replayed.content(), answer);
+      }
     } catch (RuntimeException e) {
       LOG.warn("Shadow evaluation of request {} failed: {}",
           RequestAccounting.correlationId(), e.toString());

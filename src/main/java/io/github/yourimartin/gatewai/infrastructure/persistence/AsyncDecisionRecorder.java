@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -41,6 +42,7 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   private final SpringDataRoutingDecisionRepository routingRepository;
   private final SpringDataCacheDecisionRepository cacheRepository;
   private final SpringDataFailoverEventRepository failoverRepository;
+  private final SpringDataWouldHitAssessmentRepository wouldHitRepository;
   private final Executor executor;
   private final MeterRegistry meterRegistry;
   private final DecisionRecordingProperties properties;
@@ -49,12 +51,14 @@ class AsyncDecisionRecorder implements DecisionRecorder {
       SpringDataRoutingDecisionRepository routingRepository,
       SpringDataCacheDecisionRepository cacheRepository,
       SpringDataFailoverEventRepository failoverRepository,
+      SpringDataWouldHitAssessmentRepository wouldHitRepository,
       @Qualifier("applicationTaskExecutor") TaskExecutor executor,
       MeterRegistry meterRegistry,
       DecisionRecordingProperties properties) {
     this.routingRepository = routingRepository;
     this.cacheRepository = cacheRepository;
     this.failoverRepository = failoverRepository;
+    this.wouldHitRepository = wouldHitRepository;
     this.executor = executor;
     this.meterRegistry = meterRegistry;
     this.properties = properties;
@@ -78,11 +82,17 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   }
 
   @Override
+  public void record(WouldHitAssessment assessment) {
+    submit("would_hit", () -> wouldHitRepository.save(new WouldHitAssessmentEntity(assessment)));
+  }
+
+  @Override
   @Transactional
   public int purgeOlderThan(Instant cutoff) {
     return routingRepository.deleteByCreatedAtBefore(cutoff)
         + cacheRepository.deleteByCreatedAtBefore(cutoff)
-        + failoverRepository.deleteByCreatedAtBefore(cutoff);
+        + failoverRepository.deleteByCreatedAtBefore(cutoff)
+        + wouldHitRepository.deleteByCreatedAtBefore(cutoff);
   }
 
   /**

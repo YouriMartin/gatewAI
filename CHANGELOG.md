@@ -66,6 +66,12 @@ The first published release: everything below is new to anyone pulling an image.
   the cache and the router decide off the request path and record what they would have
   done, stamped `SHADOW`. The cache warms up as it would in production.
   `gatewai_shadow_decisions_total{outcome}`, `gatewai.shadow.max-concurrent`.
+- **Would a would-hit have been right?** Every shadow would-hit is compared with the
+  answer the client received by embedding similarity; on a sample
+  (`gatewai.shadow.judge.sample-rate`, off by default) an LLM judge grades it under a
+  versioned rubric. `GET /v1/admin/shadow/wrong-hits` and the dashboard give the
+  wrong-hit rate per client with its Wilson 95 % interval, its sample size and the
+  label "judged by <model>, not by a human". No answer text is stored.
 
 ### Changed
 
