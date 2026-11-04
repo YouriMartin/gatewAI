@@ -31,22 +31,17 @@
 			Each one exists only because the parent's managed version is still
 			flagged; drop the override as soon as a parent bump catches up, and
 			check with ./mvnw -DskipFrontend dependency:list before assuming it has.
-			- tomcat: parent 4.1.1 ships 11.0.24, the authenticator fixes
-			  (CVE-2026-65905 / -65182 / -68525) landed in 11.0.25.
+			(The tomcat and jackson overrides were dropped with parent 4.1.2, which
+			ships Tomcat 11.0.27 and Jackson 3.1.7 / 2.21.7: the tomcat pin had
+			become a downgrade.)
 		-->
-		<tomcat.version>11.0.25</tomcat.version>
 		<!--
-			- jackson (both lines): parent 4.1.1 ships Jackson 3.1.5 and Jackson
-			  2.21.5. jackson-core and jackson-databind are flagged in both
-			  (GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89, GHSA-cxp5-3px4-pw24,
-			  GHSA-wv8q-qhhj-9h54; 3.x also GHSA-gx83-3vf8-gh7j, GHSA-q4xh-88c3-wmh7,
-			  GHSA-wjgm-6hv5-3cvf), fixed in 3.1.7 and 2.21.7. The project speaks
-			  Jackson 3; Jackson 2 only arrives transitively through Spring AI.
-			  Overriding the BOM versions moves core, databind and annotations
-			  together, which a single-artifact pin did not.
+			- opentelemetry: parent 4.1.2 ships 1.62.0; opentelemetry-api is flagged
+			  (GHSA-ccrj-gw8r-854m, quadratic CPU in W3C tracestate parsing, published
+			  2026-10-28), fixed in 1.67.0. Overriding the BOM version moves every
+			  io.opentelemetry artifact together.
 		-->
-		<jackson-bom.version>3.1.7</jackson-bom.version>
-		<jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+		<opentelemetry.version>1.67.0</opentelemetry.version>
 	</properties>
 	<dependencies>
 		<dependency>

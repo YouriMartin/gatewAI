@@ -192,7 +192,9 @@ results (25 advisories over 13 artifacts) on the run that introduced the job.
 comes from `spring-boot-starter-parent`, so the fix is usually a parent bump, not
 an edit under `<dependencies>`. When the parent lags a published fix, override the
 managed property in `<properties>` with a comment saying which advisory forced it
-and when it can be dropped — see the `tomcat.version` pin in `pom.xml`.
+and when it can be dropped — see the `opentelemetry.version` pin in `pom.xml`. Drop an
+override once the parent catches up: left behind, a pin turns into a downgrade (the
+`tomcat.version` pin did, with parent 4.1.2).
 
 **npm findings are different.** `package-lock.json` *is* a lockfile, so the scan
 reads resolved versions rather than resolving a range, and almost every dashboard
