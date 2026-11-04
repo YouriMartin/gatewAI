@@ -5,6 +5,7 @@ import java.time.Instant;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 
 /**
  * Records the decisions the gateway takes on the request path (v2 batch 2).
@@ -21,6 +22,9 @@ public interface DecisionRecorder {
 
   /** A request moved to the next entry of its tier (ADR 0017, v4 B.5). */
   void record(FailoverEvent event);
+
+  /** How a shadow would-hit compares with the answer served (v4 D.2). */
+  void record(WouldHitAssessment assessment);
 
   /**
    * Drops decisions older than {@code cutoff}.

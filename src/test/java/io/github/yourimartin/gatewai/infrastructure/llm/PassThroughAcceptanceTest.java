@@ -41,15 +41,18 @@ import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
+import io.github.yourimartin.gatewai.domain.port.out.AnswerJudge;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
+import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,7 +105,7 @@ class PassThroughAcceptanceTest {
   @ComponentScan(basePackages = "io.github.yourimartin.gatewai.application.service",
       useDefaultFilters = false,
       includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-          pattern = ".*\\.(PassThroughService|ShadowEvaluator)"))
+          pattern = ".*\\.(PassThroughService|ShadowEvaluator|WouldHitAssessor)"))
   @Import({OpenAiFormatPassThroughClient.class, OpenAiFormatAnswerReader.class,
       PropertiesModelRegistry.class, InMemoryEgressHealth.class})
   @EnableConfigurationProperties({ProviderProperties.class, ModelRegistryProperties.class,
@@ -136,6 +139,12 @@ class PassThroughAcceptanceTest {
   private StreamChatCompletionUseCase streamChain;
   @MockitoBean
   private LlmClient llmClient;
+  @MockitoBean
+  private TextEmbedder textEmbedder;
+  @MockitoBean
+  private EmbeddingWindow embeddingWindow;
+  @MockitoBean
+  private AnswerJudge answerJudge;
   @MockitoBean
   private ApiClientRepository apiClientRepository;
   @MockitoBean
@@ -316,7 +325,7 @@ class PassThroughAcceptanceTest {
     ObjectNode body = fixture("openai-response-format-json-schema.json");
     body.put("stream", true);
 
-    MvcResult result = sendStream(body).andReturn();
+    MvcResult result = send(body).andReturn();
     // The upstream has sent "It is 18" and is now blocked: that piece must already
     // be in the client's response.
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
@@ -340,7 +349,7 @@ class PassThroughAcceptanceTest {
     ObjectNode body = fixture("openai-tools-first-turn.json");
     body.put("stream", true);
 
-    sendStream(body)
+    send(body)
         .andExpect(request().asyncNotStarted())
         .andExpect(status().isBadGateway())
         .andExpect(jsonPath("$.error.type").value("api_error"));
@@ -349,18 +358,13 @@ class PassThroughAcceptanceTest {
 
   /** Runs a stream to its end and returns what the client received. */
   private String streamed(JsonNode body) throws Exception {
-    MvcResult started = sendStream(body)
+    MvcResult started = send(body)
         .andExpect(header().string("X-GatewAI-Cache", "BYPASS"))
         .andExpect(header().string("X-GatewAI-Model", MODEL))
         .andReturn();
     return mockMvc.perform(asyncDispatch(started))
         .andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
-  }
-
-  private org.springframework.test.web.servlet.ResultActions sendStream(JsonNode body)
-      throws Exception {
-    return send(body);
   }
 
   private org.springframework.test.web.servlet.ResultActions send(JsonNode body)

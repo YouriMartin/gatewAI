@@ -12,6 +12,7 @@ import io.github.yourimartin.gatewai.adapter.in.web.admin.ExplainRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.ExplanationView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.RecalibrateRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.RoutingConfigView;
+import io.github.yourimartin.gatewai.adapter.in.web.admin.WrongHitView;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatChoice;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionChunk;
 import io.github.yourimartin.gatewai.adapter.in.web.chat.ChatCompletionRequest;
@@ -59,6 +60,7 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       CreatedClientView.class,
       CreateClientRequest.class,
       ChangeModeRequest.class,
+      WrongHitView.class,
       RoutingConfigView.class,
       RoutingConfigView.RouteView.class,
       CalibrationView.class,

@@ -22,6 +22,8 @@ import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -47,6 +49,8 @@ class AsyncDecisionRecorderTest {
   private SpringDataFailoverEventRepository failoverRepository;
 
   private MeterRegistry meterRegistry;
+  @Mock
+  private SpringDataWouldHitAssessmentRepository wouldHitRepository;
   private DecisionRecordingProperties properties;
   private AsyncDecisionRecorder recorder;
 
@@ -57,7 +61,7 @@ class AsyncDecisionRecorderTest {
     // Runs the submitted task inline, so the assertions see the effect.
     TaskExecutor executor = new SyncTaskExecutor();
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        failoverRepository, executor, meterRegistry, properties);
+        failoverRepository, wouldHitRepository, executor, meterRegistry, properties);
   }
 
   @Test
@@ -101,7 +105,7 @@ class AsyncDecisionRecorderTest {
       throw new IllegalStateException("executor shut down");
     };
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        failoverRepository, rejecting, meterRegistry, properties);
+        failoverRepository, wouldHitRepository, rejecting, meterRegistry, properties);
 
     assertDoesNotThrow(() -> recorder.record(routingDecision()));
     assertEquals(1.0, recorder.failureCount("routing"));
@@ -125,8 +129,9 @@ class AsyncDecisionRecorderTest {
     when(routingRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(3);
     when(cacheRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(4);
     when(failoverRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(2);
+    when(wouldHitRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(5);
 
-    assertEquals(9, recorder.purgeOlderThan(cutoff));
+    assertEquals(14, recorder.purgeOlderThan(cutoff));
   }
 
   @Test
@@ -136,6 +141,15 @@ class AsyncDecisionRecorderTest {
         FailoverCause.SERVER_ERROR, 503));
 
     verify(failoverRepository).save(any(FailoverEventEntity.class));
+  }
+
+  @Test
+  void writesAWouldHitAssessment() {
+    recorder.record(new WouldHitAssessment(UUID.randomUUID(), "corr-1", "client-1",
+        Instant.now(), 0.9, false, "embedding", JudgeOutcome.NOT_SAMPLED, null, null, null,
+        null));
+
+    verify(wouldHitRepository).save(any(WouldHitAssessmentEntity.class));
   }
 
   private static RoutingDecision routingDecision() {

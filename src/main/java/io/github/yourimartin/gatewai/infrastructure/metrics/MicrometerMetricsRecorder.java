@@ -7,6 +7,8 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.PassThroughStreamOutcome;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeVerdict;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -79,5 +81,17 @@ class MicrometerMetricsRecorder implements MetricsRecorder {
   public void recordShadowDecision(ShadowOutcome outcome) {
     registry.counter("gatewai.shadow.decisions",
         "outcome", outcome.name().toLowerCase(Locale.ROOT)).increment();
+  }
+
+  /**
+   * {@code gatewai_shadow_judgements_total{outcome}} (v4 D.2): {@code yes}, {@code no},
+   * {@code unsure} for a verdict, else {@code not_sampled} or {@code failed}.
+   */
+  @Override
+  public void recordShadowJudgement(JudgeOutcome outcome, JudgeVerdict verdict) {
+    String tag = outcome == JudgeOutcome.JUDGED && verdict != null ? verdict.name()
+        : outcome.name();
+    registry.counter("gatewai.shadow.judgements",
+        "outcome", tag.toLowerCase(Locale.ROOT)).increment();
   }
 }
