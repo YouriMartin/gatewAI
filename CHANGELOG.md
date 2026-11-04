@@ -67,6 +67,15 @@ The first published release: everything below is new to anyone pulling an image.
   carry the project's former name. The MCP server reports itself as `gatewai` (was
   `gatewai-green-proxy`) with the jar's version (was a fixed `0.1.0`).
 
+### Security
+
+- **OpenTelemetry 1.67.0** (was 1.62.0 from the Spring Boot parent):
+  `opentelemetry-api` was flagged for quadratic CPU in W3C `tracestate` parsing
+  (GHSA-ccrj-gw8r-854m).
+- **Tomcat 11.0.27**: the `tomcat.version` pin to 11.0.25 had become a downgrade
+  once the parent moved to 4.1.2; dropped, with the Jackson pins the parent now
+  matches.
+
 ### Upgrading from a source build
 
 - **The database name does not change.** The compose stacks that keep data in a
