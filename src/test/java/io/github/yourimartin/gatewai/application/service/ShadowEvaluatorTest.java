@@ -35,6 +35,7 @@ class ShadowEvaluatorTest {
 
   private final LlmClient llmClient = mock(LlmClient.class);
   private final MetricsRecorder metrics = mock(MetricsRecorder.class);
+  private final WouldHitAssessor assessor = mock(WouldHitAssessor.class);
 
   @Test
   void replaysUnderTheRequestsContextAndCountsTheCacheOutcome() {
@@ -44,7 +45,7 @@ class ShadowEvaluatorTest {
       return response("HIT");
     });
 
-    new ShadowEvaluator(llmClient, metrics, 1, Runnable::run)
+    new ShadowEvaluator(llmClient, assessor, metrics, 1, Runnable::run)
         .submit(SHADOW, REQUEST, Optional.of(ANSWER));
 
     assertThat(seen.get()).isEqualTo(SHADOW);
@@ -54,7 +55,7 @@ class ShadowEvaluatorTest {
   @Test
   void dropsAndCountsWhatExceedsTheConcurrencyLimitInsteadOfQueueingIt() {
     List<Runnable> running = new ArrayList<>();
-    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, metrics, 1, running::add);
+    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, assessor, metrics, 1, running::add);
 
     evaluator.submit(SHADOW, REQUEST, Optional.of(ANSWER));
     evaluator.submit(SHADOW, REQUEST, Optional.of(ANSWER));
@@ -72,7 +73,7 @@ class ShadowEvaluatorTest {
   @Test
   void aFailedReplayIsCountedAndReleasesItsPermit() {
     List<Runnable> running = new ArrayList<>();
-    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, metrics, 1, running::add);
+    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, assessor, metrics, 1, running::add);
     when(llmClient.replay(any(), any())).thenThrow(new IllegalStateException("boom"));
 
     evaluator.submit(SHADOW, REQUEST, Optional.of(ANSWER));
@@ -85,7 +86,7 @@ class ShadowEvaluatorTest {
 
   @Test
   void anExecutorThatRefusesReleasesThePermitAndNeverThrows() {
-    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, metrics, 1, task -> {
+    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, assessor, metrics, 1, task -> {
       throw new java.util.concurrent.RejectedExecutionException("full");
     });
 
@@ -97,7 +98,7 @@ class ShadowEvaluatorTest {
 
   @Test
   void anAnswerThatCouldNotBeReadBackIsAFailedEvaluation() {
-    new ShadowEvaluator(llmClient, metrics, 1, Runnable::run)
+    new ShadowEvaluator(llmClient, assessor, metrics, 1, Runnable::run)
         .submit(SHADOW, REQUEST, Optional.empty());
 
     verify(metrics).recordShadowDecision(ShadowOutcome.FAILED);
@@ -116,7 +117,7 @@ class ShadowEvaluatorTest {
 
   @Test
   void refusesANonPositiveLimit() {
-    assertThatThrownBy(() -> new ShadowEvaluator(llmClient, metrics, 0, Runnable::run))
+    assertThatThrownBy(() -> new ShadowEvaluator(llmClient, assessor, metrics, 0, Runnable::run))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("gatewai.shadow.max-concurrent");
   }
@@ -124,5 +125,20 @@ class ShadowEvaluatorTest {
   private static LlmResponse response(String cacheOutcome) {
     return new LlmResponse("m", "Hello", "stop", 0, 0, 0, "HIT".equals(cacheOutcome),
         cacheOutcome, null);
+  }
+
+  @Test
+  void aWouldHitIsAssessedWithTheCachedAnswerAndAMissIsNot() {
+    when(llmClient.replay(REQUEST, ANSWER)).thenReturn(response("HIT"));
+    ShadowEvaluator evaluator = new ShadowEvaluator(llmClient, assessor, metrics, 1, Runnable::run);
+
+    evaluator.submit(SHADOW, REQUEST, Optional.of(ANSWER));
+
+    verify(assessor).assess(SHADOW, REQUEST, "Hello", ANSWER);
+
+    org.mockito.Mockito.reset(assessor);
+    when(llmClient.replay(REQUEST, ANSWER)).thenReturn(response("MISS"));
+    evaluator.submit(SHADOW, REQUEST, Optional.of(ANSWER));
+    verifyNoInteractions(assessor);
   }
 }

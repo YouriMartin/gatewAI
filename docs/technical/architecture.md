@@ -41,6 +41,9 @@ Shadow client (v4 D.1, ADR 0018), any request
       LlmClient.replay(...) ── the same advisor chain, SHADOW context:
          → SemanticCache → Routing → [Advisor] ShadowReplay (answers with the relayed answer)
       → cache_decision / routing_decision stamped mode = SHADOW; a miss stores the real answer
+      → a would-hit (D.2): WouldHitAssessor compares the cached answer with the one served
+           (embedding similarity always; an LLM judge on a sample, called directly)
+         → would_hit_assessment (numbers and labels, no text)
 ```
 
 ### Two paths, one switch

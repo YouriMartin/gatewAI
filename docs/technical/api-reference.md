@@ -366,6 +366,36 @@ client already has changes nothing, and records nothing.
 ### `POST /v1/admin/clients/{id}/revoke`
 Revokes the client. Returns **`204 No Content`**.
 
+## Admin — shadow mode (`ROLE_ADMIN`, v4 D.2)
+
+### `GET /v1/admin/shadow/wrong-hits?from=<iso>&to=<iso>`
+Would the cache have been right? One row per shadow client, judge model and rubric
+over `[from, to)`:
+
+```json
+[{"client_id": "2ac6…", "judge_model": "gpt-5-mini", "rubric_version": "would-hit-v1",
+  "would_hits": 214, "mean_answer_similarity": 0.912, "beyond_window": 9,
+  "judged": 41, "yes": 37, "no": 4, "unsure": 3, "failed": 0,
+  "wrong_hit_rate": 0.0976, "interval_low": 0.0386, "interval_high": 0.2251,
+  "confidence": 0.95,
+  "label": "judged by gpt-5-mini (rubric would-hit-v1), not by a human"}]
+```
+
+- Every would-hit is compared with the answer the client received by
+  `mean_answer_similarity`: the cosine of the two answers under the in-process
+  embedding model, which sees only its window of each (128 tokens for the default
+  model). `beyond_window` counts the would-hits where an answer was longer.
+- A sample (`gatewai.shadow.judge.sample-rate`, **off by default**) is graded by an LLM
+  judge. `wrong_hit_rate` is `no / (yes + no)`, with its Wilson 95 % interval;
+  `judged` (= `yes + no`) is its sample size. `unsure` is excluded from the rate and
+  counted; `failed` counts judge calls that failed.
+- The would-hits nobody judged form their own row, with a null `judge_model`, no rate,
+  and the label `not judged: answer similarity only`.
+- The rate, the interval, the sample size and the label are always returned together:
+  the verdicts are a model's, not a person's.
+
+`400` for a missing, unparseable or empty period.
+
 ## Admin — routing (`ROLE_ADMIN`)
 
 ### `GET /v1/admin/routing`

@@ -13,10 +13,12 @@ import {
   getRoutingConfig,
   listClients,
   listDecisions,
+  listWrongHits,
   type RoutingConfig,
   revokeClient,
   setClientMode,
   updateRoutingConfig,
+  type WrongHitView,
 } from './lib/api';
 import Sparkline from './lib/Sparkline.svelte';
 
@@ -29,6 +31,8 @@ let series = $state<GreenReport[]>([]);
 let error = $state('');
 
 let clients = $state<ApiClientView[]>([]);
+let wrongHits = $state<WrongHitView[]>([]);
+let wrongHitsError = $state('');
 let adminError = $state('');
 let newName = $state('');
 let newAdmin = $state(false);
@@ -122,6 +126,7 @@ async function connect() {
     series = await fetchGreenSeries(apiKey, from, to);
     status = 'ok';
     await loadClients();
+    await loadWrongHits();
     await loadRouting();
     await loadDecisions();
   } catch (e) {
@@ -188,6 +193,21 @@ async function saveRouting() {
   } catch (e) {
     routingError = message(e);
   }
+}
+
+async function loadWrongHits() {
+  try {
+    const { from, to } = lastThirtyDays();
+    wrongHits = await listWrongHits(apiKey, from, to);
+    wrongHitsError = '';
+  } catch (e) {
+    wrongHits = [];
+    wrongHitsError = message(e);
+  }
+}
+
+function clientName(id: string): string {
+  return clients.find((client) => client.id === id)?.name ?? id;
 }
 
 async function loadDecisions() {
@@ -712,6 +732,57 @@ async function revoke(id: string) {
                     </button>
                   {/if}
                 </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </section>
+
+    <section class="admin">
+      <h2>Shadow mode: would the cache have been right?</h2>
+      <p class="hint">
+        Last 30 days. Every would-hit is compared with the answer the client received by
+        embedding similarity; a sample is graded by an LLM judge. The wrong-hit rate is NO /
+        (YES + NO), with its 95 % interval; UNSURE is excluded and counted.
+      </p>
+
+      {#if wrongHitsError}
+        <p class="error">Unavailable: {wrongHitsError} (admin key required)</p>
+      {:else if wrongHits.length === 0}
+        <p class="hint">No would-hit yet: put a client in shadow mode above.</p>
+      {:else}
+        <table class="wrong-hits">
+          <thead>
+            <tr>
+              <th>Client</th><th>Would-hits</th><th>Answer similarity</th>
+              <th>Judged</th><th>Wrong-hit rate (95 %)</th><th>Unsure</th><th>Judge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each wrongHits as row (row.client_id + (row.judge_model ?? '') + (row.rubric_version ?? ''))}
+              <tr>
+                <td>{clientName(row.client_id)}</td>
+                <td>{row.would_hits}</td>
+                <td>
+                  {num(row.mean_answer_similarity)}
+                  {#if row.beyond_window > 0}
+                    <span class="tag" title="Answers longer than the embedding window: compared on their opening only">
+                      {row.beyond_window} beyond window
+                    </span>
+                  {/if}
+                </td>
+                <td>{row.judged}</td>
+                <td>
+                  {#if row.wrong_hit_rate === null}
+                    —
+                  {:else}
+                    {(row.wrong_hit_rate * 100).toFixed(1)} %
+                    [{((row.interval_low ?? 0) * 100).toFixed(1)}–{((row.interval_high ?? 0) * 100).toFixed(1)} %]
+                  {/if}
+                </td>
+                <td>{row.unsure}{row.failed > 0 ? ` (+${row.failed} failed)` : ''}</td>
+                <td class="judge-label">{row.label}</td>
               </tr>
             {/each}
           </tbody>

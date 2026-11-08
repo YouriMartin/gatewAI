@@ -45,17 +45,22 @@ import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.RelayedAnswer;
+import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
 import io.github.yourimartin.gatewai.domain.port.in.StreamChatCompletionUseCase;
+import io.github.yourimartin.gatewai.domain.port.out.AnswerJudge;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionMetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
+import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 import io.github.yourimartin.gatewai.domain.port.out.LlmClient;
 import io.github.yourimartin.gatewai.domain.port.out.MetricsRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.ProviderRegions;
 import io.github.yourimartin.gatewai.domain.port.out.RequestLogRepository;
+import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,7 +112,7 @@ class ShadowModeAcceptanceTest {
   @ComponentScan(basePackages = "io.github.yourimartin.gatewai.application.service",
       useDefaultFilters = false,
       includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-          pattern = ".*\\.(PassThroughService|ShadowEvaluator)"))
+          pattern = ".*\\.(PassThroughService|ShadowEvaluator|WouldHitAssessor)"))
   @Import({OpenAiFormatPassThroughClient.class, OpenAiFormatAnswerReader.class,
       PropertiesModelRegistry.class, InMemoryEgressHealth.class})
   @EnableConfigurationProperties({ProviderProperties.class, ModelRegistryProperties.class,
@@ -142,6 +147,12 @@ class ShadowModeAcceptanceTest {
   @MockitoBean
   private LlmClient llmClient;
   @MockitoBean
+  private TextEmbedder textEmbedder;
+  @MockitoBean
+  private EmbeddingWindow embeddingWindow;
+  @MockitoBean
+  private AnswerJudge answerJudge;
+  @MockitoBean
   private ApiClientRepository apiClientRepository;
   @MockitoBean
   private RequestLogRepository requestLogRepository;
@@ -167,6 +178,7 @@ class ShadowModeAcceptanceTest {
     LAST_BODY.set(null);
     client(SHADOW_KEY, "shadow-app", ClientMode.SHADOW);
     client(ENFORCE_KEY, "enforce-app", ClientMode.ENFORCE);
+    when(textEmbedder.embed(any())).thenReturn(new float[] {1, 0});
     // The chain's verdict: the cache holds a would-hit for this question.
     when(llmClient.replay(any(), any())).thenAnswer(invocation -> {
       replayContext.set(RequestContext.CURRENT.get());
@@ -204,6 +216,17 @@ class ShadowModeAcceptanceTest {
     assertThat(replayed.getValue().model()).isEqualTo("auto");
     assertThat(replayContext.get().mode()).isEqualTo(ClientMode.SHADOW);
     verify(metricsRecorder, timeout(5_000)).recordShadowDecision(ShadowOutcome.WOULD_HIT);
+
+    // D.2: the would-hit is compared with what the client received, by similarity only
+    // since the judge is off by default — and nothing but numbers is recorded.
+    ArgumentCaptor<WouldHitAssessment> assessed = ArgumentCaptor.forClass(WouldHitAssessment.class);
+    verify(decisionRecorder, timeout(5_000)).record(assessed.capture());
+    assertThat(assessed.getValue().correlationId()).isEqualTo(replayContext.get().traceId());
+    assertThat(assessed.getValue().answerSimilarity()).isEqualTo(1.0);
+    assertThat(assessed.getValue().judgeOutcome()).isEqualTo(JudgeOutcome.NOT_SAMPLED);
+    verify(textEmbedder).embed(CACHED_TEXT);
+    verify(textEmbedder).embed(UPSTREAM_TEXT);
+    verifyNoInteractions(answerJudge);
 
     // Served and accounted as a pass-through; the verdict is the chain's, not BYPASS.
     verify(requestLogRepository).save(any());
