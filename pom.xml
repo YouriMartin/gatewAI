@@ -20,7 +20,7 @@
 		<revision>0.0.1-SNAPSHOT</revision>
 		<java.version>25</java.version>
 		<spring-ai.version>2.0.2</spring-ai.version>
-		<checkstyle.version>14.3.0</checkstyle.version>
+		<checkstyle.version>14.4.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 		<!-- Hugging Face commit of Xenova/paraphrase-multilingual-MiniLM-L12-v2
 		     (2025-07-22), checked on 2026-10-24 to serve both pinned SHA-256s. -->
@@ -56,7 +56,7 @@
 		<dependency>
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-core</artifactId>
-			<version>8.21.0</version>
+			<version>8.22.0</version>
 		</dependency>
 		<!--
 			Postgres-backed token buckets (v3 lot B.3): the rate limit becomes the
@@ -66,7 +66,7 @@
 		<dependency>
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-postgresql</artifactId>
-			<version>8.21.0</version>
+			<version>8.22.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
