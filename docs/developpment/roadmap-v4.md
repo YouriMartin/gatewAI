@@ -609,4 +609,7 @@ B.4 and B.6.
 Budgets and spend alerts per client (after B.6) · `/v1/responses` and `/v1/embeddings` ·
 a native OpenAI→Anthropic Messages translation (keeps Anthropic prompt caching on
 pass-through) · dashboard session auth / OIDC instead of a key in local storage · v3 lot D
-(measured energy for local models) · a `/v1/messages` ingress (see the scope boundary).
+(measured energy for local models) · a `/v1/messages` ingress (see the scope boundary) ·
+shadow near-miss labelling: judge, on a sample, the best candidate *below* the threshold
+in force, so a shadow calibration can lower the threshold as well as raise it (ADR 0019
+leaves its fits able to go up only).
