@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 
@@ -49,6 +50,9 @@ import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
  * @param mode                    the mode of the client the request was decided
  *                                for (v4 D.1): a {@code SHADOW} row is what the
  *                                cache would have done, not what was served
+ * @param calibrationScope        which calibration decided the threshold (v4 D.3,
+ *                                ADR 0019); null when no threshold applied (a
+ *                                bypass), and on decisions recorded before it
  */
 public record CacheDecision(
     UUID id,
@@ -66,7 +70,8 @@ public record CacheDecision(
     ConformalStatus conformalStatus,
     CacheDecisionReason reason,
     String cacheScope,
-    ClientMode mode
+    ClientMode mode,
+    CalibrationScope calibrationScope
 ) {
 
   public CacheDecision {

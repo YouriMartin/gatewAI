@@ -7,6 +7,31 @@ rediscover it in a diff. Newest first.
 Structuring decisions still go to [`technical/adr/`](technical/adr/README.md);
 this file is for the smaller "the plan said X, the code does Y" record.
 
+## v4 lot D — D.3 (calibrate on production-labelled cases)
+
+- **50 NO by default, not the roadmap's example of 20.** 20 is feasible at α = 0.10,
+  but the rate one fit delivers is random: at 20 NO it exceeds 2α with probability
+  0.07, at 50 with 0.02 (Beta law, ADR 0019, pinned in `ConformalSpreadTest`). The
+  200 judged pairs stay.
+- **A calibration per client, with a global fallback** (the roadmap left it to the
+  ADR). The cache is already namespaced by client, so a threshold fitted on one
+  client's traffic governs that client's requests only (`V16`, ADR 0019).
+- **`source` is a body field** of `POST /v1/admin/calibration`, next to the existing
+  `routingAlpha` / `cacheAlpha`, rather than a query parameter. A field the chosen
+  source would ignore (`routingAlpha` on a shadow fit, `client` or `judgeModel` on a
+  labelled-set fit) is a `400 invalid_request`, not silently dropped.
+- **A DELETE the roadmap did not list**: `DELETE /v1/admin/calibration/cache/{clientId}`,
+  so a client can go back to the global row (ADR 0019's ratchet exit).
+- **`fit_summary` on every new row**, labelled-set fits included, and a modelled
+  spread (`modelledRateP90`) on shadow fits: the labels are purged with the decision
+  tables, and the summary is what still says what a threshold rests on.
+- **The prediction set left `SemanticCacheAdvisor`** for `CachePredictionSet`: the
+  advisor passed Checkstyle's 500-line limit once the client lookup was added. Same
+  for the service tests, split into `ConformalCalibrationServiceShadowTest`.
+- **The explanation API still reports the global cache calibration** as "in force
+  now"; the decision row's own `calibrationScope` says which one decided. Recorded in
+  `limitations.md`.
+
 ## v4 lot D — D.2 (would the cached answer have been right?)
 
 - **The assessment is its own table, not columns on `cache_decision`.** The cache

@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.application.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -151,6 +152,30 @@ class ConformalCalibrationService implements CalibrationUseCase {
       states.add(state(target));
     }
     return List.copyOf(states);
+  }
+
+  @Override
+  public List<CalibrationState> clientStates() {
+    return current().values().stream()
+        .filter(calibration -> !calibration.isGlobal())
+        .sorted(Comparator.comparing(ConformalCalibration::clientId))
+        .map(calibration -> new CalibrationState(calibration.target(),
+            statusOf(calibration), calibration, fixedFallback(calibration.target())))
+        .toList();
+  }
+
+  @Override
+  public boolean removeClientCalibration(String clientId) {
+    if (clientId == null || clientId.isBlank()) {
+      throw new IllegalArgumentException("name the client whose calibration to remove");
+    }
+    boolean removed = store.delete(CalibrationTarget.CACHE, clientId);
+    snapshot = null;
+    if (removed) {
+      LOG.info("Removed the cache calibration of client {}: it falls back to the global one",
+          clientId);
+    }
+    return removed;
   }
 
   /** Stale beats disabled: an operator turning it off should still see it rotted. */

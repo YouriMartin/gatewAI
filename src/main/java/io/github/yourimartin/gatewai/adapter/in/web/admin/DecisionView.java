@@ -56,11 +56,15 @@ public record DecisionView(String correlationId, Instant at, Cache cache,
    *                               EXACT_MATCH_ONLY or MAX_TOKENS; null otherwise
    * @param cacheScope             the conversation scope the lookup ran in, as a
    *                               hash — a hit was allowed only in this context
+   * @param calibrationScope       which calibration set the threshold (ADR 0019):
+   *                               CLIENT, GLOBAL or NONE; null on a bypass and on
+   *                               decisions recorded before v4 D.3
    */
   public record Cache(String outcome, double similarityScore, Double runnerUpScore,
                double threshold, String conformalStatus, String matchedEntryId,
                Long matchedEntryAgeSeconds, String originCorrelationId,
-               String embeddingModel, String reason, String cacheScope) {
+               String embeddingModel, String reason, String cacheScope,
+               String calibrationScope) {
 
     static Cache of(CacheDecision decision) {
       if (decision == null) {
@@ -70,7 +74,8 @@ public record DecisionView(String correlationId, Instant at, Cache cache,
           decision.runnerUpScore(), decision.threshold(),
           name(decision.conformalStatus()), decision.matchedEntryId(),
           decision.matchedEntryAgeSeconds(), decision.originCorrelationId(),
-          decision.embeddingModel(), name(decision.reason()), decision.cacheScope());
+          decision.embeddingModel(), name(decision.reason()), decision.cacheScope(),
+          name(decision.calibrationScope()));
     }
   }
 

@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -244,6 +245,7 @@ class MicrometerDecisionMetricsRecorderTest {
                                      ConformalStatus status, double score) {
     return new CacheDecision(UUID.randomUUID(), "corr", Instant.now(), "hash",
         outcome, score, null, 0.94, null, null, null, "nomic-embed-text",
-        status, null, null, ClientMode.ENFORCE);
+        status, null, null, ClientMode.ENFORCE,
+        CalibrationScope.GLOBAL);
   }
 }

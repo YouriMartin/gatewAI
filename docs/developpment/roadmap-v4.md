@@ -537,7 +537,7 @@ B.4 and B.6.
   excluded and counted); a test asserting that no new column or table holds answer text.
 - The dashboard and the API show rate, interval, sample size and the judge label together.
 
-## D.3 — Calibrate on production-labelled cases
+## D.3 — Calibrate on production-labelled cases — ✅ done (ADR 0019)
 
 **Decision to record (ADR 0019** — 0018 went to D.1's shadow path**).**
 

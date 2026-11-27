@@ -72,6 +72,14 @@ The first published release: everything below is new to anyone pulling an image.
   versioned rubric. `GET /v1/admin/shadow/wrong-hits` and the dashboard give the
   wrong-hit rate per client with its Wilson 95 % interval, its sample size and the
   label "judged by <model>, not by a human". No answer text is stored.
+- **Calibrate the cache on shadow labels** (ADR 0019): `POST /v1/admin/calibration`
+  with `"source": "shadow"` fits the cache threshold on the judge's verdicts, for one
+  client (that client's own row) or pooled (the global row). It counts only labels
+  above the threshold in force, under one judge and one rubric, and needs 200 judged
+  pairs of which 50 NO (`gatewai.conformal.shadow.min-pairs` / `min-negatives`),
+  else a 409 with the counts. Every row keeps a summary of what it was fitted on;
+  `DELETE /v1/admin/calibration/cache/{clientId}` returns a client to the global row;
+  each cache decision records which calibration decided (`calibrationScope`).
 
 ### Changed
 
@@ -97,3 +105,6 @@ The first published release: everything below is new to anyone pulling an image.
   the volume-less stacks (the cluster demo, CI) now use `gatewai`. Nothing to do.
 - **MCP clients** key their configuration by the name you gave the server, so the
   server's rename needs no change on their side.
+- **Existing calibrations become global labelled-set rows** (`V16`, applied by Flyway
+  at startup): their thresholds and provenance are unchanged, and they have no
+  `fitSummary`, since none was recorded when they were fitted. Nothing to do.

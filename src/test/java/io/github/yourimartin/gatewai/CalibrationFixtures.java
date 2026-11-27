@@ -99,5 +99,15 @@ public final class CalibrationFixtures {
                                                    String judgeModel) {
       throw new UnsupportedOperationException("not a calibrating stub");
     }
+
+    @Override
+    public List<CalibrationState> clientStates() {
+      return List.of();
+    }
+
+    @Override
+    public boolean removeClientCalibration(String clientId) {
+      throw new UnsupportedOperationException("not a calibrating stub");
+    }
   }
 }

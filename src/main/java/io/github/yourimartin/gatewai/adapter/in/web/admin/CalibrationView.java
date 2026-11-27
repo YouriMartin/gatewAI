@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.ShadowFit;
 
 /**
  * One target's calibration as the admin API reports it (v2 batch 3).
@@ -24,6 +25,16 @@ import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibrati
  * @param embeddingModel     the model it was fitted with
  * @param routingConfigVersion the routing rules it was fitted against
  * @param calibratedAt       when
+ * @param client             the client this row applies to; null for a global row
+ *                           (v4 D.3, ADR 0019)
+ * @param source             LABELLED_SET or SHADOW; null when never calibrated
+ * @param labelledBy         who labelled the cases it was fitted on, in words: a
+ *                           shadow fit says it was a model, not a person
+ * @param judgeModel         shadow: the judge whose verdicts were fitted on
+ * @param rubricVersion      shadow: the rubric they were given under
+ * @param labelFloor         shadow: the threshold in force for the scope when fitted
+ * @param fitSummary         what the fit read and excluded; null on a row fitted
+ *                           before v4 D.3
  */
 public record CalibrationView(
     String target,
@@ -37,11 +48,19 @@ public record CalibrationView(
     Integer sampleSize,
     String embeddingModel,
     String routingConfigVersion,
-    Instant calibratedAt
+    Instant calibratedAt,
+    String client,
+    String source,
+    String labelledBy,
+    String judgeModel,
+    String rubricVersion,
+    Double labelFloor,
+    FitSummaryView fitSummary
 ) {
 
   static CalibrationView of(CalibrationState state) {
     ConformalCalibration calibration = state.calibration();
+    ShadowFit fit = calibration == null ? null : calibration.shadowFit();
     return new CalibrationView(
         state.target().name(),
         state.status().name(),
@@ -54,6 +73,21 @@ public record CalibrationView(
         calibration == null ? null : calibration.sampleSize(),
         calibration == null ? null : calibration.embeddingModel(),
         calibration == null ? null : calibration.routingConfigVersion(),
-        calibration == null ? null : calibration.calibratedAt());
+        calibration == null ? null : calibration.calibratedAt(),
+        calibration == null ? null : calibration.clientId(),
+        calibration == null ? null : calibration.source().name(),
+        calibration == null ? null : labelledBy(calibration),
+        fit == null ? null : fit.judgeModel(),
+        fit == null ? null : fit.rubricVersion(),
+        fit == null ? null : fit.labelFloor(),
+        calibration == null ? null : FitSummaryView.of(calibration.fitSummary()));
+  }
+
+  /** The same wording as the shadow wrong-hit rate (v4 D.2). */
+  private static String labelledBy(ConformalCalibration calibration) {
+    ShadowFit fit = calibration.shadowFit();
+    return fit == null ? "hand-labelled cases"
+        : "judged by " + fit.judgeModel() + " (rubric " + fit.rubricVersion()
+            + "), not by a human";
   }
 }

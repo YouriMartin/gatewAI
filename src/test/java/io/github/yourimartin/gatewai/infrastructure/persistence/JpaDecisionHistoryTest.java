@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -193,6 +194,7 @@ class JpaDecisionHistoryTest {
         outcome == CacheOutcome.HIT ? "entry-1" : null,
         outcome == CacheOutcome.HIT ? 120L : null,
         outcome == CacheOutcome.HIT ? "origin-1" : null,
-        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE));
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE,
+        CalibrationScope.GLOBAL));
   }
 }

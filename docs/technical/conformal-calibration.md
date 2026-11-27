@@ -47,7 +47,7 @@ read as the same promise twice.
 | | Routing | Cache |
 |---|---|---|
 | Guarantee | `CORRECT_TARGET_COVERAGE` | `WRONG_ANSWER_RATE` |
-| Fitted on | the **positive** class: `1 − similarity` to the correct tier's route | the **negative** class: the similarity of pairs a human judged *not* servable |
+| Fitted on | the **positive** class: `1 − similarity` to the correct tier's route | the **negative** class: the similarity of pairs judged *not* servable — by a person, or on a shadow fit by the judge (v4 D.3) |
 | α means | share of prompts whose correct route may fall outside the set | share of non-servable pairs that may be served anyway |
 | Threshold | `1 − q̂` | `q̂` |
 | Cost of the error it bounds | a hand-over to the heuristic | **another question's answer, returned to a user** |
@@ -166,6 +166,141 @@ works on a fresh install. Point `gatewai.conformal.routing-cases` /
 calibrate on it instead. The **test** halves stay out of the jar on purpose: a
 calibration fitted on its own test set measures nothing.
 
+## Calibrating on shadow labels (v4 D.3)
+
+The shipped labels are adversarial and single-turn, so exchangeability with a
+team's own traffic is the weakest link of the guarantee. Shadow mode (D.1) and its
+judge (D.2) label production traffic; D.3 fits the cache on those labels.
+[ADR 0019](adr/0019-calibrate-the-cache-on-shadow-labels.md) holds the reasoning;
+this section is how it behaves.
+
+```bash
+# One client's own threshold, from its shadow would-hits
+curl -X POST -H "Authorization: Bearer $ADMIN_KEY" -H 'Content-Type: application/json' \
+     -d '{"source":"shadow","client":"<client id>","cacheAlpha":0.10}' \
+     localhost:8080/v1/admin/calibration
+
+# Every shadow client pooled into the global row
+curl -X POST -H "Authorization: Bearer $ADMIN_KEY" -H 'Content-Type: application/json' \
+     -d '{"source":"shadow"}' localhost:8080/v1/admin/calibration
+
+# Back to the global threshold for one client
+curl -X DELETE -H "Authorization: Bearer $ADMIN_KEY" \
+     localhost:8080/v1/admin/calibration/cache/<client id>
+```
+
+### What it fits on
+
+A shadow fit calibrates the **cache only**: the judge grades cached answers, not
+routes. It reads the would-hits the judge saw and joins each to the `SHADOW` cache
+decision it grades. That decision holds the query similarity the cache decided on,
+the threshold it was decided under, and the embedding model, so nothing is
+re-embedded and no text is read. A label counts when all of the following hold:
+
+- the judge said `YES` or `NO`. `UNSURE`, a failed call and a would-hit that was not
+  sampled are counted in the summary, never fitted on;
+- it was judged under the current rubric (`would-hit-v1`) and by **one** judge:
+  `judgeModel` in the request, by default `gatewai.shadow.judge.model`;
+- its similarity came from the current embedding model;
+- it sits above **the floor** (next section).
+
+The non-conformity score is unchanged: the similarity of the `NO` pairs.
+`ConformalQuantile` takes the same finite-sample rank on them.
+
+### The floor
+
+Labels only exist for would-hits, which are pairs that already cleared a threshold.
+The floor `F` is the threshold **in force for the scope now**: the client's own row
+if valid, otherwise the global row, otherwise the fixed 0.92. A label counts only if
+it was **recorded under a threshold ≤ `F`** and **scores ≥ `F`**. A label recorded
+under a higher threshold says nothing about the band below it, so it is dropped. One
+recorded under a lower threshold is cut at `F`. What remains is one population, the
+would-hits above `F`, and that is what makes the guarantee carry over:
+
+- a `NO` pair below `F` is never served, because `q̂ ≥ F`;
+- a `NO` pair above `F` is exchangeable with the fitted scores, so it is served with
+  probability at most α;
+- overall, at most α · P(similarity ≥ F | NO) ≤ α.
+
+The bound is conservative, not weaker. What changes is its subject: *of the pairs
+**this judge** would reject, at most α are served*. The judge is a model, its error
+rate is not measured anywhere, and it grades against the answer received this time,
+not against a correct answer.
+
+### How many labels, and why 50 `NO`
+
+A fit needs `gatewai.conformal.shadow.min-pairs` judged pairs (200) of which
+`min-negatives` are `NO` (50), and never fewer `NO` than the quantile needs at the α
+asked for (9 at α = 0.10, 19 at α = 0.05). Below either, the call is a `409` that
+gives every count. The `YES` pairs do not enter `q̂`. They measure the cost: the
+summary states the share of judged-servable pairs the new threshold refuses.
+
+Feasible is not the same as tight. For one fit on `n` continuous scores, the share
+of future `NO` pairs it serves follows Beta(n + 1 − k, k) with k = ⌈(n + 1)(1 − α)⌉
+(Vovk, 2012; Angelopoulos & Bates, arXiv:2107.07511). Computed from that law, which
+is modelled rather than measured, and pinned in `ConformalSpreadTest`, at α = 0.10:
+
+| `NO` pairs | P(rate > 0.15) | P(rate > 0.20) |
+|---:|---:|---:|
+| 20 | 0.18 | 0.07 |
+| 50 | 0.11 | 0.02 |
+| 93 (the shipped set) | 0.05 | < 0.01 |
+| 200 | 0.01 | < 0.01 |
+
+`NO` is the rare class, so 50 of them takes several hundred judged would-hits. Every
+shadow fit stores the 90th percentile of that law as `modelledRateP90`, labelled
+modelled.
+
+### Per client, or pooled
+
+The cache is already per client (`gatewai.cache.client-namespacing=true` by
+default): a client only hits entries its own traffic stored. So a fit on one
+client's labels becomes **that client's row**, and the cache decides that client's
+requests with it. Every other client keeps the global row. Without `client`, the
+labels of every shadow client are pooled into the **global** row. The summary breaks
+the pool down by client, so a single client dominating the shared threshold is
+visible. Each `cache_decision` records which row decided (`calibration_scope`:
+`CLIENT`, `GLOBAL` or `NONE`). With namespacing off, a client row still decides that
+client's requests, but over a cache shared with other clients, so the similarities
+it was fitted on are no longer the client's own.
+
+The intended path: put the client in `SHADOW`, let the judge sample, fit the client,
+then switch it to `ENFORCE`. Its row stays in force. The judge only runs in shadow,
+so nothing checks that row once the client enforces.
+
+### Leaving the ratchet
+
+No label exists below `F`, so a shadow fit can only **raise** the threshold, and
+each fit raises the next one's floor. The exit:
+
+1. **`DELETE /v1/admin/calibration/cache/{client}`** returns the client to the
+   global threshold, which becomes its new `F`. Every label recorded under the old
+   row is now above `F` and dropped (`recordedAboveFloor` in the 409), so a fit right
+   after a delete usually fails. That is expected.
+2. **Keep (or put back) the client in `SHADOW`** until the minimum sample has
+   built up again under the global threshold. A client in `ENFORCE` produces no
+   labels.
+3. **The global row has its own exit**: a `source=labelled-set` fit overwrites it
+   with the hand-labelled fit and leaves the client rows alone.
+
+Ending the ratchet itself means judging near-misses below the threshold. That is
+on the roadmap's "not scheduled" list.
+
+### What the summary says that the threshold does not
+
+`fit_summary` (`GET /v1/admin/calibration`) outlives the labels, which are purged
+with the decision tables. A fit stays auditable after retention, though it cannot
+be rerun on the same labels. The summary holds:
+
+- the labels read and each exclusion;
+- the `YES`/`NO` counts and the time span;
+- the refused-servable share;
+- `ambiguousBecomingServable`: decisions whose set was ambiguous at `F` and that
+  `q̂` would serve, though no label speaks for them, because an ambiguous set is
+  never served and so never judged;
+- the modelled spread;
+- the per-client breakdown.
+
 ## Invalidation and degradation
 
 A calibration is a statement about a specific embedding model and, for routing, a
@@ -177,6 +312,7 @@ describes a system that no longer exists.
 | Different embedding model | `STALE` | `STALE` |
 | Route examples edited (`PUT /v1/admin/routing`) | `STALE` | unaffected — pair similarity has nothing to do with routes |
 | `gatewai.conformal.enabled=false` | `DISABLED` | `DISABLED` |
+| A client row (v4 D.3) on another embedding model | — | that client falls back to the global row |
 | Never calibrated | `ABSENT` | `ABSENT` |
 
 In every non-`VALID` case the **fixed configured threshold applies**, a warning
@@ -198,7 +334,8 @@ thresholds — the last snapshot keeps applying.
   negations, direction swaps are over-represented relative to real traffic — so
   the measured error rates should be read as a **worst case**, and the guarantee
   transfers only as far as that resemblance holds. Calibrating on your own
-  traffic is the fix, and is one property away.
+  traffic is the fix: point the cases at your labelled traffic, or fit on
+  shadow labels (above), with the caveats that come with a judge.
 - **The cache calibration is single-turn.** Its pairs have no system prompt and
   no history, so they all fall in one conversation scope (v4 A.2,
   [ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md)). Inside other
@@ -230,6 +367,11 @@ at the same level of honesty as the energy coefficients.
 | Fitting, snapshotting, degradation | `application/service/ConformalCalibrationService` |
 | Storage (one row per target and client since v4 D.3) | `conformal_calibration` table, `JpaCalibrationStore` |
 | Labelled cases (replaceable port) | `infrastructure/calibration/ClasspathLabelledCaseSource` |
+| Which shadow labels count, and why the rest do not (v4 D.3) | `domain/model/calibration/ShadowLabelSelection` |
+| The modelled spread of one fit | `domain/model/calibration/ConformalSpread` |
+| What a fit read and excluded | `domain/model/calibration/FitSummary`, stored by `FitSummaryJson` |
+| Shadow labels (verdict joined to its decision) | `infrastructure/persistence/JpaShadowLabelHistory` |
+| The prediction set the cache applies | `infrastructure/cache/CachePredictionSet` |
 | Admin API | `adapter/in/web/admin/AdminCalibrationController` |
 | Gauges + startup report | `infrastructure/metrics/CalibrationMetrics` |
 
