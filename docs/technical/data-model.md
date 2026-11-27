@@ -100,7 +100,7 @@ done for a shadow client, which received the upstream answer of the model it nam
 `similarity_score` and `runner_up_score` (the implicit margin) · `threshold` ·
 `matched_entry_id` / `matched_entry_age_seconds` · `origin_correlation_id` ·
 `embedding_model` · `conformal_status` (v2 batch 3) · `reason` and
-`cache_scope` (`V10`, v4 A.2).
+`cache_scope` (`V10`, v4 A.2) · `calibration_scope` (`V16`, v4 D.3).
 
 `reason` ∈ `EMPTY_PROMPT` · `HISTORY_TOO_LONG` (both `BYPASS`) ·
 `EXACT_MATCH_ONLY` (a last turn past the embedding window) · `MAX_TOKENS` (a
@@ -109,6 +109,9 @@ B.3 will add `PASSTHROUGH_<feature>`. `cache_scope` is the SHA-256 of the
 conversation scope the lookup ran in ([ADR 0014](adr/0014-scope-the-cache-by-conversation-context.md)):
 a hash, never text, so a hit can be traced to the context it was allowed in.
 Rows written before `V10` hold null in both; nothing is back-filled.
+`calibration_scope` ∈ `CLIENT` (the client's own calibration decided) · `GLOBAL` ·
+`NONE` (the fixed threshold decided); null on rows written before `V16`, which
+are not back-filled.
 
 Seven properties worth knowing:
 
@@ -226,13 +229,31 @@ tables, and purged with them (`gatewai.decisions.retention-days`). A request tha
 over leaves three rows that tell its story together: `routing_decision` names where it
 was sent first, these rows each move, and `request_log` the model that answered.
 
-## `conformal_calibration` (v2 batch 3)
+## `conformal_calibration` (v2 batch 3; per client since v4 D.3)
 
-One row per target (`CACHE`, `ROUTING`) — the primary key is the target, because
-exactly one threshold is in force at a time: `guarantee` (what α promises) ·
-`alpha` · `q_hat` · `sample_size` · `embedding_model` ·
-`routing_config_version` (null for the cache, which does not depend on routes) ·
-`calibrated_at`.
+One row per target (`CACHE`, `ROUTING`) **and client**: the primary key is
+`(target, client_id)` since `V16`, because exactly one threshold is in force per
+scope at a time ([ADR 0019](adr/0019-calibrate-the-cache-on-shadow-labels.md)).
+`guarantee` (what α promises) · `alpha` · `q_hat` · `sample_size` ·
+`embedding_model` · `routing_config_version` (null for the cache, which does not
+depend on routes) · `calibrated_at` · `client_id` · `source` · `judge_model` ·
+`rubric_version` · `label_floor` · `fit_summary`.
+
+- **`client_id` is `''` on the global row**, the one every client without its own
+  falls back to (a primary-key column cannot be NULL; the domain reads it as "no
+  client"). Only the cache has client rows, and only from a fit on that client's
+  shadow labels.
+- **`source`** ∈ `LABELLED_SET` (the hand-labelled cases; every row before `V16`) ·
+  `SHADOW` (judge-labelled would-hits, v4 D.2). `judge_model`, `rubric_version`
+  and `label_floor` are set exactly on a `SHADOW` row: the one judge and one rubric
+  it was fitted on, and the threshold in force for the scope at the time, above
+  which every counted label scored.
+- **`fit_summary`** (JSONB) records what the fit read, what it excluded and why,
+  and the counts behind the threshold. It outlives the labels, which are purged
+  with the decision tables. It is null on rows fitted before `V16`.
+- **The ADR's rules are CHECK constraints too**: routing only global and from the
+  labelled set; a client row only from shadow labels; shadow provenance present
+  exactly on shadow rows.
 
 No history table. A decision that needs explaining carries its own `alpha` and
 prediction set on its own row, so replaying it never depends on what the store
@@ -418,8 +439,9 @@ startup instead of silently altering a table.
 | `V11__conversation_affinity.sql` | `conversation_affinity`, plus `routing_decision.conversation_routing` / `classified_tier` / `conversation_fingerprint` (v4 A.3) |
 | `V12__failover_event.sql` | `failover_event` and its indexes (v4 B.5) |
 | `V13__split_pricing.sql` | `request_log.cost_eur`/`cost_avoided_eur` renamed `cost`/`cost_avoided`, plus `cached_prompt_tokens`, `pricing_basis`, `currency` (v4 B.6) |
-| `V15__would_hit_assessment.sql` | `would_hit_assessment` and its indexes (v4 D.2) |
 | `V14__shadow_mode.sql` | `api_client.mode` / `mode_changed_at` / `mode_changed_by`, plus `mode` on `cache_decision` and `routing_decision` (v4 D.1) |
+| `V15__would_hit_assessment.sql` | `would_hit_assessment` and its indexes (v4 D.2) |
+| `V16__calibration_per_client.sql` | `conformal_calibration` keyed by `(target, client_id)`, plus `source`, the shadow provenance, `fit_summary` and four CHECK constraints; `cache_decision.calibration_scope` (v4 D.3) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

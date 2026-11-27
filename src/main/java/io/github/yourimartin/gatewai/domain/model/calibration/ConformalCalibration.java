@@ -24,6 +24,17 @@ import java.util.Objects;
  *                             null for {@link CalibrationTarget#CACHE}, which
  *                             does not depend on them
  * @param calibratedAt         when it was computed
+ * @param clientId             the API client this calibration applies to; null for
+ *                             the global row every other client falls back to
+ *                             (v4 D.3, ADR 0019). Only a cache calibration fitted
+ *                             on that client's shadow labels has one.
+ * @param source               where the labels came from
+ * @param shadowFit            the judge, rubric and floor of a
+ *                             {@link CalibrationSource#SHADOW} fit; null exactly
+ *                             when the source is the labelled set
+ * @param fitSummary           what the fit read and excluded, and the counts behind
+ *                             it; its kind matches {@code source}. Null on a
+ *                             calibration fitted before v4 D.3.
  */
 public record ConformalCalibration(
     CalibrationTarget target,
@@ -33,18 +44,59 @@ public record ConformalCalibration(
     int sampleSize,
     String embeddingModel,
     String routingConfigVersion,
-    Instant calibratedAt
+    Instant calibratedAt,
+    String clientId,
+    CalibrationSource source,
+    ShadowFit shadowFit,
+    FitSummary fitSummary
 ) {
 
   public ConformalCalibration {
     Objects.requireNonNull(target, "target is required");
     Objects.requireNonNull(guarantee, "guarantee is required");
+    Objects.requireNonNull(source, "source is required");
     if (alpha <= 0 || alpha >= 1) {
       throw new IllegalArgumentException("alpha must be in (0,1), was " + alpha);
     }
     if (sampleSize <= 0) {
       throw new IllegalArgumentException("sampleSize must be positive");
     }
+    if (clientId != null && clientId.isBlank()) {
+      throw new IllegalArgumentException("a client calibration names its client");
+    }
+    // The rules of ADR 0019, which the table's CHECK constraints repeat (V16).
+    if (target == CalibrationTarget.ROUTING
+        && (clientId != null || source != CalibrationSource.LABELLED_SET)) {
+      throw new IllegalArgumentException(
+          "routing is calibrated globally, on the labelled set only");
+    }
+    if (clientId != null && source != CalibrationSource.SHADOW) {
+      throw new IllegalArgumentException(
+          "a client calibration is fitted on that client's shadow labels");
+    }
+    if ((source == CalibrationSource.SHADOW) != (shadowFit != null)) {
+      throw new IllegalArgumentException(
+          "a shadow calibration names its judge, rubric and floor; no other does");
+    }
+    if (fitSummary != null
+        && (fitSummary instanceof FitSummary.Shadow) != (source == CalibrationSource.SHADOW)) {
+      throw new IllegalArgumentException("the fit summary does not match the source");
+    }
+  }
+
+  /** A global calibration fitted on the labelled set: every calibration before v4 D.3. */
+  public ConformalCalibration(CalibrationTarget target, ConformalGuarantee guarantee,
+                              double alpha, double qhat, int sampleSize,
+                              String embeddingModel, String routingConfigVersion,
+                              Instant calibratedAt) {
+    this(target, guarantee, alpha, qhat, sampleSize, embeddingModel,
+        routingConfigVersion, calibratedAt, null, CalibrationSource.LABELLED_SET, null,
+        null);
+  }
+
+  /** Whether this is the row every client without its own falls back to. */
+  public boolean isGlobal() {
+    return clientId == null;
   }
 
   /**

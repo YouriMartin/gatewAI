@@ -22,8 +22,9 @@ class JpaCalibrationStore implements CalibrationStore {
 
   @Override
   @Transactional(readOnly = true)
-  public Optional<ConformalCalibration> find(CalibrationTarget target) {
-    return repository.findById(target).map(ConformalCalibrationEntity::toDomain);
+  public Optional<ConformalCalibration> find(CalibrationTarget target, String clientId) {
+    return repository.findById(new ConformalCalibrationId(target, clientId))
+        .map(ConformalCalibrationEntity::toDomain);
   }
 
   @Override
@@ -38,5 +39,20 @@ class JpaCalibrationStore implements CalibrationStore {
   @Transactional
   public void save(ConformalCalibration calibration) {
     repository.save(new ConformalCalibrationEntity(calibration));
+  }
+
+  /** Never the global row: that one is replaced by a recalibration, not removed. */
+  @Override
+  @Transactional
+  public boolean delete(CalibrationTarget target, String clientId) {
+    if (clientId == null || clientId.isEmpty()) {
+      throw new IllegalArgumentException("only a client's own calibration can be removed");
+    }
+    ConformalCalibrationId id = new ConformalCalibrationId(target, clientId);
+    if (!repository.existsById(id)) {
+      return false;
+    }
+    repository.deleteById(id);
+    return true;
   }
 }
