@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
@@ -43,6 +44,7 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   private final SpringDataCacheDecisionRepository cacheRepository;
   private final SpringDataFailoverEventRepository failoverRepository;
   private final SpringDataWouldHitAssessmentRepository wouldHitRepository;
+  private final SpringDataShadowCounterfactualRepository counterfactualRepository;
   private final Executor executor;
   private final MeterRegistry meterRegistry;
   private final DecisionRecordingProperties properties;
@@ -52,6 +54,7 @@ class AsyncDecisionRecorder implements DecisionRecorder {
       SpringDataCacheDecisionRepository cacheRepository,
       SpringDataFailoverEventRepository failoverRepository,
       SpringDataWouldHitAssessmentRepository wouldHitRepository,
+      SpringDataShadowCounterfactualRepository counterfactualRepository,
       @Qualifier("applicationTaskExecutor") TaskExecutor executor,
       MeterRegistry meterRegistry,
       DecisionRecordingProperties properties) {
@@ -59,6 +62,7 @@ class AsyncDecisionRecorder implements DecisionRecorder {
     this.cacheRepository = cacheRepository;
     this.failoverRepository = failoverRepository;
     this.wouldHitRepository = wouldHitRepository;
+    this.counterfactualRepository = counterfactualRepository;
     this.executor = executor;
     this.meterRegistry = meterRegistry;
     this.properties = properties;
@@ -87,12 +91,19 @@ class AsyncDecisionRecorder implements DecisionRecorder {
   }
 
   @Override
+  public void record(ShadowCounterfactual counterfactual) {
+    submit("counterfactual", () -> counterfactualRepository.save(
+        new ShadowCounterfactualEntity(counterfactual)));
+  }
+
+  @Override
   @Transactional
   public int purgeOlderThan(Instant cutoff) {
     return routingRepository.deleteByCreatedAtBefore(cutoff)
         + cacheRepository.deleteByCreatedAtBefore(cutoff)
         + failoverRepository.deleteByCreatedAtBefore(cutoff)
-        + wouldHitRepository.deleteByCreatedAtBefore(cutoff);
+        + wouldHitRepository.deleteByCreatedAtBefore(cutoff)
+        + counterfactualRepository.deleteByCreatedAtBefore(cutoff);
   }
 
   /**

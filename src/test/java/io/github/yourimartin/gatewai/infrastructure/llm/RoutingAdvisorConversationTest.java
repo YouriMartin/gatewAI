@@ -25,6 +25,7 @@ import io.github.yourimartin.gatewai.domain.model.routing.ConversationAffinity;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationOpening;
 import io.github.yourimartin.gatewai.domain.model.routing.ConversationRouting;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.out.ComplexityClassifier;
 import io.github.yourimartin.gatewai.domain.port.out.ConversationAffinityStore;
@@ -313,6 +314,11 @@ class RoutingAdvisorConversationTest {
       @Override
       public void record(WouldHitAssessment assessment) {
         // No would-hit is assessed here.
+      }
+
+      @Override
+      public void record(ShadowCounterfactual counterfactual) {
+        // No counterfactual is priced here.
       }
 
       @Override

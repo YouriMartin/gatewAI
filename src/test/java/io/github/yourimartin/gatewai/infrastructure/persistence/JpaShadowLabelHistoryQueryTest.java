@@ -122,8 +122,8 @@ class JpaShadowLabelHistoryQueryTest {
     jdbc.update("""
         INSERT INTO request_log (id, correlation_id, timestamp, model, prompt_hash,
             prompt_tokens, completion_tokens, total_tokens, latency_ms, client_id,
-            pricing_basis, currency)
-        VALUES (?, ?, ?, 'm', 'h', 1, 1, 2, 1, ?, 'BLENDED', 'EUR')""",
+            pricing_basis, currency, mode)
+        VALUES (?, ?, ?, 'm', 'h', 1, 1, 2, 1, ?, 'BLENDED', 'EUR', 'SHADOW')""",
         UUID.randomUUID(), correlationId, Timestamp.from(AT), clientId);
   }
 

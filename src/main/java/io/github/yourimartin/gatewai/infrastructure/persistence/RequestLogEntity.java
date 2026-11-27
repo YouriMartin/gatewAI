@@ -9,6 +9,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 import io.github.yourimartin.gatewai.domain.model.carbon.RegionProvenance;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 
 import jakarta.persistence.Column;
@@ -116,6 +117,11 @@ class RequestLogEntity {
   @Column(name = "pue", updatable = false)
   private Double pue;
 
+  /** ENFORCE or SHADOW (V17, v4 D.4): a SHADOW row is what a shadow client paid. */
+  @Enumerated(EnumType.STRING)
+  @Column(updatable = false, nullable = false, length = 16)
+  private ClientMode mode;
+
   protected RequestLogEntity() {
     // JPA requires a no-arg constructor
   }
@@ -155,6 +161,7 @@ class RequestLogEntity {
     this.regionProvenance = provenance.regionProvenance();
     this.energySource = provenance.energySource();
     this.pue = provenance.pue();
+    this.mode = log.mode();
   }
 
   RequestLog toDomain() {
@@ -166,7 +173,8 @@ class RequestLogEntity {
             costAvoided, gramsCo2Avoided, pricingBasis, currency),
         provenance(),
         cacheHit,
-        cachedPromptTokens
+        cachedPromptTokens,
+        mode
     );
   }
 

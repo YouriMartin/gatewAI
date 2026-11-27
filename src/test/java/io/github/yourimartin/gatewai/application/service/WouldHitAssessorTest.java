@@ -127,7 +127,7 @@ class WouldHitAssessorTest {
     assertThat(prompt.getValue().get(1).content()).contains(RECEIVED.text()).contains(CACHED);
     verify(accounting).record(any(LlmRequest.class), eq(JUDGE), eq(new TokenUsage(120, 1, 121)),
         eq(false), anyLong(), eq(assessment.judgeCorrelationId()),
-        eq(WouldHitAssessor.JUDGE_CLIENT_ID));
+        eq(WouldHitAssessor.JUDGE_CLIENT_ID), eq(ClientMode.ENFORCE));
     verify(metrics).recordShadowJudgement(JudgeOutcome.JUDGED, JudgeVerdict.NO);
   }
 
@@ -143,7 +143,7 @@ class WouldHitAssessorTest {
     assertThat(assessment.verdict()).isNull();
     assertThat(assessment.judgeCorrelationId()).isNull();
     verify(accounting, never()).record(any(), anyString(), any(), anyBoolean(), anyLong(), any(),
-        any());
+        any(), any());
   }
 
   @Test

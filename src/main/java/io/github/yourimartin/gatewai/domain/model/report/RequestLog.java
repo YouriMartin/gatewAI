@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 
 /**
  * One completed request: what was called, what it cost, what it emitted, and how
@@ -21,6 +22,9 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
  * @param cachedPromptTokens prompt tokens the provider served from its cache (v4
  *                      B.6); {@code null} when it did not report them, and on
  *                      every row written before B.6
+ * @param mode          the mode of the client it was served for (v4 D.4): a
+ *                      {@code SHADOW} row is what a shadow client actually paid.
+ *                      Rows written before {@code V17} read {@code ENFORCE}.
  */
 public record RequestLog(
     UUID id,
@@ -36,12 +40,27 @@ public record RequestLog(
     GreenMetrics green,
     GreenProvenance provenance,
     boolean cacheHit,
-    Integer cachedPromptTokens
+    Integer cachedPromptTokens,
+    ClientMode mode
 ) {
 
   public RequestLog {
     if (provenance == null) {
       provenance = GreenProvenance.UNKNOWN;
     }
+    if (mode == null) {
+      mode = ClientMode.ENFORCE;
+    }
+  }
+
+  /** An enforced request: every row before v4 D.4. */
+  public RequestLog(UUID id, String correlationId, Instant timestamp, String model,
+                    String promptHash, int promptTokens, int completionTokens,
+                    int totalTokens, long latencyMs, String clientId, GreenMetrics green,
+                    GreenProvenance provenance, boolean cacheHit,
+                    Integer cachedPromptTokens) {
+    this(id, correlationId, timestamp, model, promptHash, promptTokens, completionTokens,
+        totalTokens, latencyMs, clientId, green, provenance, cacheHit, cachedPromptTokens,
+        ClientMode.ENFORCE);
   }
 }

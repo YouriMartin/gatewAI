@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.llm.PricingBasis;
 
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,21 @@ class RequestLogTest {
     assertEquals(GREEN, log.green());
     assertEquals(1.5, log.green().gramsCo2Avoided());
     assertFalse(log.cacheHit());
+  }
+
+  @Test
+  void aRowStatesTheModeItWasServedInAndDefaultsToEnforce() {
+    GreenMetrics none = GreenMetrics.none("EUR");
+    RequestLog enforced = new RequestLog(UUID.randomUUID(), "corr", Instant.now(), "m", "h",
+        1, 1, 2, 1, "c", none, GreenProvenance.UNKNOWN, false, null);
+    RequestLog shadow = new RequestLog(UUID.randomUUID(), "corr", Instant.now(), "m", "h",
+        1, 1, 2, 1, "c", none, GreenProvenance.UNKNOWN, false, null, ClientMode.SHADOW);
+    RequestLog unstated = new RequestLog(UUID.randomUUID(), "corr", Instant.now(), "m", "h",
+        1, 1, 2, 1, "c", none, GreenProvenance.UNKNOWN, false, null, null);
+
+    assertEquals(ClientMode.ENFORCE, enforced.mode());
+    assertEquals(ClientMode.SHADOW, shadow.mode());
+    assertEquals(ClientMode.ENFORCE, unstated.mode());
   }
 
   @Test

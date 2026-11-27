@@ -15,6 +15,7 @@ import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.carbon.ModelSite;
 import io.github.yourimartin.gatewai.domain.model.carbon.ProviderRegion;
 import io.github.yourimartin.gatewai.domain.model.carbon.ResolvedCarbonZone;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.ModelDefinition;
@@ -70,9 +71,12 @@ final class RequestAccounting {
    * @param correlationId captured on the request thread: a stream completes where
    *                      the Scoped Value may be unbound
    * @param clientId      captured likewise
+   * @param mode          the mode of the client it was served for, captured likewise
+   *                      (v4 D.4); a judge call is enforced even inside a shadow replay
    */
   RequestLog record(LlmRequest request, String model, TokenUsage usage, boolean cacheHit,
-                    long latencyMs, String correlationId, String clientId) {
+                    long latencyMs, String correlationId, String clientId,
+                    ClientMode mode) {
     Accounted accounted = accountGreen(model, usage, cacheHit);
     RequestLog log = new RequestLog(
         UUID.randomUUID(),
@@ -88,7 +92,8 @@ final class RequestAccounting {
         accounted.metrics(),
         accounted.provenance(),
         cacheHit,
-        usage.cachedPromptTokens()
+        usage.cachedPromptTokens(),
+        mode
     );
     requestLogRepository.save(log);
     metricsRecorder.record(log);

@@ -35,6 +35,7 @@ import io.github.yourimartin.gatewai.domain.model.llm.RelayedAnswer;
 import io.github.yourimartin.gatewai.domain.model.llm.SamplingParameters;
 import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.llm.UnknownModelException;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.port.out.CarbonIntensityProvider;
 import io.github.yourimartin.gatewai.domain.port.out.CloudRegionZones;
@@ -118,7 +119,11 @@ class PassThroughServiceShadowTest {
 
     assertThat(response.model()).isEqualTo("gpt-5");
     verify(client).forward(PREMIUM, BODY);
-    verify(requestLogRepository).save(any());
+    ArgumentCaptor<RequestLog> logged = ArgumentCaptor.forClass(RequestLog.class);
+    verify(requestLogRepository).save(logged.capture());
+    assertThat(logged.getValue().mode())
+        .as("what a shadow client paid is marked as such (v4 D.4)")
+        .isEqualTo(ClientMode.SHADOW);
     verify(shadow).submit(SHADOW, request.request(), Optional.of(ANSWER));
     // The verdict is the chain's, recorded by the evaluation: none here.
     verify(decisionRecorder, never()).record(any(CacheDecision.class));

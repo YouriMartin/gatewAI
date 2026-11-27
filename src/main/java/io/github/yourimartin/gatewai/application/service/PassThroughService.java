@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
@@ -296,7 +297,8 @@ final class PassThroughService implements PassThroughUseCase {
       usage = TokenUsage.NONE;
     }
     accounting.record(prepared.request(), model.modelId(), usage, false, latencyMs,
-        prepared.correlationId(), prepared.clientId());
+        prepared.correlationId(), prepared.clientId(),
+        prepared.context() == null ? ClientMode.ENFORCE : prepared.context().mode());
   }
 
   /**
