@@ -45,6 +45,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.ShadowOutcome;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.RelayedAnswer;
+import io.github.yourimartin.gatewai.domain.model.report.RequestLog;
 import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.in.ChatCompletionUseCase;
@@ -229,7 +230,11 @@ class ShadowModeAcceptanceTest {
     verifyNoInteractions(answerJudge);
 
     // Served and accounted as a pass-through; the verdict is the chain's, not BYPASS.
-    verify(requestLogRepository).save(any());
+    ArgumentCaptor<RequestLog> logged = ArgumentCaptor.forClass(RequestLog.class);
+    verify(requestLogRepository).save(logged.capture());
+    assertThat(logged.getValue().mode())
+        .as("what a shadow client paid is marked as such (v4 D.4)")
+        .isEqualTo(ClientMode.SHADOW);
     verify(decisionRecorder, never()).record(any(CacheDecision.class));
     verify(decisionRecorder, never()).record(any(RoutingDecision.class));
     verifyNoInteractions(chain, streamChain);

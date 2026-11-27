@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.DoubleSupplier;
 
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmMessage;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
@@ -188,8 +189,9 @@ final class WouldHitAssessor {
     long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
     TokenUsage usage = reply.usage() == null ? TokenUsage.NONE : reply.usage();
     try {
+      // Enforced: the judge call is really served, even inside a shadow replay.
       accounting.record(new LlmRequest(judgeModel, prompt, 0.0, null), judgeModel, usage,
-          false, latencyMs, correlationId, JUDGE_CLIENT_ID);
+          false, latencyMs, correlationId, JUDGE_CLIENT_ID, ClientMode.ENFORCE);
     } catch (RuntimeException e) {
       LOG.warn("Could not account judge call {}: {}", correlationId, e.toString());
     }

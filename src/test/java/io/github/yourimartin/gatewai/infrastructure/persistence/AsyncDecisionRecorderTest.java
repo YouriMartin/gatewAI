@@ -12,18 +12,23 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenMetrics;
+import io.github.yourimartin.gatewai.domain.model.carbon.GreenProvenance;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.llm.TokenUsage;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification.HeuristicRule;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationStrategy;
 import io.github.yourimartin.gatewai.domain.model.routing.DecisionReason;
 import io.github.yourimartin.gatewai.domain.model.routing.FailoverCause;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
+import io.github.yourimartin.gatewai.domain.model.shadow.CounterfactualOutcome;
 import io.github.yourimartin.gatewai.domain.model.shadow.JudgeOutcome;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -52,6 +57,8 @@ class AsyncDecisionRecorderTest {
   private MeterRegistry meterRegistry;
   @Mock
   private SpringDataWouldHitAssessmentRepository wouldHitRepository;
+  @Mock
+  private SpringDataShadowCounterfactualRepository counterfactualRepository;
   private DecisionRecordingProperties properties;
   private AsyncDecisionRecorder recorder;
 
@@ -62,7 +69,8 @@ class AsyncDecisionRecorderTest {
     // Runs the submitted task inline, so the assertions see the effect.
     TaskExecutor executor = new SyncTaskExecutor();
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        failoverRepository, wouldHitRepository, executor, meterRegistry, properties);
+        failoverRepository, wouldHitRepository, counterfactualRepository, executor,
+        meterRegistry, properties);
   }
 
   @Test
@@ -106,7 +114,8 @@ class AsyncDecisionRecorderTest {
       throw new IllegalStateException("executor shut down");
     };
     recorder = new AsyncDecisionRecorder(routingRepository, cacheRepository,
-        failoverRepository, wouldHitRepository, rejecting, meterRegistry, properties);
+        failoverRepository, wouldHitRepository, counterfactualRepository, rejecting,
+        meterRegistry, properties);
 
     assertDoesNotThrow(() -> recorder.record(routingDecision()));
     assertEquals(1.0, recorder.failureCount("routing"));
@@ -131,8 +140,18 @@ class AsyncDecisionRecorderTest {
     when(cacheRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(4);
     when(failoverRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(2);
     when(wouldHitRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(5);
+    when(counterfactualRepository.deleteByCreatedAtBefore(cutoff)).thenReturn(6);
 
-    assertEquals(14, recorder.purgeOlderThan(cutoff));
+    assertEquals(20, recorder.purgeOlderThan(cutoff));
+  }
+
+  @Test
+  void writesAShadowCounterfactual() {
+    recorder.record(new ShadowCounterfactual(UUID.randomUUID(), "corr-1", "client-a",
+        Instant.now(), CounterfactualOutcome.WOULD_HIT, null, TokenUsage.of(10, 5),
+        GreenMetrics.none("EUR"), GreenProvenance.UNKNOWN));
+
+    verify(counterfactualRepository).save(any(ShadowCounterfactualEntity.class));
   }
 
   @Test

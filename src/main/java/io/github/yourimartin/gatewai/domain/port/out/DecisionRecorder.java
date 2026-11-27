@@ -5,6 +5,7 @@ import java.time.Instant;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 
 /**
@@ -25,6 +26,9 @@ public interface DecisionRecorder {
 
   /** How a shadow would-hit compares with the answer served (v4 D.2). */
   void record(WouldHitAssessment assessment);
+
+  /** What a shadow request would have cost (v4 D.4, ADR 0020). */
+  void record(ShadowCounterfactual counterfactual);
 
   /**
    * Drops decisions older than {@code cutoff}.

@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import io.github.yourimartin.gatewai.domain.model.carbon.GreenAccountant;
 import io.github.yourimartin.gatewai.domain.model.carbon.ResolvedCarbonZone;
 import io.github.yourimartin.gatewai.domain.model.client.ShadowModeException;
+import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmRequest;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmResponse;
 import io.github.yourimartin.gatewai.domain.model.llm.LlmStreamChunk;
@@ -59,7 +60,7 @@ class ChatCompletionService
             response.promptTokens(), response.completionTokens(), response.totalTokens(),
             response.cachedPromptTokens()),
         response.cacheHit(), latencyMs, RequestAccounting.correlationId(),
-        RequestAccounting.clientId());
+        RequestAccounting.clientId(), ClientMode.ENFORCE);
     return response;
   }
 
@@ -91,7 +92,7 @@ class ChatCompletionService
     accounting.record(request, last.model(), new TokenUsage(
             last.promptTokens(), last.completionTokens(), last.totalTokens(),
             last.cachedPromptTokens()),
-        last.cacheHit(), latencyMs, correlationId, clientId);
+        last.cacheHit(), latencyMs, correlationId, clientId, ClientMode.ENFORCE);
   }
 
   /**

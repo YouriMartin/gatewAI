@@ -13,7 +13,7 @@ touching the cache logic.
 
 ## `request_log` (metrics)
 
-Persisted once per served request by `ChatCompletionService`
+Persisted once per served request by `RequestAccounting` (the chain and pass-through)
 (`RequestLogEntity` ⇄ domain `RequestLog` ⇄ `JpaRequestLogAdapter`).
 
 | Column | Type | Notes |
@@ -27,6 +27,7 @@ Persisted once per served request by `ChatCompletionService`
 | `cached_prompt_tokens` | int | prompt tokens the provider served from its prompt cache (v4 B.6); **NULL = not reported**, not zero |
 | `latency_ms` | bigint | wall-clock latency |
 | `client_id` | text | owning client (from the request context), nullable |
+| `mode` | varchar(16) | `ENFORCE` · `SHADOW` (`V17`, v4 D.4): a `SHADOW` row is what a shadow client actually paid for a request served by pass-through. A judge call is `ENFORCE`, even inside a shadow replay. Rows before `V17` read `ENFORCE` |
 | `cost` | double | actual cost, in `currency` (`cost_eur` until v4 B.6, which held whatever currency the prices were in) |
 | `energy_kwh` | double | estimated energy |
 | `grams_co2` | double | estimated emissions |
@@ -206,6 +207,29 @@ to the shadow request's `cache_decision` and `request_log` rows.
 
 **No answer text.** Both answers are compared in memory and discarded; the table has
 no text column, and `WouldHitAssessmentSchemaTest` fails if one is added.
+
+## `shadow_counterfactual` (v4 D.4)
+
+One row per evaluated shadow request: what it would have cost had gatewAI enforced
+its decision ([ADR 0020](adr/0020-price-the-shadow-counterfactual-at-replay.md)).
+Priced by the replay when it decided, by the same accounting code as `request_log`,
+and self-describing like it, so a report of a past period re-derives from these rows
+and never from today's prices or regions. Written off the request path by
+`AsyncDecisionRecorder`, purged with the decision tables, joined on `correlation_id`
+to the request's `request_log` row (what was paid) and its `SHADOW` decisions.
+
+| Column | Type | Notes |
+|---|---|---|
+| `outcome` | `varchar(16)` | `WOULD_HIT` (from the cache: no inference) · `ROUTED` (the model the router chose) · `PASSED_THROUGH` (the chain cannot honour it: the actual) |
+| `model` | `varchar(255)` | the model that would have answered; null exactly on a `WOULD_HIT` |
+| `prompt_tokens` … `cached_prompt_tokens` | `integer` | the usage it was priced with: the answer received's, since the routed model never ran (**modelled**) |
+| `cost`, `pricing_basis`, `currency` | | as in `request_log` (v4 B.6); zero on a `WOULD_HIT` |
+| `energy_kwh`, `grams_co2` | `float8` | as in `request_log`; zero on a `WOULD_HIT` |
+| `provider` … `pue` | | the provenance it was priced under (v3 C.5) |
+
+No avoided figures: those compare a served request with the premium baseline. CHECK
+constraints hold the outcome to its three values, a model on every outcome but
+`WOULD_HIT`, and a `WOULD_HIT` to zero cost, energy and CO2.
 
 ## `failover_event` (v4 B.5)
 
@@ -442,6 +466,7 @@ startup instead of silently altering a table.
 | `V14__shadow_mode.sql` | `api_client.mode` / `mode_changed_at` / `mode_changed_by`, plus `mode` on `cache_decision` and `routing_decision` (v4 D.1) |
 | `V15__would_hit_assessment.sql` | `would_hit_assessment` and its indexes (v4 D.2) |
 | `V16__calibration_per_client.sql` | `conformal_calibration` keyed by `(target, client_id)`, plus `source`, the shadow provenance, `fit_summary` and four CHECK constraints; `cache_decision.calibration_scope` (v4 D.3) |
+| `V17__shadow_counterfactual.sql` | `request_log.mode` (+ check and an index on `mode, client_id, timestamp`), and `shadow_counterfactual` with its indexes and CHECK constraints (v4 D.4) |
 
 The `vector_store` table and the `vector` extension are **not** managed by
 Flyway: Spring AI initializes them

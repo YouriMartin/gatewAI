@@ -25,3 +25,4 @@ part that ages well.
 | [0017](0017-ordered-failover-inside-a-tier.md) | Ordered failover inside a tier: the entries of one tier, in a declared order, before the first byte; the gateway is the only retry layer | Accepted |
 | [0018](0018-shadow-mode-serves-by-pass-through.md) | Shadow mode: a shadow client is served by pass-through, and the chain decides by replaying the answer it received | Accepted |
 | [0019](0019-calibrate-the-cache-on-shadow-labels.md) | Calibrate the cache on shadow labels: per client with a global fallback, above the threshold in force, one judge and one rubric per fit, with a stored fit summary | Accepted |
+| [0020](0020-price-the-shadow-counterfactual-at-replay.md) | The shadow report prices the counterfactual when the replay decides it, stores it self-describing, and reports from stored rows only | Accepted |

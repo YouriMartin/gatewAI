@@ -12,6 +12,7 @@ import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
@@ -160,6 +161,11 @@ final class ConversationCacheEvaluator {
       @Override
       public void record(WouldHitAssessment assessment) {
         // No would-hit is assessed here.
+      }
+
+      @Override
+      public void record(ShadowCounterfactual counterfactual) {
+        // No counterfactual is priced here.
       }
 
       @Override

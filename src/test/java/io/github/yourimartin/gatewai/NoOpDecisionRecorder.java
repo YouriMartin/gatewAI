@@ -5,6 +5,7 @@ import java.time.Instant;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
 import io.github.yourimartin.gatewai.domain.model.decision.FailoverEvent;
 import io.github.yourimartin.gatewai.domain.model.decision.RoutingDecision;
+import io.github.yourimartin.gatewai.domain.model.shadow.ShadowCounterfactual;
 import io.github.yourimartin.gatewai.domain.model.shadow.WouldHitAssessment;
 import io.github.yourimartin.gatewai.domain.port.out.DecisionRecorder;
 
@@ -28,6 +29,11 @@ public class NoOpDecisionRecorder implements DecisionRecorder {
 
   @Override
   public void record(WouldHitAssessment assessment) {
+    // Not kept.
+  }
+
+  @Override
+  public void record(ShadowCounterfactual counterfactual) {
     // Not kept.
   }
 
