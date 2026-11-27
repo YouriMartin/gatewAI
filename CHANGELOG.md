@@ -79,6 +79,12 @@ The first published release: everything below is new to anyone pulling an image.
   carry the project's former name. The MCP server reports itself as `gatewai` (was
   `gatewai-green-proxy`) with the jar's version (was a fixed `0.1.0`).
 
+### Fixed
+
+- **`POST /v1/admin/clients` without `"admin"` is no longer a 400.** The flag is
+  optional and defaults to `false`; on a source build it was required, because
+  Jackson 3 refuses a missing primitive.
+
 ### Security
 
 - **OpenTelemetry 1.67.0** (was 1.62.0 from the Spring Boot parent):

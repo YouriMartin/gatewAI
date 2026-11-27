@@ -2,6 +2,7 @@ package io.github.yourimartin.gatewai.adapter.in.web.admin;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -24,6 +25,7 @@ import io.github.yourimartin.gatewai.domain.model.client.CreatedApiClient;
 import io.github.yourimartin.gatewai.domain.port.in.ManageApiClientsUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ApiClientRepository;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -73,6 +75,24 @@ class AdminClientControllerTest {
         .andExpect(jsonPath("$.api_key").value("gw_secret"))
         .andExpect(jsonPath("$.client.name").value("acme"))
         .andExpect(jsonPath("$.client.admin").value(true));
+  }
+
+  @Test
+  @DisplayName("a body without admin creates a non-admin client, not a 400")
+  void aMissingAdminFlagMeansNotAdmin() throws Exception {
+    when(useCase.create("acme", false))
+        .thenReturn(new CreatedApiClient(client(false), "gw_secret"));
+
+    for (String body : List.of("{\"name\":\"acme\"}", "{\"name\":\"acme\",\"admin\":null}")) {
+      mockMvc.perform(post("/v1/admin/clients")
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body)
+              .with(authentication(adminAuth())))
+          .andExpect(status().isCreated())
+          .andExpect(jsonPath("$.client.admin").value(false));
+    }
+
+    verify(useCase, times(2)).create("acme", false);
   }
 
   @Test
