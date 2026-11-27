@@ -341,7 +341,8 @@ included). Range must satisfy `from < to`, max 366 days, else `400`.
 ## Admin — clients (`ROLE_ADMIN`)
 
 ### `POST /v1/admin/clients`
-Body: `{"name": "my-app", "admin": false}`. Returns **`201`** with
+Body: `{"name": "my-app", "admin": false}`; `admin` is optional and defaults to
+`false`. Returns **`201`** with
 `CreatedClientView`:
 
 ```json
