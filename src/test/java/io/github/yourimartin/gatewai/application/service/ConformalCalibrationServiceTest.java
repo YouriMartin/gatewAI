@@ -7,16 +7,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationSource;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
 import io.github.yourimartin.gatewai.domain.model.calibration.LabelledCase;
+import io.github.yourimartin.gatewai.domain.model.calibration.ShadowFit;
 import io.github.yourimartin.gatewai.domain.model.routing.ModelTier;
 import io.github.yourimartin.gatewai.domain.model.routing.RoutingConfig;
 import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
@@ -70,6 +74,20 @@ class ConformalCalibrationServiceTest {
   }
 
   @Test
+  @DisplayName("a client's own calibration never stands in for the global threshold")
+  void aClientRowDoesNotReplaceTheGlobalOne() {
+    store.save(new ConformalCalibration(CalibrationTarget.CACHE,
+        ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.97, 50, "nomic-embed-text", null,
+        Instant.parse("2026-11-27T00:00:00Z"), "client-a", CalibrationSource.SHADOW,
+        new ShadowFit("judge", "would-hit-v1", 0.95)));
+
+    CalibrationState cache = service(true).state(CalibrationTarget.CACHE);
+
+    assertEquals(CalibrationStatus.ABSENT, cache.status());
+    assertEquals(FIXED_CACHE_THRESHOLD, cache.effectiveThreshold());
+  }
+
+  @Test
   @DisplayName("routing scores come from the same scoring the router ranks with")
   void fitsRoutingOnTheScoresTheRouterDecidesWith() {
     when(labelledCases.routingCases()).thenReturn(List.of(
@@ -84,7 +102,7 @@ class ConformalCalibrationServiceTest {
     service(true).recalibrate(0.25, 0.25);
 
     ConformalCalibration routing =
-        store.find(CalibrationTarget.ROUTING).orElseThrow();
+        store.find(CalibrationTarget.ROUTING, null).orElseThrow();
     assertEquals(ConformalGuarantee.CORRECT_TARGET_COVERAGE, routing.guarantee());
     assertEquals(3, routing.sampleSize());
     // Non-conformity 1-score = {0.20, 0.30, 0.50}; ceil(4 * 0.75) = 3 -> 0.50.
@@ -115,7 +133,7 @@ class ConformalCalibrationServiceTest {
 
     service(true).recalibrate(0.50, 0.25);
 
-    ConformalCalibration cache = store.find(CalibrationTarget.CACHE).orElseThrow();
+    ConformalCalibration cache = store.find(CalibrationTarget.CACHE, null).orElseThrow();
     assertEquals(ConformalGuarantee.WRONG_ANSWER_RATE, cache.guarantee());
     assertEquals(3, cache.sampleSize(), "only the non-servable pairs are fitted on");
     // Similarities {0, 0.707, 1}; ceil(4 * 0.75) = 3 -> the largest, 1.0.
@@ -225,8 +243,8 @@ class ConformalCalibrationServiceTest {
     private final List<ConformalCalibration> saved = new ArrayList<>();
 
     @Override
-    public Optional<ConformalCalibration> find(CalibrationTarget target) {
-      return saved.stream().filter(c -> c.target() == target).findFirst();
+    public Optional<ConformalCalibration> find(CalibrationTarget target, String clientId) {
+      return saved.stream().filter(c -> sameScope(c, target, clientId)).findFirst();
     }
 
     @Override
@@ -236,8 +254,18 @@ class ConformalCalibrationServiceTest {
 
     @Override
     public void save(ConformalCalibration calibration) {
-      saved.removeIf(c -> c.target() == calibration.target());
+      saved.removeIf(c -> sameScope(c, calibration.target(), calibration.clientId()));
       saved.add(calibration);
+    }
+
+    @Override
+    public boolean delete(CalibrationTarget target, String clientId) {
+      return saved.removeIf(c -> sameScope(c, target, clientId));
+    }
+
+    private static boolean sameScope(ConformalCalibration c, CalibrationTarget target,
+                                     String clientId) {
+      return c.target() == target && Objects.equals(c.clientId(), clientId);
     }
   }
 }

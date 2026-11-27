@@ -262,8 +262,11 @@ class ConformalCalibrationService implements CalibrationUseCase {
     try {
       Map<CalibrationTarget, ConformalCalibration> loaded =
           new EnumMap<>(CalibrationTarget.class);
-      store.findAll().forEach(calibration ->
-          loaded.put(calibration.target(), calibration));
+      // Global rows only: a client's own row (v4 D.3) must never stand in for
+      // the threshold every other client is decided under.
+      store.findAll().stream()
+          .filter(ConformalCalibration::isGlobal)
+          .forEach(calibration -> loaded.put(calibration.target(), calibration));
       Snapshot fresh = new Snapshot(loaded, Instant.now());
       snapshot = fresh;
       return fresh.byTarget();

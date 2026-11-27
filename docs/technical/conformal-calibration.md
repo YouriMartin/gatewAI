@@ -228,7 +228,7 @@ at the same level of honesty as the energy coefficients.
 | What α promises | `domain/model/calibration/ConformalGuarantee` |
 | Route scoring shared by router and calibration | `domain/model/routing/RouteScoring` |
 | Fitting, snapshotting, degradation | `application/service/ConformalCalibrationService` |
-| Storage (one row per target) | `conformal_calibration` table, `JpaCalibrationStore` |
+| Storage (one row per target and client since v4 D.3) | `conformal_calibration` table, `JpaCalibrationStore` |
 | Labelled cases (replaceable port) | `infrastructure/calibration/ClasspathLabelledCaseSource` |
 | Admin API | `adapter/in/web/admin/AdminCalibrationController` |
 | Gauges + startup report | `infrastructure/metrics/CalibrationMetrics` |
