@@ -10,6 +10,7 @@ import io.github.yourimartin.gatewai.adapter.in.web.admin.CreatedClientView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.DecisionView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.ExplainRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.ExplanationView;
+import io.github.yourimartin.gatewai.adapter.in.web.admin.FitSummaryView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.RecalibrateRequest;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.RoutingConfigView;
 import io.github.yourimartin.gatewai.adapter.in.web.admin.WrongHitView;
@@ -25,6 +26,7 @@ import io.github.yourimartin.gatewai.adapter.in.web.chat.TokenUsage;
 import io.github.yourimartin.gatewai.adapter.in.web.models.ModelListView;
 import io.github.yourimartin.gatewai.adapter.in.web.models.ModelView;
 import io.github.yourimartin.gatewai.adapter.in.web.report.GreenReportResponse;
+import io.github.yourimartin.gatewai.domain.model.calibration.FitSummary;
 import io.github.yourimartin.gatewai.domain.model.routing.ClassificationJustification;
 
 import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
@@ -65,6 +67,10 @@ class NativeRuntimeHints implements RuntimeHintsRegistrar {
       RoutingConfigView.RouteView.class,
       CalibrationView.class,
       RecalibrateRequest.class,
+      // Shadow calibration (v4 D.3): the summary view carries two domain records.
+      FitSummaryView.class,
+      FitSummary.Exclusions.class,
+      FitSummary.ClientCounts.class,
       // Decision trace and explanations (v2 batch 9). The justification is a
       // sealed interface: its implementations are serialized by their concrete
       // type, so each one is registered rather than relying on the interface.

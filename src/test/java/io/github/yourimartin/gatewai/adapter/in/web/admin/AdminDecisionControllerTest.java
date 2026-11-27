@@ -16,6 +16,7 @@ import java.util.UUID;
 
 import io.github.yourimartin.gatewai.adapter.in.web.security.ApiKeyAuthentication;
 import io.github.yourimartin.gatewai.adapter.in.web.security.SecurityConfig;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
@@ -205,7 +206,8 @@ class AdminDecisionControllerTest {
   private static CacheDecision cache() {
     return new CacheDecision(UUID.randomUUID(), "req-1", NOW, "b".repeat(64),
         CacheOutcome.MISS, 0.71, 0.42, 0.92, null, null, null,
-        "nomic-embed-text", ConformalStatus.EMPTY_SET, null, null, ClientMode.ENFORCE);
+        "nomic-embed-text", ConformalStatus.EMPTY_SET, null, null, ClientMode.ENFORCE,
+        CalibrationScope.GLOBAL);
   }
 
   private static RoutingDecision routing() {

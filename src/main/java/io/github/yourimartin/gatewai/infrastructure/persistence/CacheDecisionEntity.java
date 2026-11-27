@@ -3,6 +3,7 @@ package io.github.yourimartin.gatewai.infrastructure.persistence;
 import java.time.Instant;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.client.ClientMode;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -73,6 +74,11 @@ class CacheDecisionEntity {
   @Column(updatable = false, nullable = false, length = 16)
   private ClientMode mode;
 
+  /** Which calibration decided (V16, v4 D.3); null on a bypass and on older rows. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "calibration_scope", updatable = false, length = 16)
+  private CalibrationScope calibrationScope;
+
   protected CacheDecisionEntity() {
     // JPA requires a no-arg constructor
   }
@@ -94,6 +100,7 @@ class CacheDecisionEntity {
     this.reason = decision.reason();
     this.cacheScope = decision.cacheScope();
     this.mode = decision.mode();
+    this.calibrationScope = decision.calibrationScope();
   }
 
   CacheDecision toDomain() {
@@ -101,6 +108,6 @@ class CacheDecisionEntity {
         id, correlationId, createdAt, promptHash, outcome,
         similarityScore, runnerUpScore, threshold,
         matchedEntryId, matchedEntryAgeSeconds, originCorrelationId,
-        embeddingModel, conformalStatus, reason, cacheScope, mode);
+        embeddingModel, conformalStatus, reason, cacheScope, mode, calibrationScope);
   }
 }

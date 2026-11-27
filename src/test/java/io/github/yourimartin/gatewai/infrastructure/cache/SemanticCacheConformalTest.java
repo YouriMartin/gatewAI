@@ -9,13 +9,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import io.github.yourimartin.gatewai.CalibrationFixtures;
 import io.github.yourimartin.gatewai.InMemoryConversationAffinityStore;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationSource;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
+import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
+import io.github.yourimartin.gatewai.domain.model.calibration.ShadowFit;
+import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
+import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
 
@@ -88,7 +98,8 @@ class SemanticCacheConformalTest {
     assertEquals("Spring is a framework.",
         result.chatResponse().getResult().getOutput().getText());
     verify(tracer).decided(any(), any(), any(), eq(0.90),
-        eq(ConformalStatus.SINGLETON), any(), any());
+        eq(ConformalStatus.SINGLETON), any(), any(),
+        eq(CalibrationScope.GLOBAL));
   }
 
   @Test
@@ -106,7 +117,8 @@ class SemanticCacheConformalTest {
 
     verify(callChain).nextCall(any());
     verify(tracer).decided(any(), any(), isNull(), eq(0.90),
-        eq(ConformalStatus.AMBIGUOUS), any(), any());
+        eq(ConformalStatus.AMBIGUOUS), any(), any(),
+        eq(CalibrationScope.GLOBAL));
   }
 
   @Test
@@ -124,7 +136,8 @@ class SemanticCacheConformalTest {
     assertEquals("A framework.",
         result.chatResponse().getResult().getOutput().getText());
     verify(tracer).decided(any(), any(), any(), eq(0.92),
-        eq(ConformalStatus.NOT_CALIBRATED), any(), any());
+        eq(ConformalStatus.NOT_CALIBRATED), any(), any(),
+        eq(CalibrationScope.NONE));
   }
 
   @Test
@@ -146,7 +159,34 @@ class SemanticCacheConformalTest {
     // 0.85 would have cleared the stale 0.80 but not the fixed 0.92.
     verify(callChain).nextCall(any());
     verify(tracer).decided(any(), any(), isNull(), eq(0.92),
-        eq(ConformalStatus.STALE_CALIBRATION), any(), any());
+        eq(ConformalStatus.STALE_CALIBRATION), any(), any(),
+        eq(CalibrationScope.NONE));
+  }
+
+  @Test
+  @DisplayName("a client's own calibration decides its requests, and the trace says so")
+  void aClientCalibrationDecidesForItsClient() {
+    CalibrationUseCase calibrations = mock(CalibrationUseCase.class);
+    ConformalCalibration own = new ConformalCalibration(CalibrationTarget.CACHE,
+        ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.95, 50, "nomic-embed-text", null,
+        Instant.parse("2026-11-27T00:00:00Z"), "client-a", CalibrationSource.SHADOW,
+        new ShadowFit("judge", "would-hit-v1", 0.92), null);
+    when(calibrations.state(CalibrationTarget.CACHE, "client-a")).thenReturn(
+        new CalibrationState(CalibrationTarget.CACHE, CalibrationStatus.VALID, own,
+            properties.getSimilarityThreshold()));
+    advisor = new SemanticCacheAdvisor(vectorStore, properties, tracer, calibrations,
+        mock(ModelRegistry.class), text -> true, new InMemoryConversationAffinityStore());
+    // 0.94 clears the fixed 0.92 but not the client's own 0.95.
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(List.of(cached("What is Spring?", "Spring is a framework.", 0.94)));
+    when(callChain.nextCall(any())).thenReturn(
+        buildLlmResponse("Spring is a framework.", "local", "stop"));
+
+    ScopedValue.where(RequestContext.CURRENT, new RequestContext("client-a", "trace-1"))
+        .run(() -> advisor.adviseCall(buildRequest("What is Spring?"), callChain));
+
+    verify(tracer).decided(any(), any(), isNull(), eq(0.95),
+        eq(ConformalStatus.EMPTY_SET), any(), any(), eq(CalibrationScope.CLIENT));
   }
 
   private SemanticCacheAdvisor calibratedAdvisor(double threshold) {

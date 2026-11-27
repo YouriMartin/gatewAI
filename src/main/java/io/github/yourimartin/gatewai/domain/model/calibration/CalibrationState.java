@@ -27,4 +27,12 @@ public record CalibrationState(
   public boolean isApplied() {
     return status == CalibrationStatus.VALID;
   }
+
+  /** Which calibration decides under this state (v4 D.3): the trace records it. */
+  public CalibrationScope scope() {
+    if (!isApplied()) {
+      return CalibrationScope.NONE;
+    }
+    return calibration.isGlobal() ? CalibrationScope.GLOBAL : CalibrationScope.CLIENT;
+  }
 }

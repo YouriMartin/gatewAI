@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecision;
@@ -46,10 +47,11 @@ class CacheDecisionTracer {
    *
    * @param reason why this was not a plain similarity lookup, or null
    * @param scope  the conversation scope the lookup ran in (ADR 0014)
+   * @param calibration which calibration set {@code threshold} (ADR 0019)
    */
   void decided(String userText, List<Document> candidates, Document hit,
                double threshold, ConformalStatus conformalStatus,
-               CacheDecisionReason reason, String scope) {
+               CacheDecisionReason reason, String scope, CalibrationScope calibration) {
     try {
       Double best = score(candidates, 0);
       Double runnerUp = score(candidates, 1);
@@ -70,24 +72,27 @@ class CacheDecisionTracer {
           conformalStatus,
           reason,
           scope,
-          RequestContext.currentMode()));
+          RequestContext.currentMode(),
+          calibration));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }
   }
 
-  /** Records a request the cache never looked at, and why. */
+  /** Records a request the cache never looked at, and why: no threshold applied. */
   void bypassed(String userText, CacheDecisionReason reason, String scope) {
-    record(userText, CacheOutcome.BYPASS, 0, reason, scope);
+    record(userText, CacheOutcome.BYPASS, 0, reason, scope, null);
   }
 
   /** Records a lookup that failed; the request is served as if it missed. */
-  void failed(String userText, double threshold, String scope) {
-    record(userText, CacheOutcome.ERROR, threshold, null, scope);
+  void failed(String userText, double threshold, String scope,
+              CalibrationScope calibration) {
+    record(userText, CacheOutcome.ERROR, threshold, null, scope, calibration);
   }
 
   private void record(String userText, CacheOutcome outcome, double threshold,
-                      CacheDecisionReason reason, String scope) {
+                      CacheDecisionReason reason, String scope,
+                      CalibrationScope calibration) {
     try {
       publish(new CacheDecision(
           UUID.randomUUID(),
@@ -101,7 +106,8 @@ class CacheDecisionTracer {
           null,
           reason,
           scope,
-          RequestContext.currentMode()));
+          RequestContext.currentMode(),
+          calibration));
     } catch (RuntimeException e) {
       LOG.warn("Could not build cache decision: {}", e.toString());
     }

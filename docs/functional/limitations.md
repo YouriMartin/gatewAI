@@ -144,7 +144,7 @@ What that costs:
 - **The response's `model` is the provider's name**, often a dated variant. The
   registry id is in `X-GatewAI-Model` and in `request_log`.
 
-## Shadow mode: verdicts, not yet grades
+## Shadow mode: verdicts, and a judge's grades
 
 Shadow mode (v4 D.1, [ADR 0018](../technical/adr/0018-shadow-mode-serves-by-pass-through.md))
 records what the cache and the router would have done for a client, while it receives
@@ -189,6 +189,40 @@ the upstream answer of the model it names. Know what it does not do yet:
   is a slight underestimate for bursty repeats.
 - **The answer is read in memory and never stored by shadow itself.** On a miss the
   cache stores it under its usual rules, which is what it would have done in `ENFORCE`.
+
+## Shadow calibration: a judge's labels, above a floor
+
+The cache can be calibrated on shadow labels (v4 D.3,
+[ADR 0019](../technical/adr/0019-calibrate-the-cache-on-shadow-labels.md)): per
+client, or pooled into the global row. Know what such a threshold promises:
+
+- **The guarantee is about the judge's NO, not a person's.** "At most α of the pairs
+  this judge would reject are served." The judge's own error rate is not measured,
+  and it grades against the answer received this time, not a correct one. A row says
+  so (`labelledBy: judged by <model> (rubric <version>), not by a human`).
+- **A shadow fit can only raise the threshold.** Labels exist only above the threshold
+  that was in force, so a fit never learns that a lower one would be safe, and each
+  fit raises the next one's floor. Removing a client's row (`DELETE`) returns it to
+  the global threshold, but a new fit then needs a fresh sample observed in `SHADOW`
+  under that threshold. Until near-misses are judged (not scheduled), that is the
+  only way down.
+- **It needs many labels.** 200 judged pairs of which 50 NO by default, and NO is the
+  rare class. As arithmetic, not a measurement: with the judge sampling 5 % of
+  would-hits and 10 % of judged pairs NO, 50 NO takes about 10,000 would-hits above
+  the floor. 50 is chosen so that one fit rarely serves twice the
+  wrong answers it promises (modelled at 2 % for α = 0.10); the summary states the
+  modelled spread of every fit, never a measured one.
+- **Ambiguous sets and UNSURE pairs are outside the sample.** A request whose
+  candidates were too close to call was never served, so never judged; at a higher
+  threshold some of them would be served. The summary counts them
+  (`ambiguousBecomingServable`). UNSURE verdicts are excluded and counted.
+- **Nothing watches a row once the client enforces.** The judge runs in shadow only,
+  and staleness is by embedding model, never by drift. Recalibrate by hand.
+- **A fit cannot be rerun after retention.** The labels are purged with the decision
+  tables; the row keeps a summary of what it was fitted on, not the labels.
+- **The explanation API reports the global cache calibration.** A decision row
+  records which calibration decided it (`calibrationScope`), but the provenance an
+  explanation adds ("what is in force now") is the global one.
 
 ## Failover inside a tier
 

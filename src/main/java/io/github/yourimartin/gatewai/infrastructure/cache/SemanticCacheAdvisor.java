@@ -8,9 +8,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
-import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
-import io.github.yourimartin.gatewai.domain.model.calibration.ConformalStatus;
 import io.github.yourimartin.gatewai.domain.model.context.RequestContext;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheDecisionReason;
 import io.github.yourimartin.gatewai.domain.model.decision.CacheOutcome;
@@ -21,6 +19,7 @@ import io.github.yourimartin.gatewai.domain.port.in.CalibrationUseCase;
 import io.github.yourimartin.gatewai.domain.port.out.ConversationAffinityStore;
 import io.github.yourimartin.gatewai.domain.port.out.EmbeddingWindow;
 import io.github.yourimartin.gatewai.domain.port.out.ModelRegistry;
+import io.github.yourimartin.gatewai.infrastructure.cache.CachePredictionSet.CacheVerdict;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,13 +124,15 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       candidates = search(lookup);
     } catch (RuntimeException e) {
       LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
-      tracer.failed(lookup.userText(), activeThreshold(), lookup.scope());
+      CalibrationState inForce = calibrationInForce();
+      tracer.failed(lookup.userText(), inForce.effectiveThreshold(), lookup.scope(),
+          inForce.scope());
       return CachedResponses.withOutcome(chain.nextCall(request), CacheOutcome.MISS);
     }
 
-    Verdict verdict = decide(candidates, lookup);
+    CacheVerdict verdict = decide(candidates, lookup);
     tracer.decided(lookup.userText(), candidates, verdict.hit(), verdict.threshold(),
-        verdict.status(), verdict.reason(), lookup.scope());
+        verdict.status(), verdict.reason(), lookup.scope(), verdict.calibration());
 
     if (verdict.hit() != null) {
       LOG.info("Cache HIT for query [{}] (score={})",
@@ -164,13 +165,15 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       candidates = search(lookup);
     } catch (RuntimeException e) {
       LOG.warn("Cache lookup failed ({}), treating as a miss", e.toString());
-      tracer.failed(lookup.userText(), activeThreshold(), lookup.scope());
+      CalibrationState inForce = calibrationInForce();
+      tracer.failed(lookup.userText(), inForce.effectiveThreshold(), lookup.scope(),
+          inForce.scope());
       return chain.nextStream(request);
     }
 
-    Verdict verdict = decide(candidates, lookup);
+    CacheVerdict verdict = decide(candidates, lookup);
     tracer.decided(lookup.userText(), candidates, verdict.hit(), verdict.threshold(),
-        verdict.status(), verdict.reason(), lookup.scope());
+        verdict.status(), verdict.reason(), lookup.scope(), verdict.calibration());
 
     if (verdict.hit() != null) {
       LOG.info("Cache HIT (stream) for query [{}] (score={})",
@@ -267,73 +270,24 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
     return vectorStore.similaritySearch(searchBuilder.build());
   }
 
-  /** The threshold in force, for a lookup that failed before deciding. */
-  private double activeThreshold() {
-    return calibrations.state(CalibrationTarget.CACHE).effectiveThreshold();
+  /**
+   * The cache calibration in force for this request's client: its own row when
+   * valid, otherwise the global one, otherwise the fixed threshold (ADR 0019).
+   */
+  private CalibrationState calibrationInForce() {
+    return calibrations.state(CalibrationTarget.CACHE, boundClientId());
   }
 
   /**
    * The prediction set, then the request's own limits: a candidate whose stored
    * answer is longer than the request's {@code max_tokens} is not served.
    */
-  private Verdict decide(List<Document> candidates, CacheLookup lookup) {
-    Verdict verdict = decide(candidates);
-    CacheDecisionReason reason =
-        lookup.exactOnly() ? CacheDecisionReason.EXACT_MATCH_ONLY : null;
+  private CacheVerdict decide(List<Document> candidates, CacheLookup lookup) {
+    CacheVerdict verdict = CachePredictionSet.decide(candidates, calibrationInForce());
     if (verdict.hit() != null && !fitsMaxTokens(verdict.hit(), lookup.maxTokens())) {
-      return new Verdict(null, verdict.threshold(), verdict.status(),
-          CacheDecisionReason.MAX_TOKENS);
+      return verdict.refused(CacheDecisionReason.MAX_TOKENS);
     }
-    return new Verdict(verdict.hit(), verdict.threshold(), verdict.status(), reason);
-  }
-
-  /**
-   * Applies the conformal prediction set to the candidates (v2 batch 3).
-   *
-   * <p>Under a valid calibration the threshold is {@code q̂}, fitted so that at
-   * most α of the pairs a human judged wrong are served, and the <b>size</b> of
-   * the set decides:
-   *
-   * <ul>
-   *   <li>empty — nothing is close enough: a miss;</li>
-   *   <li>one — serve it;</li>
-   *   <li>more than one — <b>do not serve</b>. If two stored answers both look
-   *       right for this query, at most one of them is, and taking the higher
-   *       score is guessing with the user's answer. Ambiguity is a risk signal,
-   *       not a tie to break.</li>
-   * </ul>
-   *
-   * <p>With no calibration in force this degrades to exactly the previous
-   * behaviour — fixed threshold, best candidate wins — because a gateway that
-   * has never been calibrated must keep working, and because changing the
-   * serving rule for uncalibrated installs would be a behaviour change smuggled
-   * in under a feature.
-   */
-  private Verdict decide(List<Document> candidates) {
-    CalibrationState calibration = calibrations.state(CalibrationTarget.CACHE);
-    double threshold = calibration.effectiveThreshold();
-
-    List<Document> set = candidates == null ? List.of() : candidates.stream()
-        .filter(candidate -> admits(candidate, threshold))
-        .toList();
-
-    if (!calibration.isApplied()) {
-      ConformalStatus status = calibration.status() == CalibrationStatus.STALE
-          ? ConformalStatus.STALE_CALIBRATION : ConformalStatus.NOT_CALIBRATED;
-      return new Verdict(set.isEmpty() ? null : set.getFirst(), threshold, status, null);
-    }
-
-    return switch (set.size()) {
-      case 0 -> new Verdict(null, threshold, ConformalStatus.EMPTY_SET, null);
-      case 1 -> new Verdict(set.getFirst(), threshold, ConformalStatus.SINGLETON, null);
-      default -> new Verdict(null, threshold, ConformalStatus.AMBIGUOUS, null);
-    };
-  }
-
-  /** An unscored candidate is not admitted: absence of a score is not a match. */
-  private static boolean admits(Document candidate, double threshold) {
-    Double score = candidate.getScore();
-    return score != null && score >= threshold;
+    return lookup.exactOnly() ? verdict.because(CacheDecisionReason.EXACT_MATCH_ONLY) : verdict;
   }
 
   /**
@@ -480,17 +434,5 @@ class SemanticCacheAdvisor implements CallAdvisor, StreamAdvisor {
       return text;
     }
     return text.substring(0, maxLen) + "...";
-  }
-
-  /**
-   * What the cache decided, and under which threshold.
-   *
-   * @param hit       the entry to serve, or null
-   * @param threshold the acceptance threshold in force, calibrated or fixed
-   * @param status    the shape of the prediction set, for the trace
-   * @param reason    why this was not a plain lookup, or null
-   */
-  private record Verdict(Document hit, double threshold, ConformalStatus status,
-                         CacheDecisionReason reason) {
   }
 }

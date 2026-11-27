@@ -406,7 +406,8 @@ final class PassThroughService implements PassThroughUseCase {
           null,
           CacheDecisionReason.passThrough(first),
           null,
-          RequestContext.currentMode()));
+          RequestContext.currentMode(),
+          null));
     } catch (RuntimeException e) {
       LOG.warn("Could not record the pass-through cache decision: {}", e.toString());
     }

@@ -39,6 +39,13 @@ public interface CalibrationUseCase {
   List<CalibrationState> states();
 
   /**
+   * Every client's own calibration (v4 D.3, ADR 0019), each with its own status:
+   * a client row that is not {@code VALID} is listed, and is not what decides for
+   * that client — the global state is.
+   */
+  List<CalibrationState> clientStates();
+
+  /**
    * Recomputes both calibrations from the labelled set and stores them.
    *
    * <p>Expensive and explicit: it embeds the labelled cache pairs and classifies
@@ -66,4 +73,13 @@ public interface CalibrationUseCase {
    */
   CalibrationState calibrateCacheOnShadow(String clientId, Double cacheAlpha,
                                           String judgeModel);
+
+  /**
+   * Removes a client's own cache calibration, returning it to the global one
+   * (ADR 0019). It does not end the ratchet by itself: the next shadow fit for
+   * that client counts only the labels recorded under the global threshold.
+   *
+   * @return whether the client had one
+   */
+  boolean removeClientCalibration(String clientId);
 }

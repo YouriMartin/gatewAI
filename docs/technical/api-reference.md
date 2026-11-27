@@ -440,29 +440,80 @@ never be live on one node only. See [`clustering.md`](clustering.md).
 ## Admin — calibration (`ROLE_ADMIN`)
 
 ### `GET /v1/admin/calibration`
-What governs each decision right now. One entry per target (`CACHE`, `ROUTING`):
+What governs each decision right now: one entry per target (`CACHE`, `ROUTING`) for
+the global row, then one per client that has its own cache row (v4 D.3,
+[ADR 0019](adr/0019-calibrate-the-cache-on-shadow-labels.md)):
 
 ```json
 [{"target": "CACHE", "status": "VALID", "applied": true,
   "effectiveThreshold": 0.9526, "fixedFallback": 0.92,
   "guarantee": "WRONG_ANSWER_RATE", "alpha": 0.10, "qhat": 0.9526,
   "sampleSize": 93, "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
-  "routingConfigVersion": null, "calibratedAt": "2026-08-11T18:34:50Z"}]
+  "routingConfigVersion": null, "calibratedAt": "2026-08-11T18:34:50Z",
+  "client": null, "source": "LABELLED_SET", "labelledBy": "hand-labelled cases",
+  "judgeModel": null, "rubricVersion": null, "labelFloor": null,
+  "fitSummary": {"type": "labelledSet",
+                 "source": "classpath:/eval/cache-calibration.jsonl",
+                 "read": 200, "fitted": 93}}]
 ```
 
 `status` ∈ `VALID` | `STALE` | `ABSENT` | `DISABLED`. `effectiveThreshold` is
-what is actually applied — `fixedFallback` whenever `applied` is false.
+what is actually applied: `fixedFallback` whenever `applied` is false. On a client
+row, `status` is that row's own. A client row that is not `VALID` is listed but does
+not decide for the client: the global row does.
+
+A shadow row names its judge and carries `labelledBy: "judged by <model> (rubric
+<version>), not by a human"`, the floor it was fitted above (`labelFloor`), and a
+`fitSummary` of `type: "shadow"`:
+
+| Field | Meaning |
+|---|---|
+| `exclusions` | `read` labels and why each excluded one was left out: `failed`, `unsure`, `noDecision`, `otherRubric`, `otherJudge`, `otherEmbedding`, `recordedAboveFloor`, `belowFloor`; plus `notSampled` would-hits, which are not labels |
+| `yes` / `no` | the counted pairs; `qhat` is fitted on the `no` ones (`sampleSize`) |
+| `labelsFrom` / `labelsTo` | the span of the counted labels |
+| `refusedServableShare` | of the counted `yes` pairs, the share the threshold refuses (the cost) |
+| `ambiguousBecomingServable` | decisions whose set was ambiguous at the floor and would be served at `qhat`, though no label speaks for them |
+| `modelledRateP90` | with probability 0.9 this fit serves at most this share of the judge's NO pairs; `modelledRateP90Basis` says it is modelled, not measured |
+| `minPairs` / `minNegatives` | the minimum sample the fit was held to |
+| `perClient` | `read` / `yes` / `no` per client; one entry for a client fit, every client for a pooled one |
+
+Rows fitted before v4 D.3 have `fitSummary: null`.
 
 ### `POST /v1/admin/calibration`
-Fits both calibrations from the labelled set and stores them. Body optional:
-`{"routingAlpha": 0.10, "cacheAlpha": 0.10}`; omitted values use the configured
-defaults. Returns the same shape as `GET`.
+Fits and stores, then returns the same shape as `GET`. Body optional:
 
-Takes ~2 s on a local stack since v3 lot A — it embeds every labelled pair and
-scores every labelled prompt, now in-process (it was ~15 s over HTTP). `409 calibration_failed` when the labelled set cannot support
-the α asked for (the message says how many cases it would need); `400
-invalid_alpha` when α is outside `(0,1)`. See
-[`conformal-calibration.md`](conformal-calibration.md).
+| Field | Applies to | Meaning |
+|---|---|---|
+| `source` | — | `labelled-set` (default) or `shadow` |
+| `routingAlpha` | `labelled-set` | risk level for routing |
+| `cacheAlpha` | both | risk level for the cache |
+| `client` | `shadow` | the client to fit; absent pools every shadow client into the **global** row |
+| `judgeModel` | `shadow` | the judge whose verdicts count; absent uses `gatewai.shadow.judge.model` |
+
+Omitted levels use the configured defaults. A field that does not apply to the
+source is refused (`400 invalid_request`) rather than ignored.
+
+- **`labelled-set`** fits both targets from the hand-labelled cases: ~2 s on a local
+  stack (in-process embeddings). It replaces the **global** rows and leaves every
+  client row as it is.
+- **`shadow`** fits the **cache only**, on the judge's YES/NO verdicts on shadow
+  would-hits (v4 D.2): no embedding, a few queries. It counts only labels judged
+  under the current rubric, by the one judge, on the current embedding model, and
+  recorded at or below — and scoring at or above — the threshold in force for the
+  scope. It needs `gatewai.conformal.shadow.min-pairs` judged pairs (200) of which
+  `min-negatives` NO (50, and never fewer than the α asks for).
+
+Errors: `400 invalid_alpha` (labelled set, α outside `(0,1)`) · `400 invalid_request`
+(an unknown `source`, a field that does not apply, no judge named, α outside `(0,1)`
+on a shadow fit) · `409 calibration_failed` when the cases cannot support the fit:
+for a shadow fit the message gives the counts found, the counts needed, and how many
+labels each rule excluded. See [`conformal-calibration.md`](conformal-calibration.md).
+
+### `DELETE /v1/admin/calibration/cache/{clientId}`
+Removes a client's own cache row; the client falls back to the global one at once.
+`204`, or `404 calibration_not_found` when it had none. The global row cannot be
+removed, only refitted. This does not end the ratchet on its own: see
+[`conformal-calibration.md`](conformal-calibration.md#leaving-the-ratchet).
 
 ## Admin — decisions (`ROLE_ADMIN`)
 
@@ -485,7 +536,8 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
            "matchedEntryId": null, "matchedEntryAgeSeconds": null,
            "originCorrelationId": null,
            "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
-           "reason": null, "cacheScope": "3cf52977134c…"},
+           "reason": null, "cacheScope": "3cf52977134c…",
+           "calibrationScope": "GLOBAL"},
  "routing": {"chosenTier": "CLOUD_PREMIUM", "chosenModelId": "qwen2.5:3b",
              "decisionReason": "MATCH", "strategy": "EMBEDDING",
              "effectiveStrategy": "EMBEDDING", "escalatedTo": null,
@@ -504,6 +556,9 @@ One request's decisions, **exactly as persisted, with nothing recomputed**:
 point. `cache.cacheScope` is the hash of the conversation scope the lookup ran in
 (never text), and `cache.reason` says why a decision was not a plain lookup:
 `EMPTY_PROMPT`, `HISTORY_TOO_LONG`, `EXACT_MATCH_ONLY` or `MAX_TOKENS` (v4 A.2).
+`cache.calibrationScope` says which calibration set `threshold` (v4 D.3): `CLIENT`
+(the client's own row), `GLOBAL` or `NONE` (the fixed threshold); null on a bypass
+and on decisions recorded before `V16`.
 `routing.conversationRouting` says how the conversation bore on the decision
 ([ADR 0015](adr/0015-conversation-sticky-routing.md), v4 A.3): `STICKY` (kept the
 recorded model), `UPGRADED` (moved up for this turn and stays there) or

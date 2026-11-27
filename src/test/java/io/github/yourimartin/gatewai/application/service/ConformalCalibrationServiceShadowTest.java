@@ -257,6 +257,31 @@ class ConformalCalibrationServiceShadowTest {
         "routing has no client rows");
   }
 
+  @Test
+  @DisplayName("client rows are listed with their own status; removing one returns it")
+  void clientRowsAreListedAndRemovable() {
+    store.save(clientRow("b", 0.98));
+    store.save(clientRow("a", 0.97));
+    store.save(new ConformalCalibration(CalibrationTarget.CACHE,
+        ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.99, 50, "mxbai-embed-large", null,
+        AT, "c", CalibrationSource.SHADOW, new ShadowFit(JUDGE, "would-hit-v1", 0.92),
+        null));
+    ConformalCalibrationService service = service();
+
+    List<CalibrationState> clients = service.clientStates();
+    assertEquals(List.of("a", "b", "c"),
+        clients.stream().map(state -> state.calibration().clientId()).toList());
+    assertEquals(CalibrationStatus.STALE, clients.get(2).status(),
+        "a stale client row is listed, and says so");
+
+    assertTrue(service.removeClientCalibration("a"));
+    assertEquals(false, service.removeClientCalibration("a"));
+    assertEquals(FIXED_CACHE_THRESHOLD,
+        service.state(CalibrationTarget.CACHE, "a").effectiveThreshold(),
+        "a removed client falls back to the global state at once");
+    assertThrows(IllegalArgumentException.class, () -> service.removeClientCalibration(" "));
+  }
+
   private void label(String client, JudgeVerdict verdict, double similarity,
                      double recordedThreshold) {
     labels.add(new ShadowLabel(client, AT, JudgeOutcome.JUDGED, verdict, JUDGE,

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationScope;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationStatus;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
@@ -176,7 +177,8 @@ class DecisionExplanationServiceTest {
   private static CacheDecision cacheHit() {
     return new CacheDecision(UUID.randomUUID(), "req-2", NOW, "b".repeat(64),
         CacheOutcome.HIT, 0.97, 0.42, 0.92, "entry-1", 30L, "origin-1",
-        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE);
+        "nomic-embed-text", ConformalStatus.SINGLETON, null, null, ClientMode.ENFORCE,
+        CalibrationScope.GLOBAL);
   }
 
   private static final class StubHistory implements DecisionHistory {
@@ -264,6 +266,16 @@ class DecisionExplanationServiceTest {
     @Override
     public CalibrationState calibrateCacheOnShadow(String clientId, Double cacheAlpha,
                                                    String judgeModel) {
+      throw new UnsupportedOperationException("not part of an explanation");
+    }
+
+    @Override
+    public List<CalibrationState> clientStates() {
+      return List.of();
+    }
+
+    @Override
+    public boolean removeClientCalibration(String clientId) {
       throw new UnsupportedOperationException("not part of an explanation");
     }
   }
