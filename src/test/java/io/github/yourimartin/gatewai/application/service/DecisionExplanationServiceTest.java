@@ -251,8 +251,19 @@ class DecisionExplanationServiceTest {
     }
 
     @Override
+    public CalibrationState state(CalibrationTarget target, String clientId) {
+      return state(target);
+    }
+
+    @Override
     public List<CalibrationState> recalibrate(Double routingAlpha,
                                               Double cacheAlpha) {
+      throw new UnsupportedOperationException("not part of an explanation");
+    }
+
+    @Override
+    public CalibrationState calibrateCacheOnShadow(String clientId, Double cacheAlpha,
+                                                   String judgeModel) {
       throw new UnsupportedOperationException("not part of an explanation");
     }
   }

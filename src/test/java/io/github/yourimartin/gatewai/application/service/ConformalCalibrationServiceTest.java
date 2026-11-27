@@ -10,8 +10,6 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationSource;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationState;
@@ -27,6 +25,7 @@ import io.github.yourimartin.gatewai.domain.model.routing.SemanticRoute;
 import io.github.yourimartin.gatewai.domain.port.out.CalibrationStore;
 import io.github.yourimartin.gatewai.domain.port.out.LabelledCaseSource;
 import io.github.yourimartin.gatewai.domain.port.out.RoutingConfigPort;
+import io.github.yourimartin.gatewai.domain.port.out.ShadowLabelHistory;
 import io.github.yourimartin.gatewai.domain.port.out.TextEmbedder;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -42,13 +41,15 @@ class ConformalCalibrationServiceTest {
   private LabelledCaseSource labelledCases;
   private TextEmbedder embedder;
   private RoutingConfigPort routingConfig;
+  private ShadowLabelHistory shadowLabels;
 
   @BeforeEach
   void setUp() {
-    store = new InMemoryStore();
+    store = new InMemoryCalibrationStore();
     labelledCases = mock(LabelledCaseSource.class);
     embedder = mock(TextEmbedder.class);
     routingConfig = mock(RoutingConfigPort.class);
+    shadowLabels = mock(ShadowLabelHistory.class);
 
     when(embedder.modelId()).thenReturn("nomic-embed-text");
     when(routingConfig.get()).thenReturn(new RoutingConfig("embedding", 100, 500,
@@ -79,7 +80,7 @@ class ConformalCalibrationServiceTest {
     store.save(new ConformalCalibration(CalibrationTarget.CACHE,
         ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.97, 50, "nomic-embed-text", null,
         Instant.parse("2026-11-27T00:00:00Z"), "client-a", CalibrationSource.SHADOW,
-        new ShadowFit("judge", "would-hit-v1", 0.95)));
+        new ShadowFit("judge", "would-hit-v1", 0.95), null));
 
     CalibrationState cache = service(true).state(CalibrationTarget.CACHE);
 
@@ -203,8 +204,8 @@ class ConformalCalibrationServiceTest {
     when(failing.findAll()).thenThrow(new IllegalStateException("database is down"));
 
     ConformalCalibrationService service = new ConformalCalibrationService(
-        failing, labelledCases, embedder, routingConfig,
-        true, 0.10, 0.10, FIXED_CACHE_THRESHOLD);
+        failing, labelledCases, embedder, routingConfig, shadowLabels,
+        true, 0.10, 0.10, FIXED_CACHE_THRESHOLD, 200, 50, "");
 
     // This runs inside the cache advisor and the router: it is on the request
     // path, so it must answer even when the database is gone.
@@ -216,7 +217,8 @@ class ConformalCalibrationServiceTest {
 
   private ConformalCalibrationService service(boolean enabled) {
     return new ConformalCalibrationService(store, labelledCases, embedder,
-        routingConfig, enabled, 0.10, 0.10, FIXED_CACHE_THRESHOLD);
+        routingConfig, shadowLabels, enabled, 0.10, 0.10, FIXED_CACHE_THRESHOLD, 200, 50,
+        "");
   }
 
   /**
@@ -235,37 +237,5 @@ class ConformalCalibrationServiceTest {
       pairs.add(new LabelledCase.CachePair("q" + i, "e" + i, false));
     }
     return pairs;
-  }
-
-  /** A store with no database behind it, so the fit is what is under test. */
-  private static final class InMemoryStore implements CalibrationStore {
-
-    private final List<ConformalCalibration> saved = new ArrayList<>();
-
-    @Override
-    public Optional<ConformalCalibration> find(CalibrationTarget target, String clientId) {
-      return saved.stream().filter(c -> sameScope(c, target, clientId)).findFirst();
-    }
-
-    @Override
-    public List<ConformalCalibration> findAll() {
-      return List.copyOf(saved);
-    }
-
-    @Override
-    public void save(ConformalCalibration calibration) {
-      saved.removeIf(c -> sameScope(c, calibration.target(), calibration.clientId()));
-      saved.add(calibration);
-    }
-
-    @Override
-    public boolean delete(CalibrationTarget target, String clientId) {
-      return saved.removeIf(c -> sameScope(c, target, clientId));
-    }
-
-    private static boolean sameScope(ConformalCalibration c, CalibrationTarget target,
-                                     String clientId) {
-      return c.target() == target && Objects.equals(c.clientId(), clientId);
-    }
   }
 }

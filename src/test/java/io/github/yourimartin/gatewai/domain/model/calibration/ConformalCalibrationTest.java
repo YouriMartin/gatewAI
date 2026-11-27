@@ -92,11 +92,11 @@ class ConformalCalibrationTest {
         () -> shadow(CalibrationTarget.CACHE, " ", fit));
     assertThrows(IllegalArgumentException.class, () -> new ConformalCalibration(
         CalibrationTarget.CACHE, ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.94, 93,
-        "m", null, WHEN, "client-a", CalibrationSource.LABELLED_SET, null),
+        "m", null, WHEN, "client-a", CalibrationSource.LABELLED_SET, null, null),
         "a client row only comes from that client's shadow labels");
     assertThrows(IllegalArgumentException.class, () -> new ConformalCalibration(
         CalibrationTarget.CACHE, ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, 0.94, 93,
-        "m", null, WHEN, null, CalibrationSource.LABELLED_SET, fit),
+        "m", null, WHEN, null, CalibrationSource.LABELLED_SET, fit, null),
         "only a shadow fit carries a judge");
   }
 
@@ -122,7 +122,8 @@ class ConformalCalibrationTest {
   private static ConformalCalibration shadow(CalibrationTarget target, String clientId,
                                              ShadowFit fit) {
     return new ConformalCalibration(target, ConformalGuarantee.WRONG_ANSWER_RATE, 0.10,
-        0.97, 50, "nomic-embed-text", null, WHEN, clientId, CalibrationSource.SHADOW, fit);
+        0.97, 50, "nomic-embed-text", null, WHEN, clientId, CalibrationSource.SHADOW, fit,
+        null);
   }
 
   private static ConformalCalibration calibration(CalibrationTarget target,

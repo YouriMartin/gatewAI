@@ -83,8 +83,20 @@ public final class CalibrationFixtures {
       return List.of(state(CalibrationTarget.CACHE), state(CalibrationTarget.ROUTING));
     }
 
+    /** The stub holds one calibration for every client: no client has its own. */
+    @Override
+    public CalibrationState state(CalibrationTarget target, String clientId) {
+      return state(target);
+    }
+
     @Override
     public List<CalibrationState> recalibrate(Double routingAlpha, Double cacheAlpha) {
+      throw new UnsupportedOperationException("not a calibrating stub");
+    }
+
+    @Override
+    public CalibrationState calibrateCacheOnShadow(String clientId, Double cacheAlpha,
+                                                   String judgeModel) {
       throw new UnsupportedOperationException("not a calibrating stub");
     }
   }

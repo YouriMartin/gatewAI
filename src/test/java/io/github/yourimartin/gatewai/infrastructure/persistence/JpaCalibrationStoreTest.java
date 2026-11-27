@@ -7,13 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationSource;
 import io.github.yourimartin.gatewai.domain.model.calibration.CalibrationTarget;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalCalibration;
 import io.github.yourimartin.gatewai.domain.model.calibration.ConformalGuarantee;
+import io.github.yourimartin.gatewai.domain.model.calibration.FitSummary;
 import io.github.yourimartin.gatewai.domain.model.calibration.ShadowFit;
 import io.github.yourimartin.gatewai.domain.port.out.CalibrationStore;
 
@@ -61,7 +64,7 @@ class JpaCalibrationStoreTest {
     store.save(clientRow(0.98, 60));
 
     ConformalCalibration stored = store.find(CalibrationTarget.CACHE, clientId).orElseThrow();
-    assertEquals(clientRow(0.98, 60), stored);
+    assertEquals(clientRow(0.98, 60), stored, "the fit summary round-trips through jsonb");
     assertEquals(1, rowsOfTheClient(), "a recalibration overwrites its own scope");
     assertEquals(globalBefore, store.find(CalibrationTarget.CACHE, null),
         "a client fit leaves the global row as it was");
@@ -121,7 +124,10 @@ class JpaCalibrationStoreTest {
     return new ConformalCalibration(CalibrationTarget.CACHE,
         ConformalGuarantee.WRONG_ANSWER_RATE, 0.10, qhat, negatives,
         "paraphrase-multilingual-MiniLM-L12-v2", null, WHEN, clientId,
-        CalibrationSource.SHADOW, new ShadowFit("judge", "would-hit-v1", 0.95));
+        CalibrationSource.SHADOW, new ShadowFit("judge", "would-hit-v1", 0.95),
+        new FitSummary.Shadow(new FitSummary.Exclusions(4, 70, 1, 2, 0, 0, 0, 0, 3, 4),
+            10, negatives, WHEN, WHEN, 0.1, 1, 0.15, 200, 50,
+            new TreeMap<>(Map.of(clientId, new FitSummary.ClientCounts(70, 10, negatives)))));
   }
 
   private int rowsOfTheClient() {

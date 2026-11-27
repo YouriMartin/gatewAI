@@ -16,6 +16,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 /**
  * The current calibration for one target and one scope (v2 batch 3; per client
  * since v4 D.3, ADR 0019). (target, client) is the primary key: recalibrating
@@ -72,6 +75,11 @@ class ConformalCalibrationEntity {
   @Column(name = "label_floor")
   private Double labelFloor;
 
+  /** {@link FitSummaryJson}; null on rows fitted before {@code V16}. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "fit_summary")
+  private String fitSummary;
+
   protected ConformalCalibrationEntity() {
     // JPA requires a no-arg constructor
   }
@@ -94,6 +102,7 @@ class ConformalCalibrationEntity {
       this.rubricVersion = fit.rubricVersion();
       this.labelFloor = fit.labelFloor();
     }
+    this.fitSummary = FitSummaryJson.toJson(calibration.fitSummary());
   }
 
   ConformalCalibration toDomain() {
@@ -101,6 +110,7 @@ class ConformalCalibrationEntity {
         ? new ShadowFit(judgeModel, rubricVersion, labelFloor) : null;
     return new ConformalCalibration(target, guarantee, alpha, qhat, sampleSize,
         embeddingModel, routingConfigVersion, calibratedAt,
-        ConformalCalibrationId.GLOBAL.equals(clientId) ? null : clientId, source, fit);
+        ConformalCalibrationId.GLOBAL.equals(clientId) ? null : clientId, source, fit,
+        FitSummaryJson.fromJson(fitSummary));
   }
 }

@@ -32,6 +32,9 @@ import java.util.Objects;
  * @param shadowFit            the judge, rubric and floor of a
  *                             {@link CalibrationSource#SHADOW} fit; null exactly
  *                             when the source is the labelled set
+ * @param fitSummary           what the fit read and excluded, and the counts behind
+ *                             it; its kind matches {@code source}. Null on a
+ *                             calibration fitted before v4 D.3.
  */
 public record ConformalCalibration(
     CalibrationTarget target,
@@ -44,7 +47,8 @@ public record ConformalCalibration(
     Instant calibratedAt,
     String clientId,
     CalibrationSource source,
-    ShadowFit shadowFit
+    ShadowFit shadowFit,
+    FitSummary fitSummary
 ) {
 
   public ConformalCalibration {
@@ -74,6 +78,10 @@ public record ConformalCalibration(
       throw new IllegalArgumentException(
           "a shadow calibration names its judge, rubric and floor; no other does");
     }
+    if (fitSummary != null
+        && (fitSummary instanceof FitSummary.Shadow) != (source == CalibrationSource.SHADOW)) {
+      throw new IllegalArgumentException("the fit summary does not match the source");
+    }
   }
 
   /** A global calibration fitted on the labelled set: every calibration before v4 D.3. */
@@ -82,7 +90,8 @@ public record ConformalCalibration(
                               String embeddingModel, String routingConfigVersion,
                               Instant calibratedAt) {
     this(target, guarantee, alpha, qhat, sampleSize, embeddingModel,
-        routingConfigVersion, calibratedAt, null, CalibrationSource.LABELLED_SET, null);
+        routingConfigVersion, calibratedAt, null, CalibrationSource.LABELLED_SET, null,
+        null);
   }
 
   /** Whether this is the row every client without its own falls back to. */
