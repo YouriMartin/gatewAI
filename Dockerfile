@@ -12,7 +12,7 @@
 # linux-x64 and linux-aarch64 natives inside it and pick one at load time — so a
 # multi-arch release builds it once, natively, and only stage 2 is per-arch.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk@sha256:83f4a7fc27df94dcc7b8de04d14cbbba8da14406f921e966969c3b09000aa507 AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk@sha256:ce2ef9d2d67a68de5e196d4de9d743327c44a10b57fe02ec39f572c652cacfd3 AS build
 WORKDIR /workspace
 
 # The release workflow passes the tag's version; a local build stays a SNAPSHOT.
@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Stage 2 — slim runtime. curl is added for the container healthcheck against
 # the unauthenticated /actuator/health endpoint.
 # ---------------------------------------------------------------------------
-FROM eclipse-temurin:25-jre@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0 AS runtime
+FROM eclipse-temurin:25-jre@sha256:4ed132f6832e9804b123e89a849a7b4502756ae64a4ee08ebab939d9d5d0a9fa AS runtime
 ARG GATEWAI_VERSION=0.0.1-SNAPSHOT
 LABEL org.opencontainers.image.title="gatewAI" \
       org.opencontainers.image.description="Self-hosted LLM gateway: semantic cache, routing and carbon accounting" \
